@@ -124,3 +124,54 @@ The `-automation` argument turns on a scripting facility which does the followin
     can do.
 
 The `-profile` argument does some primitive measurements of the emulated FPS and Mhz values.
+
+## Debug / Automation
+
+When `-automation` is passed as an argument the console will present a 
+read loop with command history and arrow keys and so on, which can execute Lua expressions while the emulator runs.
+
+The following functions / variables are available:
+
+```lua
+c256emu.stop()
+c256emu.continue()
+c256emu.step() // not currently working
+c256emu.add_breakpoint(<address>, <function>)
+c256emu.clear_breakpoint(<address>)
+c256emu.breakpoints() 
+
+c256emu.peek(<address>)
+c256emu.peek16(<address>)
+c256emu.poke(<address>, <byte>)
+c256emu.poke16(<address>, <word>)
+c256emu.peakbuf(<address>, <num_bytes>)
+
+c256emu.load_bin(<file>, <address>)
+c256emu.load_hex(<file>)
+
+c256emu.cpu_state.pc
+c256emu.cpu_state.a
+c256emu.cpu_state.x
+c256emu.cpu_state.y
+c256emu.cpu_state.cycle_count
+c256emu.cpu_state.status.carry_flag
+c256emu.cpu_state.status.zero_flag
+c256emu.cpu_state.status.interrupt_disable_flag
+c256emu.cpu_state.status.decimal_flag
+c256emu.cpu_state.status.break_flag
+c256emu.cpu_state.status.accumulator_width_flag
+c256emu.cpu_state.status.index_width_flag
+c256emu.cpu_state.status.emulation_flag
+c256emu.cpu_state.status.overflow_flag
+c256emu.cpu_state.status.sign_flag
+```
+
+The `-script` argument can be used to read any Lua program, to set up functions, breakpoints, etc. to execute on boot.
+
+### What missing from the debugger right now:
+
+  * Fix single stepping
+  * Raise / clear interrupts
+  * Disassembly
+  * Conditional breakpoints
+

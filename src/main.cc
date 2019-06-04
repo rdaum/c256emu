@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
     if (!FLAGS_kernel_hex.empty())
       system.LoadHex(FLAGS_kernel_hex);
     else if (!FLAGS_kernel_bin.empty())
-      system.LoadBin(FLAGS_kernel_bin);
+      system.LoadBin(FLAGS_kernel_bin, Address(0x18, 0x0000));
     else
       LOG(FATAL) << "No kernel";
 

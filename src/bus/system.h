@@ -19,7 +19,7 @@ public:
 
   void LoadHex(const std::string &kernel_hex_file);
 
-  void LoadBin(const std::string &kernel_bin_file);
+  void LoadBin(const std::string &kernel_bin_file, const Address &addr);
 
   void Initialize(const std::string &automation_script = "");
 

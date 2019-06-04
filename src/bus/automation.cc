@@ -44,9 +44,14 @@ bool Automation::LoadScript(const std::string &path) {
 
   auto result = luaL_loadfile(lua_state_, path.c_str());
   if (result != 0) {
-    LOG(ERROR) << "LoadScript failure: " << lua_tostring(lua_state_, -1);
+    LOG(ERROR) << "LoadScript load failure: " << lua_tostring(lua_state_, -1);
     return false;
   }
+  if (lua_pcall(lua_state_, 0, LUA_MULTRET, 0) != 0) {
+    LOG(ERROR) << "LoadScript run failure: " << lua_tostring(lua_state_, -1);
+    return false;
+  }
+  LOG(INFO) << "Loaded automation script: " << path;
   return true;
 }
 
@@ -123,6 +128,13 @@ const luaL_reg Automation::c256emu_methods[] = {
     {"clear_breakpoint", Automation::LuaClearBreakpoint},
     {"breakpoints", Automation::LuaGetBreakpoints},
     {"cpu_state", Automation::LuaGetCpuState},
+    {"peek", Automation::LuaPeek},
+    {"poke", Automation::LuaPoke},
+    {"peek16", Automation::LuaPeek16},
+    {"poke16", Automation::LuaPoke16},
+    {"peekbuf", Automation::LuaPeekBuf},
+    {"load_hex", Automation::LuaLoadHex},
+    {"load_bin", Automation::LuaLoadBin},
     {0, 0}};
 
 // static
@@ -167,6 +179,85 @@ int Automation::LuaGetBreakpoints(lua_State *L) {
 
   return 1;
 }
+
+// static
+int Automation::LuaPeek(lua_State *L) {
+  System *sys = GetSystem(L);
+  lua_pop(L, 1);
+  uint32_t addr = lua_tointeger(L, -1);
+  auto v = sys->ReadByte(Address(addr));
+  lua_pushinteger(L, v);
+  return 1;
+}
+
+// static
+int Automation::LuaPoke(lua_State *L) {
+  System *sys = GetSystem(L);
+  lua_pop(L, 1);
+  uint32_t addr = lua_tointeger(L, -1);
+  uint32_t v = lua_tointeger(L, -1);
+  sys->StoreByte(Address(addr), v);
+  return 0;
+}
+
+// static
+int Automation::LuaPeek16(lua_State *L) {
+  System *sys = GetSystem(L);
+  lua_pop(L, 1);
+  uint32_t addr = lua_tointeger(L, -1);
+  auto v = sys->ReadTwoBytes(Address(addr));
+  lua_pushinteger(L, v);
+  return 1;
+}
+
+// static
+int Automation::LuaPoke16(lua_State *L) {
+  System *sys = GetSystem(L);
+  lua_pop(L, 1);
+  uint32_t addr = lua_tointeger(L, -1);
+  uint32_t v = lua_tointeger(L, -1);
+  sys->StoreByte(Address(addr), v);
+  return 0;
+}
+
+// static
+int Automation::LuaPeekBuf(lua_State *L) {
+  System *sys = GetSystem(L);
+  lua_pop(L, 1);
+  uint32_t start_addr = lua_tointeger(L, -1);
+  uint32_t buf_size = lua_tointeger(L, -1);
+
+  Address addr(start_addr);
+  std::vector<uint8_t> buffer;
+  for (size_t i = 0; i < buf_size; i++) {
+    buffer.push_back(sys->ReadByte(addr));
+    addr = addr + 1;
+  }
+
+  lua_pushlstring(L, (const char*)buffer.data(), buf_size);
+
+  return 1;
+}
+
+// static
+int Automation::LuaLoadHex(lua_State *L) {
+  System *sys = GetSystem(L);
+  lua_pop(L, 1);
+  const std::string path = lua_tostring(L, -1);
+  sys->LoadHex(path);
+  return 0;
+}
+
+//static
+int Automation::LuaLoadBin(lua_State *L) {
+  System *sys = GetSystem(L);
+  lua_pop(L, 1);
+  const std::string path = lua_tostring(L, -1);
+  uint32_t addr = lua_tointeger(L, -1);
+  sys->LoadBin(path, Address(addr));
+  return 0;
+}
+
 
 // static
 int Automation::LuaGetCpuState(lua_State *L) {

@@ -48,6 +48,14 @@ private:
   static int LuaGetBreakpoints(lua_State *L) ;
   static int LuaGetCpuState(lua_State *L);
   static int LuaStep(lua_State *L);
+  static int LuaPeek(lua_State *L);
+  static int LuaPoke(lua_State *L);
+  static int LuaPeek16(lua_State *L);
+  static int LuaPoke16(lua_State *L);
+  static int LuaPeekBuf(lua_State *L);
+  static int LuaLoadHex(lua_State *L);
+  static int LuaLoadBin(lua_State *L);
+
   static const luaL_reg c256emu_methods[];
 
   std::recursive_mutex lua_mutex_;

@@ -91,9 +91,9 @@ void System::LoadHex(const std::string &kernel_hex_file) {
   LoadFromHex(kernel_hex_file, system_bus_.get());
 }
 
-void System::LoadBin(const std::string &kernel_bin_file) {
+void System::LoadBin(const std::string &kernel_bin_file, const Address &addr) {
   // GAVIN copies up to 512k flash mem to kernel mem.
-  LoadFromBin(kernel_bin_file, Address(0x18, 0x00), system_bus_.get());
+  LoadFromBin(kernel_bin_file, addr, system_bus_.get());
 }
 
 void System::Initialize(const std::string &automation_script) {
@@ -131,21 +131,26 @@ void System::Run(bool profile, bool automation) {
   auto frame_clock = std::chrono::high_resolution_clock::now();
 
   while (is_cpu_executing_.load()) {
-    std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
-    if (automation) {
-      CHECK(cpu_.ExecuteNextInstruction());
-      if (!automation_->Step()) {
-        is_cpu_executing_ = false;
-        return;
+    {
+      if (automation) {
+        {
+          std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
+          CHECK(cpu_.ExecuteNextInstruction());
+        }
+        if (!automation_->Step()) {
+          is_cpu_executing_ = false;
+          return;
+        }
+      } else {
+        std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
+        CHECK(cpu_.ExecuteNextInstruction());
       }
-    } else {
-      CHECK(cpu_.ExecuteNextInstruction());
     }
-
     // It's questionable whether we can do this smoothly. Need better approach.
     auto since_last_render_time =
         std::chrono::high_resolution_clock::now() - frame_clock;
     if (since_last_render_time >= kVickyFrameDelayNanos) {
+      std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
       system_bus_->vicky()->RenderLine();
       frame_clock = std::chrono::high_resolution_clock::now();
     }
