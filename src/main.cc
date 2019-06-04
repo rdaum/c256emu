@@ -5,11 +5,7 @@
 #include <thread>
 
 #include <glog/logging.h>
-
-extern "C" {
-#include <readline/history.h>
-#include <readline/readline.h>
-}
+#include <linenoise.h>
 
 #include "bus/automation.h"
 #include "bus/system.h"
@@ -47,10 +43,12 @@ int main(int argc, char *argv[]) {
   });
 
   if (FLAGS_automation) {
+    linenoiseInstallWindowChangeHandler();
+
     char *buf;
-    while ((buf = readline(">> ")) != nullptr) {
+    while ((buf = linenoise(">> ")) != nullptr) {
       if (strlen(buf) > 0) {
-        add_history(buf);
+        linenoiseHistoryAdd(buf);
       }
 
       system.automation()->Eval(buf);
@@ -58,6 +56,7 @@ int main(int argc, char *argv[]) {
       // readline malloc's a new buffer every time.
       free(buf);
     }
+    linenoiseHistoryFree();
     system.Stop();
   }
 

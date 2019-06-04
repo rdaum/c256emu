@@ -72,7 +72,6 @@ To build, you will need a C++17 compliant compiler (clang or GCC should work), C
   * libsdl2-dev
   * liblua5.1-0-dev
   * libboost1.65-dev
-  * libreadline-dev
   * libgflags-dev
   * libadplug-dev
   * libsrecord-dev
@@ -85,7 +84,8 @@ Then kick off cmake as usual:
   make
   ```
 
-The build will clone and install its own copy of the Google test framework.
+The build will clone and install its own copy of the Google test framework and
+the liblinenoise-ng library.
 
 ## Using
 

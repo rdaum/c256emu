@@ -11,7 +11,6 @@ find_package(PkgConfig)
 find_package(Lua REQUIRED)
 find_package(gflags REQUIRED)
 find_package(Boost)
-find_package(Readline)
 
 pkg_check_modules(SDL2 REQUIRED sdl2)
 pkg_check_modules(GLOG REQUIRED libglog)
@@ -20,6 +19,8 @@ pkg_check_modules(SREC REQUIRED srecord)
 
 # Configure google-test as a downloadable library.
 include(cmake/External_GTest.cmake)
+
+include(cmake/External_LinenoiseNG.cmake)
 
 # CPU emulator. A fork of lib65816 from Francesco Rigoni.
 file(GLOB CPU65816_SOURCES src/cpu/*.cc src/cpu/opcodes/*.cc)
@@ -46,7 +47,7 @@ target_include_directories(c256emu PUBLIC
                            ${BOOST_INCLUDE_DIRS}
                            ${LUA_INCLUDE_DIRS}
                            ${GFLAGS_INCLUDE_DIRS}
-                           ${Readline_INCLUDE_DIR}
+                           ${LINENOISENG_INCLUDE_DIR}
                            ${SREC_INCLUDE_DIR}
                            ./src)
 target_link_libraries(c256emu bus cpu65816 pthread rt
@@ -57,7 +58,7 @@ target_link_libraries(c256emu bus cpu65816 pthread rt
                       ${GFLAGS_LIBRARIES}
                       ${ADPLUG_LIBRARY}
                       ${SREC_LIBRARIES}
-                      ${Readline_LIBRARY})
+                      ${LINENOISENG_LIBRARY})
 target_compile_options(c256emu PUBLIC
                        ${SDL2_CFLAGS_OTHER}
                        ${GLOG_CFLAGS_OTHER}
