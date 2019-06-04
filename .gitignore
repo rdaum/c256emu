@@ -1,0 +1,14 @@
+.idea/
+*.cbp
+*.hex
+*.lst
+cmake-build-*/
+nohup.out
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+lib65816.a
+simple-logger/
+.DS_Store
+*~
