@@ -1,0 +1,6 @@
+Code style is Google C++/Chromium style:
+
+  https://google.github.io/styleguide/cppguide.html
+
+Format with clang-format --style=Chromium
+
