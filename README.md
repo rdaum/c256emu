@@ -1,8 +1,9 @@
 # c256emu
 
-This is a work in progress emulator for the [C256 Foenix](https://www.google.com) microcomputer.
+This is a work in progress emulator for the [C256 Foenix](https://c256foenix.com/) microcomputer.
 
-It is written in C++ and renders to via SDL2.
+It is written in C++ and renders to a window via SDL2. It's relatively fast, and on my i5 workstation emulates the C256
+at around 30mhz and a full 60fps.
 
 It supports the following features at the moment. There are definitely bugs and missing pieces. There are definitely
 going to be mismatches with the hardware as I do not have a board to compare against yet. When the Rev C boards are
