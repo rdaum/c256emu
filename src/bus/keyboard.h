@@ -6,11 +6,10 @@
 #include <atomic>
 #include <mutex>
 #include <thread>
-#include <boost/circular_buffer.hpp>
-
 #include "bus/sdl_to_atset_keymap.h"
 #include "cpu/cpu_65816.h"
 #include <atomic>
+#include <circular_buffer.hpp>
 
 class System;
 class InterruptController;
@@ -49,9 +48,9 @@ class Keyboard : public SystemBusDevice {
   RepeatKeyInfo repeat_key_;
 
   std::recursive_mutex keyboard_mutex_;
-  boost::circular_buffer<uint8_t>
+  jm::circular_buffer<uint8_t, 64>
       input_buffer_;  // written to by the CPU at + 0x0
-  boost::circular_buffer<uint8_t>
+  jm::circular_buffer<uint8_t, 64>
       output_buffer_;  // written to by the keyboard, read by CPU at  + 0x0
   uint8_t status_register_ = 0;  // read by the CPU at + 0x4
 

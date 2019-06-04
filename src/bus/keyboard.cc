@@ -52,8 +52,7 @@ constexpr Address kKeyboardStatusRegister(0xaf, 0x1064);
 constexpr Address kKeyboardBufferRegister(0xaf, 0x1060);
 
 Keyboard::Keyboard(System *sys, InterruptController *int_controller)
-    : sys_(sys), int_controller_(int_controller), input_buffer_(64),
-      output_buffer_(64) {
+    : sys_(sys), int_controller_(int_controller) {
   // TODO move all timers to one timer manager.
   poll_thread_ = std::thread([this] {
     running_ = true;

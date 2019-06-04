@@ -71,7 +71,6 @@ To build, you will need a C++17 compliant compiler (clang or GCC should work), C
 
   * libsdl2-dev
   * liblua5.1-0-dev
-  * libboost1.65-dev
   * libgflags-dev
   * libadplug-dev
   * libsrecord-dev
@@ -84,8 +83,8 @@ Then kick off cmake as usual:
   make
   ```
 
-The build will clone and install its own copy of the Google test framework and
-the liblinenoise-ng library.
+The build will clone and install its own copy of the Google test framework,
+the liblinenoise-ng library, and the 'jm' circular_buffer library.
 
 ## Using
 
@@ -108,14 +107,14 @@ Below are the set of arguments the program accepts:
      default: ""
   * `-profile` (enable CPU performance profiling) type: bool default: false
 
-To run the emulator you will need to at minimum provide either a `-kernel_bin` argument or kernel_hex argument. Both
+To run the emulator you will need to at minimum provide either a `-kernel_bin` argument or `kernel_hex` argument. Both
 arguments are for loading a bootable kernel into the emulated C256's
 memory. `-kernel_bin` takes a raw binary file consisting of a 65816 program that will be loaded into memory at $18:0000.
 kernel_hex takes any format recognized by libsrecord, such as Intel Hex Extended, etc. The hex format itself will
-determine where in memory the kernel is loaded, but should be ``$18:0000` and up, as described by the `kernel.bin` argument above.
+determine where in memory the kernel is loaded, but should be `$18:0000` and up, as described by the `kernel.bin` argument above.
 
 The program_hex argument allows for additional code to be loaded in at the location of your choosing. Loading in at
-``$19:0000`, for example, will override the C256's normal kernel boot with a program of your own choosing.
+`$19:0000`, for example, will override the C256's normal kernel boot with a program of your own choosing.
 
 The `-automation` argument turns on a scripting facility which does the following:
 

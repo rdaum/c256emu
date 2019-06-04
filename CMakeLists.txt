@@ -10,7 +10,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
 find_package(PkgConfig)
 find_package(Lua REQUIRED)
 find_package(gflags REQUIRED)
-find_package(Boost)
 
 pkg_check_modules(SDL2 REQUIRED sdl2)
 pkg_check_modules(GLOG REQUIRED libglog)
@@ -20,7 +19,11 @@ pkg_check_modules(SREC REQUIRED srecord)
 # Configure google-test as a downloadable library.
 include(cmake/External_GTest.cmake)
 
+# Configure liblinenoise-ng as a downloadable library.
 include(cmake/External_LinenoiseNG.cmake)
+
+# Configure circular_buffer a downloadable library.
+include(cmake/External_circular_buffer.cmake)
 
 # CPU emulator. A fork of lib65816 from Francesco Rigoni.
 file(GLOB CPU65816_SOURCES src/cpu/*.cc src/cpu/opcodes/*.cc)
@@ -33,18 +36,19 @@ target_compile_options(cpu65816 PUBLIC ${GLOG_CFLAGS_OTHER} -Werror -Wall)
 file(GLOB BUS_SOURCES src/bus/*.cc)
 file(GLOB BUS_HEADERS src/bus/*.h)
 add_library(bus ${BUS_SOURCES} ${BUS_HEADERS})
-add_dependencies(bus cpu65816)
+add_dependencies(bus cpu65816 circular_buffer)
 target_include_directories(bus PUBLIC ${SDL2_INCLUDE_DIRS} ${GLOG_INCLUDE_DIRS} ${LUA_INCLUDE_DIRS} ${SREC_INCLUDE_DIR}
+                            ${CIRCULAR_BUFFER_INCLUDE_DIRS}
                            ${ADPLUG_INCLUDE_DIRS} ./src)
 target_compile_options(bus PUBLIC ${SDL2_CFLAGS_OTHER} ${GLOG_CFLAGS_OTHER} -Werror -Wall -Wextra -Wno-unused-parameter)
 
 # Main executable
 add_executable(c256emu src/main.cc)
-add_dependencies(c256emu cpu65816 bus)
+add_dependencies(c256emu cpu65816 bus )
 target_include_directories(c256emu PUBLIC
                            ${SDL2_INCLUDE_DIRS}
                            ${GLOG_INCLUDE_DIRS}
-                           ${BOOST_INCLUDE_DIRS}
+                           ${CIRCULAR_BUFFER_INCLUDE_DIRS}
                            ${LUA_INCLUDE_DIRS}
                            ${GFLAGS_INCLUDE_DIRS}
                            ${LINENOISENG_INCLUDE_DIR}
@@ -53,7 +57,7 @@ target_include_directories(c256emu PUBLIC
 target_link_libraries(c256emu bus cpu65816 pthread rt
                       ${SDL2_LIBRARIES}
                       ${GLOG_LIBRARIES}
-                      ${BOOST_LIBRARIES}
+                      ${CIRCULAR_BUFFER_LIBRARIES}
                       ${LUA_LIBRARIES}
                       ${GFLAGS_LIBRARIES}
                       ${ADPLUG_LIBRARY}
