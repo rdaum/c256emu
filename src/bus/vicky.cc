@@ -70,10 +70,10 @@ void Vicky::Start() {
   CHECK(window_);
   renderer_ = SDL_CreateRenderer(window_, -1, 0);
   vicky_texture_.reset(SDL_CreateTexture(
-      renderer_, SDL_PIXELFORMAT_BGRA8888, SDL_TEXTUREACCESS_STREAMING,
+      renderer_, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
       kVickyBitmapWidth, kVickyBitmapHeight));
 
-  pixel_format_.reset(SDL_AllocFormat(SDL_PIXELFORMAT_BGRA8888));
+  pixel_format_.reset(SDL_AllocFormat(SDL_PIXELFORMAT_ARGB8888));
   CHECK(renderer_);
 }
 
@@ -102,6 +102,8 @@ Vicky::~Vicky() {
 uint8_t Vicky::ReadByte(const Address &addr, uint8_t **address) { return 0; }
 
 std::vector<SystemBusDevice::MemoryRegion> Vicky::GetMemoryRegions() {
+  // Chunks of memory that can be written directly into, to avoid calls to
+  // StoreByte.
   return {
       SystemBusDevice::MemoryRegion{0xb00000, 0xf00000, video_ram_},
       SystemBusDevice::MemoryRegion{CS_TEXT_MEM_PTR.AsInt(),
@@ -133,7 +135,17 @@ std::vector<SystemBusDevice::MemoryRegion> Vicky::GetMemoryRegions() {
       SystemBusDevice::MemoryRegion{MOUSE_PTR_GRAP1_START.AsInt(),
                                     MOUSE_PTR_GRAP1_END.WithOffset(-1).AsInt(),
                                     mouse_cursor_1_},
-
+      SystemBusDevice::MemoryRegion{GRPH_LUT0_PTR.AsInt(),
+                                    (GAMMA_B_LUT_PTR - 1).AsInt(),
+                                    reinterpret_cast<uint8_t *>(lut_)},
+      SystemBusDevice::MemoryRegion{
+          FG_CHAR_LUT_PTR.AsInt(), (BG_CHAR_LUT_PTR - 1).AsInt(),
+          reinterpret_cast<uint8_t *>(fg_colour_mem_)},
+      SystemBusDevice::MemoryRegion{
+          BG_CHAR_LUT_PTR.AsInt(), 0xaf1fc0,
+          reinterpret_cast<uint8_t *>(bg_colour_mem_)},
+      SystemBusDevice::MemoryRegion{
+          BORDER_COLOR_B.AsInt(), BORDER_COLOR_R.AsInt(), border_colour_.bgra},
   };
 }
 
@@ -225,35 +237,8 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
     return;
   }
 
-  // Palette set.
-  if (addr.InRange(GRPH_LUT0_PTR, GAMMA_B_LUT_PTR - 1)) {
-    uint8_t lut_idx = (offset - 0x2000) / 0x400;
-    uint8_t palette_idx = (offset - 0x2000) % 0x400 / 4;
-    uint8_t colour_idx = (offset - 0x2000) % 0x400 % 4;
-    switch (colour_idx) {
-    case 0:
-      if (address)
-        *address = &lut_[lut_idx][palette_idx].b;
-      lut_[lut_idx][palette_idx].b = v;
-      break;
-    case 1:
-      if (address)
-        *address = &lut_[lut_idx][palette_idx].g;
-      lut_[lut_idx][palette_idx].g = v;
-      break;
-    case 2:
-      if (address)
-        *address = &lut_[lut_idx][palette_idx].r;
-      lut_[lut_idx][palette_idx].r = v;
-      break;
-    case 3:
-      if (address)
-        *address = &lut_[lut_idx][palette_idx].a;
-      lut_[lut_idx][palette_idx].a = v;
-      break;
-    }
-    return;
-  }
+  // Gamma set.
+
   if (addr.InRange(GAMMA_B_LUT_PTR, GAMMA_G_LUT_PTR - 1)) {
     if (address)
       *address = reinterpret_cast<uint8_t *>(
@@ -295,19 +280,6 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
     return;
   }
 
-  if (addr.InRange(FG_CHAR_LUT_PTR, BG_CHAR_LUT_PTR - 1)) {
-    uint8_t palette_idx = (offset - FG_CHAR_LUT_PTR.offset_) % 0x400 / 4;
-    uint8_t colour_idx = (offset - FG_CHAR_LUT_PTR.offset_) % 0x400 % 4;
-    fg_colour_mem_[palette_idx] |= v << (8 * (3 - colour_idx));
-    return;
-  }
-  if (addr.InRange(BG_CHAR_LUT_PTR, Address(0xaf, 0x1f7f))) {
-    uint8_t palette_idx = (offset - BG_CHAR_LUT_PTR.offset_) % 0x400 / 4;
-    uint8_t colour_idx = (offset - BG_CHAR_LUT_PTR.offset_) % 0x400 % 4;
-    bg_colour_mem_[palette_idx] |= v << (8 * (3 - colour_idx));
-    return;
-  }
-
   if (addr == MOUSE_PTR_CTRL_REG_L) {
     mouse_cursor_enable_ = v & 0x01;
     mouse_cursor_select_ = v & 0x02;
@@ -315,18 +287,6 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
   }
   if (addr == BORDER_CTRL_REG) {
     border_enabled_ = v & (1 << Border_Ctrl_Enable);
-    return;
-  }
-  if (addr == BORDER_COLOR_B) {
-    border_colour_.b = v;
-    return;
-  }
-  if (addr == BORDER_COLOR_G) {
-    border_colour_.g = v;
-    return;
-  }
-  if (addr == BORDER_COLOR_R) {
-    border_colour_.r = v;
     return;
   }
   LOG(INFO) << "Unknown Vicky register: " << addr;
@@ -364,7 +324,6 @@ void Vicky::RenderLine() {
     }
   }
 
-  SDL_PixelFormat *pixel_format = pixel_format_.get();
   uint32_t *row_pixels = &frame_buffer_[kVickyBitmapWidth * raster_y_];
 
   // Calculate sprites valid for this row before scanning.
@@ -387,18 +346,17 @@ void Vicky::RenderLine() {
 
     // Bitmap
     if (mode_ & Mstr_Ctrl_Bitmap_En && bitmap_enabled_)
-      RenderBitmap(pixel_format, raster_x, row_pixel);
+      RenderBitmap(raster_x, row_pixel);
 
     // Layers back to front, sprites first, tiles next
     for (uint8_t layer = kNumLayers; layer-- > 0;) {
       // Sprites
       if (sprite_masks[layer]) {
-        RenderSprites(pixel_format, raster_x, layer, sprite_masks[layer],
-                      row_pixel);
+        RenderSprites(raster_x, layer, sprite_masks[layer], row_pixel);
       }
 
       if (mode_ & Mstr_Ctrl_TileMap_En) {
-        RenderTileMap(pixel_format, raster_x, layer, row_pixel);
+        RenderTileMap(raster_x, layer, row_pixel);
       }
     }
 
@@ -412,27 +370,22 @@ void Vicky::RenderLine() {
 
     if (border_enabled_) {
       if (raster_x < kBorderWidth) {
-        *row_pixel =
-            SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
-                        border_colour_.b, border_colour_.a);
+        *row_pixel = border_colour_.v;
         continue;
       }
       if (raster_x > kVickyBitmapWidth - kBorderWidth) {
-        *row_pixel =
-            SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
-                        border_colour_.b, border_colour_.a);
+        *row_pixel = border_colour_.v;
+
         continue;
       }
       if (raster_y_ < kBorderHeight) {
-        *row_pixel =
-            SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
-                        border_colour_.b, border_colour_.a);
+        *row_pixel = border_colour_.v;
+
         continue;
       }
       if (raster_y_ > kVickyBitmapHeight - kBorderHeight) {
-        *row_pixel =
-            SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
-                        border_colour_.b, border_colour_.a);
+        *row_pixel = border_colour_.v;
+
         continue;
       }
     }
@@ -449,20 +402,17 @@ void Vicky::RenderLine() {
   }
 }
 
-bool Vicky::RenderBitmap(const SDL_PixelFormat *pixel_format, uint16_t raster_x,
-                         uint32_t *row_pixel) {
+bool Vicky::RenderBitmap(uint16_t raster_x, uint32_t *row_pixel) {
   uint8_t *indexed_row =
       video_ram_ + bitmap_addr_offset_ + (raster_y_ * kVickyBitmapWidth);
   uint8_t colour_index = indexed_row[raster_x];
   if (colour_index == 0)
     return false;
-  SDL_Color color = lut_[bitmap_lut_][colour_index];
-  *row_pixel = SDL_MapRGBA(pixel_format, color.r, color.g, color.b, color.a);
+  *row_pixel = lut_[bitmap_lut_][colour_index].v;
   return true;
 }
 
-bool Vicky::RenderSprites(const SDL_PixelFormat *pixel_format,
-                          uint16_t raster_x, uint8_t layer,
+bool Vicky::RenderSprites(uint16_t raster_x, uint8_t layer,
                           uint32_t sprite_mask, uint32_t *row_pixel) {
   // TODO this sprite routine can't keep up to 14mhz emulation on my
   // PC if lots of sprites were enabled in many layers.
@@ -471,8 +421,9 @@ bool Vicky::RenderSprites(const SDL_PixelFormat *pixel_format,
   for (int sprite_num = 0; sprite_mask; sprite_num++, sprite_mask >>= 1) {
     Sprite &sprite = sprites_[sprite_num];
 
-    if (!sprite.enabled || raster_x < sprite.x || raster_x > sprite.x + kSpriteSize ||
-        raster_y_ < sprite.y || raster_y_ > sprite.y + kSpriteSize)
+    if (!sprite.enabled || raster_x < sprite.x ||
+        raster_x > sprite.x + kSpriteSize || raster_y_ < sprite.y ||
+        raster_y_ > sprite.y + kSpriteSize)
       continue;
 
     const uint8_t *sprite_mem = video_ram_ + sprite.start_addr;
@@ -480,16 +431,13 @@ bool Vicky::RenderSprites(const SDL_PixelFormat *pixel_format,
         sprite_mem[raster_x - sprite.x + (raster_y_ - sprite.y) * kSpriteSize];
     if (colour_index == 0)
       return false;
-    SDL_Color colour = lut_[sprite.lut][colour_index];
-    *row_pixel =
-        SDL_MapRGBA(pixel_format, colour.r, colour.g, colour.b, colour.a);
+    *row_pixel = lut_[sprite.lut][colour_index].v;
     return true;
   }
   return false;
 }
 
-bool Vicky::RenderTileMap(const SDL_PixelFormat *pixel_format,
-                          uint16_t raster_x, uint8_t layer,
+bool Vicky::RenderTileMap(uint16_t raster_x, uint8_t layer,
                           uint32_t *row_pixel) {
   if (tile_sets_[layer].enabled) {
 
@@ -525,8 +473,7 @@ bool Vicky::RenderTileMap(const SDL_PixelFormat *pixel_format,
     if (colour_index == 0)
       return false;
 
-    SDL_Color color = lut_[tile_set.lut][colour_index];
-    *row_pixel = SDL_MapRGBA(pixel_format, color.r, color.g, color.b, color.a);
+    *row_pixel = lut_[tile_set.lut][colour_index].v;
     return true;
   }
   return false;

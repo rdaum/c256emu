@@ -53,14 +53,12 @@ public:
   inline bool is_vertical_end() { return raster_y_ == 479; }
 
 private:
-  bool RenderBitmap(const SDL_PixelFormat *pixel_format, uint16_t raster_x,
-                    uint32_t *pixel);
+  bool RenderBitmap(uint16_t raster_x, uint32_t *pixel);
   bool RenderCharacterGenerator(uint16_t raster_x, uint32_t *pixel);
   bool RenderMouseCursor(uint16_t raster_x, uint32_t *pixel);
-  bool RenderTileMap(const SDL_PixelFormat *pixel_format, uint16_t raster_x,
-                     uint8_t layer, uint32_t *pixel);
-  bool RenderSprites(const SDL_PixelFormat *pixel_format, uint16_t raster_x,
-                     uint8_t layer, uint32_t sprite_mask, uint32_t *pixel);
+  bool RenderTileMap(uint16_t raster_x, uint8_t layer, uint32_t *pixel);
+  bool RenderSprites(uint16_t raster_x, uint8_t layer, uint32_t sprite_mask,
+                     uint32_t *pixel);
 
   System *sys_;
   InterruptController *int_controller_;
@@ -68,12 +66,12 @@ private:
   SDL_Window *window_;
   SDL_Renderer *renderer_;
 
-  // The 8 palette look up tables, represented as SDL colours.
-  SDL_Color lut_[8][256];
-  union {
+  union BGRAColour {
     uint32_t v;
-    uint8_t bgra[4];
-  } background_bgr_;
+    uint8_t bgra[4] { 0, 0 ,0 , 0 };
+  };
+  BGRAColour lut_[8][256];
+  BGRAColour background_bgr_;
 
   uint16_t gamma_r_[256];
   uint16_t gamma_g_[256];
@@ -139,7 +137,7 @@ private:
   Sprite sprites_[32];
 
   bool border_enabled_;
-  SDL_Color border_colour_;
+  BGRAColour border_colour_;
 
   uint16_t raster_y_ = 0;
 
