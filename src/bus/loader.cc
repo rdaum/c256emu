@@ -20,7 +20,7 @@ void LoadFromHex(const std::string &filename, SystemBus *system_bus) {
       const srecord::record::data_t *v = record.get_data();
       while (num_bytes--) {
         system_bus->StoreByte(address, *v++);
-        address.offset_++;
+        address = address + 1;
       }
     }
   } catch (std::exception e) {

@@ -278,7 +278,7 @@ int Automation::LuaGetCpuState(lua_State *L) {
   lua_pushinteger(L, system->cpu()->program_address().AsInt());
   lua_settable(L, -3);
   lua_pushstring(L, "cycle_count");
-  lua_pushinteger(L, system->cpu()->TotalCycles());
+  lua_pushinteger(L, system->cpu()->total_cycles_counter());
   lua_settable(L, -3);
   lua_pushstring(L, "status");
   lua_createtable(L, 0, 10);

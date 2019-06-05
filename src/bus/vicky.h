@@ -6,35 +6,35 @@
 #include "cpu/cpu_65816.h"
 
 #include <atomic>
-#include <mutex>
-#include <thread>
 #include <chrono>
 #include <functional>
+#include <mutex>
+#include <thread>
 
 class System;
 class InterruptController;
 
 using UniqueTexturePtr =
-std::unique_ptr<SDL_Texture, std::function<void(SDL_Texture *)>>;
+    std::unique_ptr<SDL_Texture, std::function<void(SDL_Texture *)>>;
 
 using UniquePixelFormatPtr =
-std::unique_ptr<SDL_PixelFormat, std::function<void(SDL_PixelFormat *)>>;
+    std::unique_ptr<SDL_PixelFormat, std::function<void(SDL_PixelFormat *)>>;
 
 constexpr uint8_t kBorderWidth = 16;
 constexpr uint8_t kBorderHeight = 16;
 
-constexpr uint16_t kBitmapWidth = 640;
-constexpr uint16_t kBitmapHeight = 480;
+constexpr uint16_t kVickyBitmapWidth = 640;
+constexpr uint16_t kVickyBitmapHeight = 480;
 
-constexpr uint32_t kRasterSize = kBitmapWidth * kBitmapHeight;
+constexpr uint32_t kRasterSize = kVickyBitmapWidth * kVickyBitmapHeight;
 
 constexpr uint8_t kNumLayers = 4;
 
 // Emulate the Vicky VDP.
 // Text mode only for now.
 class Vicky : public SystemBusDevice {
- public:
-  Vicky(System* system, InterruptController* int_controller);
+public:
+  Vicky(System *system, InterruptController *int_controller);
 
   ~Vicky() override;
 
@@ -46,17 +46,28 @@ class Vicky : public SystemBusDevice {
 
   // SystemBusDevice implementation
   std::vector<MemoryRegion> GetMemoryRegions() override;
-  void StoreByte(const Address& addr, uint8_t v, uint8_t** address) override;
-  uint8_t ReadByte(const Address& addr, uint8_t** address) override;
-  bool DecodeAddress(const Address& from_addr, Address& to_addr) override;
+  void StoreByte(const Address &addr, uint8_t v, uint8_t **address) override;
+  uint8_t ReadByte(const Address &addr, uint8_t **address) override;
+  bool DecodeAddress(const Address &from_addr, Address &to_addr) override;
 
- private:
+  inline bool is_vertical_end() { return raster_y_ == 479; }
+
+private:
+  void RenderBitmap(const SDL_PixelFormat *pixel_format, uint32_t *row_pixels,
+                    uint16_t raster_x);
+  void RenderCharacterGenerator(uint32_t *row_pixels, uint16_t raster_x);
+  void RenderMouseCursor(uint32_t *row_pixels, uint16_t raster_x);
+  void RenderTileMap(const SDL_PixelFormat *pixel_format, uint32_t *row_pixels,
+                     uint16_t raster_x, uint8_t layer);
+  void RenderSprites(const SDL_PixelFormat *pixel_format, uint32_t *row_pixels,
+                     uint16_t raster_x, uint8_t layer);
+
   std::atomic_bool is_dirty_;
-  System* sys_;
-  InterruptController* int_controller_;
+  System *sys_;
+  InterruptController *int_controller_;
 
-  SDL_Window* window_;
-  SDL_Renderer* renderer_;
+  SDL_Window *window_;
+  SDL_Renderer *renderer_;
 
   // The 8 palette look up tables, represented as SDL colours.
   SDL_Color lut_[8][256];
@@ -125,7 +136,7 @@ class Vicky : public SystemBusDevice {
     uint16_t y;
   };
   Sprite sprites_[32];
-  uint32_t enabled_sprites_[kNumLayers] {0,0,0,0};
+  uint32_t enabled_sprites_[kNumLayers]{0, 0, 0, 0};
 
   bool border_enabled_;
   SDL_Color border_colour_;

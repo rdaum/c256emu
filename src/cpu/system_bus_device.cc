@@ -59,10 +59,6 @@ Address Address::WithOffsetNoWrapAround(int16_t offset) const {
   return SumOffsetToAddressNoWrapAround((const Address &)*this, offset);
 }
 
-Address Address::WithOffsetWrapAround(int16_t offset) const {
-  return SumOffsetToAddressWrapAround((const Address &)*this, offset);
-}
-
 bool Address::InRange(const Address &start, const Address &end) const {
   uint32_t val32 = AsInt();
   return val32 >= start.AsInt() && val32 <= end.AsInt();

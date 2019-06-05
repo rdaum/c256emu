@@ -1,5 +1,7 @@
 #include "bus/system.h"
 
+#include <gflags/gflags.h>
+
 #include "bus/ch376_sd.h"
 #include "bus/int_controller.h"
 #include "bus/keyboard.h"
@@ -10,11 +12,17 @@
 #include "bus/vicky.h"
 
 namespace {
-constexpr double kVickyTargetFpNs = 28800;
-constexpr auto kVickyFrameDelayNanos =
+
+constexpr double kVickyTargetFps = 60;
+constexpr auto kVickyFrameDelayDuration =
     std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::seconds(1)) /
-    kVickyTargetFpNs;
+    kVickyTargetFps;
+constexpr int kTargetClockRate = 14000000;
+constexpr int kRasterLinesPerSecond = kVickyBitmapHeight * kVickyTargetFps;
+constexpr int kCyclesPerScanline = kTargetClockRate / kRasterLinesPerSecond;
+
+DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
 
 } // namespace
 
@@ -125,55 +133,65 @@ void System::Initialize(const std::string &automation_script) {
 }
 
 void System::Run(bool profile, bool automation) {
-  uint64_t instructions = 0;
+  uint64_t frames = 0;
   auto profile_previous_time = std::chrono::high_resolution_clock::now();
   uint64_t profile_last_cycles = 0;
   auto frame_clock = std::chrono::high_resolution_clock::now();
 
-  while (is_cpu_executing_.load()) {
+  while (is_cpu_executing_) {
+
+    // Execute the number of instruction's we'd expect to get done in a
+    // scanline.
+    const uint64_t next_cycle_break =
+        cpu_.total_cycles_counter() + kCyclesPerScanline;
+    while (cpu_.total_cycles_counter() < next_cycle_break) {
+      std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
+      CHECK(cpu_.ExecuteNextInstruction());
+    }
+
+    // Render a line.
     {
-      if (automation) {
+      bool frame_end = false;
+      {
+        std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
+        system_bus_->vicky()->RenderLine();
+        frame_end = system_bus_->vicky()->is_vertical_end();
+      }
+      // If it's frame end...
+      if (frame_end) {
+        // Sleep amount of time until next frame to get 60fps, if not in
+        // turbo mode.
+        if (!FLAGS_turbo) {
+          auto since_last_render_time =
+              std::chrono::high_resolution_clock::now() - frame_clock;
+          auto sleep_time = kVickyFrameDelayDuration - since_last_render_time;
+          std::this_thread::sleep_for(sleep_time);
+        }
+        frames++;
         {
           std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
-          CHECK(cpu_.ExecuteNextInstruction());
+          system_bus_->int_controller()->RaiseFrameStart();
         }
-        if (!automation_->Step()) {
-          is_cpu_executing_ = false;
-          return;
+
+        if (profile && frames % 60 == 0) {
+          auto profile_now_time = std::chrono::high_resolution_clock::now();
+          auto profile_time_past = profile_now_time - profile_previous_time;
+          uint64_t profile_cycles_taken =
+              cpu_.total_cycles_counter() - profile_last_cycles;
+
+          double time_ms =
+              std::chrono::duration_cast<std::chrono::milliseconds>(
+                  profile_time_past)
+                  .count();
+          double mhz_equiv = profile_cycles_taken / 1000.0 / time_ms;
+          LOG(INFO) << "average " << 1000.0 / (time_ms / 60.0) << "fps; "
+                    << profile_cycles_taken / 60.0 / 480.0
+                    << "cycles per line; " << mhz_equiv << "mhz equiv;";
+          profile_last_cycles = cpu_.total_cycles_counter();
+          profile_previous_time = std::chrono::high_resolution_clock::now();
         }
-      } else {
-        std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
-        CHECK(cpu_.ExecuteNextInstruction());
+        frame_clock = std::chrono::high_resolution_clock::now();
       }
-    }
-    // It's questionable whether we can do this smoothly. Need better approach.
-    auto since_last_render_time =
-        std::chrono::high_resolution_clock::now() - frame_clock;
-    if (since_last_render_time >= kVickyFrameDelayNanos) {
-      std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
-      system_bus_->vicky()->RenderLine();
-      frame_clock = std::chrono::high_resolution_clock::now();
-    }
-
-    if (profile) {
-      if (instructions % 1000000 == 0) {
-        auto profile_now_time = std::chrono::high_resolution_clock::now();
-        auto profile_time_past = profile_now_time - profile_previous_time;
-        profile_previous_time = std::chrono::high_resolution_clock::now();
-        double profile_cycles_taken = cpu_.TotalCycles() - profile_last_cycles;
-        profile_last_cycles = cpu_.TotalCycles();
-
-        double time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                             profile_time_past)
-                             .count();
-        auto mhz_equiv =
-            (1000.0 / (time_ms / profile_cycles_taken)) / 1000000.0;
-        LOG(INFO) << time_ms << "ms for 1m instructions, or "
-                  << profile_cycles_taken / 1000000.0 << "m cycles, or "
-                  << mhz_equiv << "mhz equiv"
-                  << " scan line every: " << kVickyFrameDelayNanos.count();
-      }
-      instructions++;
     }
   }
 }

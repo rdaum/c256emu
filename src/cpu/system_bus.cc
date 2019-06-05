@@ -32,8 +32,9 @@ void SystemBus::RegisterDevice(SystemBusDevice *device) {
 
 void SystemBus::StoreByte(const Address &addr, uint8_t v) {
   SystemBusDevice::MemoryRegion mem_region;
-  if (MemoryRegionforAddress(addr.AsInt(), &mem_region)) {
-    uint32_t offset = addr.AsInt() - mem_region.start_address;
+  const uint32_t address = addr.AsInt();
+  if (MemoryRegionforAddress(address, &mem_region)) {
+    uint32_t offset = address - mem_region.start_address;
     mem_region.mem[offset] = v;
     return;
   }
@@ -48,9 +49,9 @@ void SystemBus::StoreByte(const Address &addr, uint8_t v) {
 
 void SystemBus::StoreWord(const Address &addr, uint16_t v) {
   SystemBusDevice::MemoryRegion mem_region;
-  if (MemoryRegionforAddress(addr.AsInt(), &mem_region)) {
-
-    uint32_t offset = addr.AsInt() - mem_region.start_address;
+  const uint32_t address = addr.AsInt();
+  if (MemoryRegionforAddress(address, &mem_region)) {
+    uint32_t offset = address - mem_region.start_address;
     *(uint16_t *)(&mem_region.mem[offset]) = v;
     return;
   }
@@ -58,25 +59,26 @@ void SystemBus::StoreWord(const Address &addr, uint16_t v) {
   Address decoded_address;
   SystemBusDevice *device = DeviceForAddress(addr, decoded_address);
   if (device) {
-    uint8_t *address = nullptr;
+    uint8_t *physical_address = nullptr;
     uint8_t least_significant_byte = (uint8_t)(v & 0xFF);
     uint8_t most_significant_byte = (uint8_t)((v & 0xFF00) >> 8);
-    device->StoreByte(decoded_address, least_significant_byte, &address);
-    if (address) {
-      address[1] = most_significant_byte;
+    device->StoreByte(decoded_address, least_significant_byte,
+                      &physical_address);
+    if (physical_address) {
+      physical_address[1] = most_significant_byte;
       return;
     }
     device->StoreByte(decoded_address.WithOffset(1), most_significant_byte,
-                      &address);
+                      &physical_address);
     return;
   }
 }
 
 void SystemBus::StoreLong(const Address &addr, uint32_t v) {
   SystemBusDevice::MemoryRegion mem_region;
-  if (MemoryRegionforAddress(addr.AsInt(), &mem_region)) {
-
-    uint32_t offset = addr.AsInt() - mem_region.start_address;
+  const uint32_t address = addr.AsInt();
+  if (MemoryRegionforAddress(address, &mem_region)) {
+    uint32_t offset = address - mem_region.start_address;
     *(uint32_t *)(&mem_region.mem[offset]) = v;
     return;
   }
@@ -100,38 +102,38 @@ void SystemBus::StoreLong(const Address &addr, uint32_t v) {
 
 uint8_t SystemBus::ReadByte(const Address &addr) {
   SystemBusDevice::MemoryRegion mem_region;
-  if (MemoryRegionforAddress(addr.AsInt(), &mem_region)) {
-
-    uint32_t offset = addr.AsInt() - mem_region.start_address;
+  const uint32_t address = addr.AsInt();
+  if (MemoryRegionforAddress(address, &mem_region)) {
+    uint32_t offset = address - mem_region.start_address;
     return mem_region.mem[offset];
   }
 
-  Address decodedAddress;
-  SystemBusDevice *device = DeviceForAddress(addr, decodedAddress);
+  Address decoded_address;
+  SystemBusDevice *device = DeviceForAddress(addr, decoded_address);
   if (device) {
-    return device->ReadByte(decodedAddress);
+    return device->ReadByte(decoded_address);
   }
   return 0;
 }
 
 uint16_t SystemBus::ReadWord(const Address &addr) {
   SystemBusDevice::MemoryRegion mem_region;
-  if (MemoryRegionforAddress(addr.AsInt(), &mem_region)) {
-
-    uint32_t offset = addr.AsInt() - mem_region.start_address;
+  const uint32_t address = addr.AsInt();
+  if (MemoryRegionforAddress(address, &mem_region)) {
+    uint32_t offset = address - mem_region.start_address;
     return *(uint16_t *)(&mem_region.mem[offset]);
   }
 
   Address decoded_address;
   SystemBusDevice *device = DeviceForAddress(addr, decoded_address);
   if (device) {
-    uint8_t *address = nullptr;
+    uint8_t *physical_address = nullptr;
     uint8_t least_significant_byte =
-        device->ReadByte(decoded_address, &address);
+        device->ReadByte(decoded_address, &physical_address);
     uint8_t most_significant_byte;
 
-    if (address) {
-      most_significant_byte = address[1];
+    if (physical_address) {
+      most_significant_byte = physical_address[1];
     } else {
       most_significant_byte = device->ReadByte(decoded_address.WithOffset(1));
     }
@@ -144,9 +146,9 @@ uint16_t SystemBus::ReadWord(const Address &addr) {
 
 uint32_t SystemBus::ReadLong(const Address &addr) {
   SystemBusDevice::MemoryRegion mem_region;
-  if (MemoryRegionforAddress(addr.AsInt(), &mem_region)) {
-
-    uint32_t offset = addr.AsInt() - mem_region.start_address;
+  const uint32_t address = addr.AsInt();
+  if (MemoryRegionforAddress(address, &mem_region)) {
+    uint32_t offset = address - mem_region.start_address;
     return *(uint32_t *)(&mem_region.mem[offset]);
   }
 
@@ -166,30 +168,30 @@ uint32_t SystemBus::ReadLong(const Address &addr) {
 
 Address SystemBus::ReadAddressAt(const Address &addr) {
   SystemBusDevice::MemoryRegion mem_region;
-  if (MemoryRegionforAddress(addr.AsInt(), &mem_region)) {
-
-    uint32_t offset = addr.AsInt() - mem_region.start_address;
-    uint8_t least_significant_byte = mem_region.mem[offset];
-    uint8_t most_significant_byte = mem_region.mem[++offset];
-    uint8_t bank = mem_region.mem[++offset];
-    uint16_t addr_offset =
-        ((uint16_t)most_significant_byte << 8) | least_significant_byte;
-    return Address(bank, addr_offset);
+  uint32_t address = addr.AsInt();
+  if (MemoryRegionforAddress(address, &mem_region)) {
+    uint32_t offset = address - mem_region.start_address;
+    struct addr_store {
+      uint32_t value : 24;
+    };
+    addr_store *addr24 =
+        reinterpret_cast<struct addr_store *>(&mem_region.mem[offset]);
+    return Address(addr24->value);
   }
 
   Address decoded_address{0x00, 0x0000};
   SystemBusDevice *device = DeviceForAddress(addr, decoded_address);
   if (device) {
-    uint8_t *address;
+    uint8_t *physical_address;
     // Read offset
     uint8_t least_significant_byte =
-        device->ReadByte(decoded_address, &address);
+        device->ReadByte(decoded_address, &physical_address);
     uint8_t most_significant_byte;
     uint8_t bank;
 
-    if (address) {
-      most_significant_byte = address[1];
-      bank = address[2];
+    if (physical_address) {
+      most_significant_byte = physical_address[1];
+      bank = physical_address[2];
     } else {
       most_significant_byte = device->ReadByte(decoded_address.WithOffset(1));
       // Read bank

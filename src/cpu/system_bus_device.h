@@ -30,6 +30,13 @@
 
 class Address {
 public:
+  static size_t Size(const Address &begin, const Address &end);
+  static bool OffsetsAreOnDifferentPages(uint16_t offset1, uint16_t offset2);
+  static Address SumOffsetToAddress(const Address &addr, int16_t offset2);
+  static Address SumOffsetToAddressNoWrapAround(const Address &addr,
+                                                int16_t offset);
+  static Address SumOffsetToAddressWrapAround(const Address &addr,
+                                              int16_t offset);
   Address() = default;
   explicit Address(uint32_t addr);
   constexpr Address(uint8_t bank, uint16_t offset)
@@ -39,21 +46,12 @@ public:
   bool operator==(const Address &o) const;
   bool operator<(const Address &o) const;
 
-  static size_t Size(const Address &begin, const Address &end);
   uint32_t AsInt() const;
-
-  static bool OffsetsAreOnDifferentPages(uint16_t offset1, uint16_t offset2);
-  static Address SumOffsetToAddress(const Address &addr, int16_t offset2);
-  static Address SumOffsetToAddressNoWrapAround(const Address &addr,
-                                                int16_t offset);
-  static Address SumOffsetToAddressWrapAround(const Address &addr,
-                                              int16_t offset);
 
   bool InRange(const Address &start, const Address &end) const;
 
   Address WithOffset(int16_t offset) const;
   Address WithOffsetNoWrapAround(int16_t offset) const;
-  Address WithOffsetWrapAround(int16_t offset) const;
 
   void GetBankAndOffset(uint8_t *bank, uint16_t *offset) {
     *bank = bank_;
@@ -102,18 +100,18 @@ public:
     address. That is: maps the virtual address to the real one and stores one
     byte in it.
     If the device is capable of returning a stable pointer that can be cached
-    and re-used, 'address' will be it the address of the byte stored.
+    and re-used, 'physical_address' will be it the address of the byte stored.
    */
-  virtual void StoreByte(const Address &, uint8_t, uint8_t **address = 0) = 0;
+  virtual void StoreByte(const Address &, uint8_t, uint8_t **physical_address = 0) = 0;
 
   /**
     Reads one byte from the real address represented by the specified virtual
     address. That is: maps the virtual address to the real one and reads from
     it.
     If the device is capable of returning a stable pointer that can be cached
-    and re-used, 'address' will be it the address of the byte read;
+    and re-used, 'physical_address' will be it the address of the byte read;
    */
-  virtual uint8_t ReadByte(const Address &, uint8_t **address = 0) = 0;
+  virtual uint8_t ReadByte(const Address &, uint8_t **physical_address = 0) = 0;
 
   /**
     Returns true if the address was decoded successfully by this device.

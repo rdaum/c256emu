@@ -11,7 +11,6 @@
 #include "bus/vicky_def.h"
 #include "vicky.h"
 
-
 namespace {
 
 constexpr uint8_t kColsPerLine = 128;
@@ -61,14 +60,14 @@ Vicky::Vicky(System *system, InterruptController *int_controller)
 void Vicky::Start() {
   SDL_Init(SDL_INIT_VIDEO);
   window_ = SDL_CreateWindow("Vicky", SDL_WINDOWPOS_UNDEFINED,
-                             SDL_WINDOWPOS_UNDEFINED, kBitmapWidth,
-                             kBitmapHeight, SDL_WINDOW_OPENGL);
+                             SDL_WINDOWPOS_UNDEFINED, kVickyBitmapWidth,
+                             kVickyBitmapHeight, SDL_WINDOW_OPENGL);
 
   CHECK(window_);
   renderer_ = SDL_CreateRenderer(window_, -1, 0);
   vicky_texture_.reset(SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_BGRA8888,
                                          SDL_TEXTUREACCESS_STREAMING,
-                                         kBitmapWidth, kBitmapHeight));
+      kVickyBitmapWidth, kVickyBitmapHeight));
 
   pixel_format_.reset(SDL_AllocFormat(SDL_PIXELFORMAT_BGRA8888));
   CHECK(renderer_);
@@ -96,9 +95,7 @@ Vicky::~Vicky() {
   }
 }
 
-uint8_t Vicky::ReadByte(const Address &addr, uint8_t **address) {
-  return 0;
-}
+uint8_t Vicky::ReadByte(const Address &addr, uint8_t **address) { return 0; }
 
 std::vector<SystemBusDevice::MemoryRegion> Vicky::GetMemoryRegions() {
   return {
@@ -144,7 +141,6 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
     bitmap_lut_ = (v & 0b01110000) >> 4;
     return;
   }
-
 
   if (Set16(addr, MASTER_CTRL_REG_L, &mode_, v)) {
     LOG(INFO) << "Set mode: " << mode_ << " Address: " << addr;
@@ -227,7 +223,7 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
   }
 
   // Palette set.
-  if (addr.InRange(GRPH_LUT0_PTR, GAMMA_B_LUT_PTR -1)) {
+  if (addr.InRange(GRPH_LUT0_PTR, GAMMA_B_LUT_PTR - 1)) {
     uint8_t lut_idx = (offset - 0x2000) / 0x400;
     uint8_t palette_idx = (offset - 0x2000) % 0x400 / 4;
     uint8_t colour_idx = (offset - 0x2000) % 0x400 % 4;
@@ -255,7 +251,7 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
     }
     return;
   }
-  if (addr.InRange(GAMMA_B_LUT_PTR, GAMMA_G_LUT_PTR -1)) {
+  if (addr.InRange(GAMMA_B_LUT_PTR, GAMMA_G_LUT_PTR - 1)) {
     if (address)
       *address = reinterpret_cast<uint8_t *>(
           &gamma_b_[offset - GAMMA_B_LUT_PTR.offset_]);
@@ -264,7 +260,7 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
 
     return;
   }
-  if (addr.InRange(GAMMA_G_LUT_PTR, GAMMA_R_LUT_PTR -1)) {
+  if (addr.InRange(GAMMA_G_LUT_PTR, GAMMA_R_LUT_PTR - 1)) {
     if (address)
       *address = reinterpret_cast<uint8_t *>(
           &gamma_g_[offset - GAMMA_B_LUT_PTR.offset_]);
@@ -273,7 +269,7 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
 
     return;
   }
-  if (addr.InRange(GAMMA_R_LUT_PTR, TILE_MAP0-1)) {
+  if (addr.InRange(GAMMA_R_LUT_PTR, TILE_MAP0 - 1)) {
     if (address)
       *address = reinterpret_cast<uint8_t *>(
           &gamma_r_[offset - GAMMA_B_LUT_PTR.offset_]);
@@ -366,7 +362,8 @@ void Vicky::RenderLine() {
     }
   }
 
-  uint32_t *row_pixels = &frame_buffer_[kBitmapWidth * raster_y_];
+  SDL_PixelFormat *pixel_format = pixel_format_.get();
+  uint32_t *row_pixels = &frame_buffer_[kVickyBitmapWidth * raster_y_];
 
   // Render order:
   // Background bitmap
@@ -380,201 +377,216 @@ void Vicky::RenderLine() {
   // Tile layer 0
   // Sprites
   // Text
-  for (uint16_t raster_x = 0; raster_x < kBitmapWidth; raster_x++) {
+  for (uint16_t raster_x = 0; raster_x < kVickyBitmapWidth; raster_x++) {
 
     if (border_enabled_) {
       if (raster_x < kBorderWidth) {
         row_pixels[raster_x] =
-            SDL_MapRGBA(pixel_format_.get(), border_colour_.r, border_colour_.g,
+            SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
                         border_colour_.b, border_colour_.a);
         continue;
       }
-      if (raster_x > kBitmapWidth - kBorderWidth) {
+      if (raster_x > kVickyBitmapWidth - kBorderWidth) {
         row_pixels[raster_x] =
-            SDL_MapRGBA(pixel_format_.get(), border_colour_.r, border_colour_.g,
+            SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
                         border_colour_.b, border_colour_.a);
         continue;
       }
       if (raster_y_ < kBorderHeight) {
         row_pixels[raster_x] =
-            SDL_MapRGBA(pixel_format_.get(), border_colour_.r, border_colour_.g,
+            SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
                         border_colour_.b, border_colour_.a);
         continue;
       }
-      if (raster_y_ > kBitmapHeight - kBorderHeight) {
+      if (raster_y_ > kVickyBitmapHeight - kBorderHeight) {
         row_pixels[raster_x] =
-            SDL_MapRGBA(pixel_format_.get(), border_colour_.r, border_colour_.g,
+            SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
                         border_colour_.b, border_colour_.a);
         continue;
       }
     }
 
-
     // 8bpp indexed bitmap goes behind everything.
     if (mode_ & Mstr_Ctrl_Bitmap_En && bitmap_enabled_) {
-      uint8_t *indexed_row =
-          video_ram_ + bitmap_addr_offset_ + (raster_y_ * kBitmapWidth);
-      uint8_t colour_index = indexed_row[raster_x];
-      if (colour_index != 0) {
-        SDL_Color color = lut_[bitmap_lut_][colour_index];
-        row_pixels[raster_x] = SDL_MapRGBA(pixel_format_.get(), color.r,
-                                           color.g, color.b, color.a);
-      }
+      RenderBitmap(pixel_format, row_pixels, raster_x);
     }
 
     // Layers back to front, sprites first, tiles next
     for (uint8_t layer = kNumLayers; layer-- > 0;) {
       // Sprites
       if (mode_ & Mstr_Ctrl_Sprite_En) {
-        // TODO this sprite routine can't keep up to 14mhz emulation on my
-        // PC if lots of sprites were enabled in many layers.
-        uint32_t enabled_sprites = enabled_sprites_[layer];
-
-        // No sprites in this layer?  Move on.
-        if (!enabled_sprites)
-          continue;
-
-        // Keep drawing until we run out of sprites in this layer.
-        for (uint8_t sprite_num = 0; enabled_sprites != 0;
-             sprite_num++, enabled_sprites <<= 1) {
-          if (!(enabled_sprites & 1UL << sprite_num))
-            continue;
-
-          Sprite &sprite = sprites_[sprite_num];
-
-          if (raster_x < sprite.x || raster_x > sprite.x + kSpriteSize ||
-              raster_y_ < sprite.y || raster_y_ > sprite.y + kSpriteSize)
-            continue;
-
-          uint8_t *sprite_mem = video_ram_ + sprite.start_addr;
-          uint8_t colour_index =
-              sprite_mem[raster_x - sprite.x +
-                         (raster_y_ - sprite.y) * kSpriteSize];
-          if (colour_index == 0)
-            continue;
-          SDL_Color color1 = lut_[sprite.lut][colour_index];
-          row_pixels[raster_x] = SDL_MapRGBA(pixel_format_.get(), color1.r,
-                                             color1.g, color1.b, color1.a);
-        }
+        RenderSprites(pixel_format, row_pixels, raster_x, layer);
       }
 
       if (mode_ & Mstr_Ctrl_TileMap_En) {
         // Tiles
-        if (tile_sets_[layer].enabled) {
-
-          // TODO support for linear tile sheets.  this assumes a 256x256 sheet
-          // of 16x16 tiles for now.
-
-          const auto &tile_set = tile_sets_[layer];
-          uint8_t screen_tile_row = raster_y_ / kTileSize;
-          uint8_t screen_tile_sub_row = raster_y_ % kTileSize;
-
-          uint8_t screen_tile_col = raster_x / kTileSize;
-          uint8_t screen_tile_sub_col = raster_x % kTileSize;
-
-          uint8_t tile_num =
-              tile_set.tile_map.map[screen_tile_row][screen_tile_col];
-          uint8_t *tile_sheet_bitmap = &video_ram_[tile_set.start_addr];
-
-          uint8_t tile_sheet_column =
-              tile_num % kTileSize; // the column in the tile sheet
-          uint8_t tile_sheet_row =
-              tile_num / kTileSize; // the row in the tile sheet
-
-          // the physical memory location of the row in the sheet our tile is
-          // in
-          uint8_t *tile_bitmap_row =
-              &tile_sheet_bitmap[(tile_sheet_row * kTileSize +
-                                  screen_tile_sub_row) *
-                                 tile_set.stride_x];
-
-          // the physical memory location of the column in the sheet our tile
-          // is in
-          uint8_t *tile_bitmap_column =
-              &tile_bitmap_row[tile_sheet_column * kTileSize];
-
-          uint8_t colour_index = tile_bitmap_column[screen_tile_sub_col];
-          if (colour_index == 0)
-            continue;
-          SDL_Color color = lut_[tile_set.lut][colour_index];
-          row_pixels[raster_x] = SDL_MapRGBA(pixel_format_.get(), color.r,
-                                             color.g, color.b, color.a);
-        }
+        RenderTileMap(pixel_format, row_pixels, raster_x, layer);
       }
     }
 
     // Character set generator.
     if (run_char_gen) {
-      uint16_t bitmap_x = raster_x;
-      uint16_t bitmap_y = raster_y_;
-
-      // If the border is enabled, reduce the rendered area accordingly.
-      if (border_enabled_) {
-        bitmap_x -= kBorderWidth;
-        bitmap_y -= kBorderHeight;
-      }
-      const uint16_t cursor_x = cursor_x_;
-      const uint16_t cursor_y = cursor_y_;
-      uint16_t row = bitmap_y / 8;
-      uint16_t sub_row = bitmap_y % 8;
-
-      uint8_t column = bitmap_x / 8;
-      uint8_t sub_column = bitmap_x % 8;
-
-      uint8_t character = text_mem_[column + (row * kColsPerLine)];
-      uint8_t colour = text_colour_mem_[column + (row * kColsPerLine)];
-      uint8_t fg_colour_num = (uint8_t)((colour & 0xf0) >> 4);
-      uint8_t bg_colour_num = (uint8_t)(colour & 0x0f);
-      uint8_t *character_font = &font_bank_0_[character * 8];
-      uint8_t *cursor_font = &font_bank_0_[cursor_char_ * 8];
-
-      uint32_t fg_colour = fg_colour_mem_[fg_colour_num];
-      uint32_t bg_colour = bg_colour_mem_[bg_colour_num];
-
-      // TODO: cursor colour?
-      bool is_cursor_cell = cursor_state_ && cursor_reg_ & Vky_Cursor_Enable &&
-                            (cursor_x == column && cursor_y == row);
-
-      uint32_t *char_pixels = &row_pixels[raster_x];
-
-      int pixel_pos = 1 << (7 - sub_column);
-      if (is_cursor_cell && cursor_font[sub_row] & pixel_pos) {
-        *char_pixels = fg_colour;
-      } else if (character_font[sub_row] & pixel_pos) {
-        *char_pixels = is_cursor_cell ? bg_colour : fg_colour;
-      } else if (mode_ & Mstr_Ctrl_Text_Mode_En && !is_cursor_cell) {
-        // note no bg color in overlay or when cursor on
-        *char_pixels = bg_colour;
-      }
+      RenderCharacterGenerator(row_pixels, raster_x);
     }
 
     // Mouse
     if (mouse_cursor_enable_) {
-      SDL_GetMouseState(&mouse_pos_x_, &mouse_pos_y_);
-      if ((raster_x >= mouse_pos_x_ && raster_x <= mouse_pos_x_ + 16) &&
-          (raster_y_ >= mouse_pos_y_ && raster_y_ <= mouse_pos_y_ + 16)) {
-        uint8_t *mouse_mem =
-            mouse_cursor_select_ ? mouse_cursor_0_ : mouse_cursor_1_;
-        uint8_t mouse_sub_col = raster_x % 16;
-        uint8_t mouse_sub_row = raster_y_ % 16;
-        uint8_t pixel_val = mouse_mem[mouse_sub_col + (mouse_sub_row * 16)];
-        if (pixel_val != 0) {
-          row_pixels[raster_x] =
-              pixel_val | (pixel_val << 8) | (pixel_val << 16);
-        }
-      }
+      RenderMouseCursor(row_pixels, raster_x);
     }
   }
 
   // TODO line interrupt
-
   raster_y_++;
-  if (raster_y_ == kBitmapHeight) {
+  if (raster_y_ == kVickyBitmapHeight) {
     SDL_UpdateTexture(vicky_texture_.get(), nullptr, frame_buffer_,
-                      kBitmapWidth * sizeof(uint32_t));
+                      kVickyBitmapWidth * sizeof(uint32_t));
     SDL_RenderCopy(renderer_, vicky_texture_.get(), nullptr, nullptr);
     SDL_RenderPresent(renderer_);
     raster_y_ = 0;
-    int_controller_->RaiseFrameStart();
+  }
+}
+
+void Vicky::RenderBitmap(const SDL_PixelFormat *pixel_format,
+                         uint32_t *row_pixels, uint16_t raster_x) {
+  uint8_t *indexed_row =
+      video_ram_ + bitmap_addr_offset_ + (raster_y_ * kVickyBitmapWidth);
+  uint8_t colour_index = indexed_row[raster_x];
+  if (colour_index != 0) {
+    SDL_Color color = lut_[bitmap_lut_][colour_index];
+    row_pixels[raster_x] =
+        SDL_MapRGBA(pixel_format, color.r, color.g, color.b, color.a);
+  }
+}
+
+void Vicky::RenderSprites(const SDL_PixelFormat *pixel_format,
+                          uint32_t *row_pixels, uint16_t raster_x,
+                          uint8_t layer) {
+  // TODO this sprite routine can't keep up to 14mhz emulation on my
+  // PC if lots of sprites were enabled in many layers.
+  uint32_t enabled_sprites = enabled_sprites_[layer];
+
+  // No sprites in this layer?  Move on.
+  if (!enabled_sprites)
+    return;
+
+  // Keep drawing until we run out of sprites in this layer.
+  for (uint8_t sprite_num = 0; enabled_sprites != 0;
+       sprite_num++, enabled_sprites <<= 1) {
+    if (!(enabled_sprites & 1UL << sprite_num))
+      return;
+
+    Sprite &sprite = sprites_[sprite_num];
+
+    if (raster_x < sprite.x || raster_x > sprite.x + kSpriteSize ||
+        raster_y_ < sprite.y || raster_y_ > sprite.y + kSpriteSize)
+      return;
+
+    uint8_t *sprite_mem = video_ram_ + sprite.start_addr;
+    uint8_t colour_index =
+        sprite_mem[raster_x - sprite.x + (raster_y_ - sprite.y) * kSpriteSize];
+    if (colour_index == 0)
+      return;
+    SDL_Color color1 = lut_[sprite.lut][colour_index];
+    row_pixels[raster_x] =
+        SDL_MapRGBA(pixel_format, color1.r, color1.g, color1.b, color1.a);
+  }
+}
+
+void Vicky::RenderTileMap(const SDL_PixelFormat *pixel_format,
+                          uint32_t *row_pixels, uint16_t raster_x,
+                          uint8_t layer) {
+  if (tile_sets_[layer].enabled) {
+
+    // TODO support for linear tile sheets.  this assumes a 256x256 sheet
+    // of 16x16 tiles for now.
+
+    const auto &tile_set = tile_sets_[layer];
+    uint8_t screen_tile_row = raster_y_ / kTileSize;
+    uint8_t screen_tile_sub_row = raster_y_ % kTileSize;
+
+    uint8_t screen_tile_col = raster_x / kTileSize;
+    uint8_t screen_tile_sub_col = raster_x % kTileSize;
+
+    uint8_t tile_num = tile_set.tile_map.map[screen_tile_row][screen_tile_col];
+    uint8_t *tile_sheet_bitmap = &video_ram_[tile_set.start_addr];
+
+    uint8_t tile_sheet_column =
+        tile_num % kTileSize; // the column in the tile sheet
+    uint8_t tile_sheet_row = tile_num / kTileSize; // the row in the tile sheet
+
+    // the physical memory location of the row in the sheet our tile is
+    // in
+    uint8_t *tile_bitmap_row =
+        &tile_sheet_bitmap[(tile_sheet_row * kTileSize + screen_tile_sub_row) *
+                           tile_set.stride_x];
+
+    // the physical memory location of the column in the sheet our tile
+    // is in
+    uint8_t *tile_bitmap_column =
+        &tile_bitmap_row[tile_sheet_column * kTileSize];
+
+    uint8_t colour_index = tile_bitmap_column[screen_tile_sub_col];
+    if (colour_index != 0) {
+      SDL_Color color = lut_[tile_set.lut][colour_index];
+      row_pixels[raster_x] =
+          SDL_MapRGBA(pixel_format, color.r, color.g, color.b, color.a);
+    }
+  }
+}
+void Vicky::RenderMouseCursor(uint32_t *row_pixels, uint16_t raster_x) {
+  SDL_GetMouseState(&mouse_pos_x_, &mouse_pos_y_);
+  if ((raster_x >= mouse_pos_x_ && raster_x <= mouse_pos_x_ + 16) &&
+      (raster_y_ >= mouse_pos_y_ && raster_y_ <= mouse_pos_y_ + 16)) {
+    uint8_t *mouse_mem =
+        mouse_cursor_select_ ? mouse_cursor_0_ : mouse_cursor_1_;
+    uint8_t mouse_sub_col = raster_x % 16;
+    uint8_t mouse_sub_row = raster_y_ % 16;
+    uint8_t pixel_val = mouse_mem[mouse_sub_col + (mouse_sub_row * 16)];
+    if (pixel_val != 0) {
+      row_pixels[raster_x] = pixel_val | (pixel_val << 8) | (pixel_val << 16);
+    }
+  }
+}
+void Vicky::RenderCharacterGenerator(uint32_t *row_pixels, uint16_t raster_x) {
+  uint16_t bitmap_x = raster_x;
+  uint16_t bitmap_y = raster_y_;
+
+  // If the border is enabled, reduce the rendered area accordingly.
+  if (border_enabled_) {
+    bitmap_x -= kBorderWidth;
+    bitmap_y -= kBorderHeight;
+  }
+  const uint16_t cursor_x = cursor_x_;
+  const uint16_t cursor_y = cursor_y_;
+  uint16_t row = bitmap_y / 8;
+  uint16_t sub_row = bitmap_y % 8;
+
+  uint8_t column = bitmap_x / 8;
+  uint8_t sub_column = bitmap_x % 8;
+
+  uint8_t character = text_mem_[column + (row * kColsPerLine)];
+  uint8_t colour = text_colour_mem_[column + (row * kColsPerLine)];
+  uint8_t fg_colour_num = (uint8_t)((colour & 0xf0) >> 4);
+  uint8_t bg_colour_num = (uint8_t)(colour & 0x0f);
+  uint8_t *character_font = &font_bank_0_[character * 8];
+  uint8_t *cursor_font = &font_bank_0_[cursor_char_ * 8];
+
+  uint32_t fg_colour = fg_colour_mem_[fg_colour_num];
+  uint32_t bg_colour = bg_colour_mem_[bg_colour_num];
+
+  // TODO: cursor colour?
+  bool is_cursor_cell = cursor_state_ && cursor_reg_ & Vky_Cursor_Enable &&
+                        (cursor_x == column && cursor_y == row);
+
+  uint32_t *char_pixels = &row_pixels[raster_x];
+
+  int pixel_pos = 1 << (7 - sub_column);
+  if (is_cursor_cell && cursor_font[sub_row] & pixel_pos) {
+    *char_pixels = fg_colour;
+  } else if (character_font[sub_row] & pixel_pos) {
+    *char_pixels = is_cursor_cell ? bg_colour : fg_colour;
+  } else if (mode_ & Mstr_Ctrl_Text_Mode_En && !is_cursor_cell) {
+    // note no bg color in overlay or when cursor on
+    *char_pixels = bg_colour;
   }
 }

@@ -25,6 +25,9 @@ include(cmake/External_LinenoiseNG.cmake)
 # Configure circular_buffer a downloadable library.
 include(cmake/External_circular_buffer.cmake)
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
+
 # CPU emulator. A fork of lib65816 from Francesco Rigoni.
 file(GLOB CPU65816_SOURCES src/cpu/*.cc src/cpu/opcodes/*.cc)
 file(GLOB CPU65816_HEADERS src/cpu/*.h src/cpu/opcodes/*.h)

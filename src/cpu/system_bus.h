@@ -41,10 +41,9 @@ public:
   Address ReadAddressAt(const Address &addr);
 
 private:
+  SystemBusDevice *DeviceForAddress(const Address &, Address &) const;
   bool MemoryRegionforAddress(uint32_t address,
                               SystemBusDevice::MemoryRegion *region) const;
-  SystemBusDevice *DeviceForAddress(const Address &, Address &) const;
-
   std::vector<SystemBusDevice::MemoryRegion> memory_regions_;
   std::vector<SystemBusDevice *> devices_;
 };
