@@ -53,14 +53,14 @@ public:
   inline bool is_vertical_end() { return raster_y_ == 479; }
 
 private:
-  void RenderBitmap(const SDL_PixelFormat *pixel_format, uint32_t *row_pixels,
-                    uint16_t raster_x);
-  void RenderCharacterGenerator(uint32_t *row_pixels, uint16_t raster_x);
-  void RenderMouseCursor(uint32_t *row_pixels, uint16_t raster_x);
-  void RenderTileMap(const SDL_PixelFormat *pixel_format, uint32_t *row_pixels,
-                     uint16_t raster_x, uint8_t layer);
-  void RenderSprites(const SDL_PixelFormat *pixel_format, uint32_t *row_pixels,
-                     uint16_t raster_x, uint8_t layer);
+  bool RenderBitmap(const SDL_PixelFormat *pixel_format, uint16_t raster_x,
+                    uint32_t *pixel);
+  bool RenderCharacterGenerator(uint16_t raster_x, uint32_t *pixel);
+  bool RenderMouseCursor(uint16_t raster_x, uint32_t *pixel);
+  bool RenderTileMap(const SDL_PixelFormat *pixel_format, uint16_t raster_x,
+                     uint8_t layer, uint32_t *pixel);
+  bool RenderSprites(const SDL_PixelFormat *pixel_format, uint16_t raster_x,
+                     uint8_t layer, uint32_t *pixel);
 
   std::atomic_bool is_dirty_;
   System *sys_;
@@ -130,13 +130,14 @@ private:
 
   struct Sprite {
     bool tile_striding = false;
+    bool enabled = false;
+    uint8_t layer = 0;
     uint32_t start_addr;
     uint8_t lut = 0;
     uint16_t x;
     uint16_t y;
   };
   Sprite sprites_[32];
-  uint32_t enabled_sprites_[kNumLayers]{0, 0, 0, 0};
 
   bool border_enabled_;
   SDL_Color border_colour_;

@@ -65,8 +65,8 @@ void Vicky::Start() {
 
   CHECK(window_);
   renderer_ = SDL_CreateRenderer(window_, -1, 0);
-  vicky_texture_.reset(SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_BGRA8888,
-                                         SDL_TEXTUREACCESS_STREAMING,
+  vicky_texture_.reset(SDL_CreateTexture(
+      renderer_, SDL_PIXELFORMAT_BGRA8888, SDL_TEXTUREACCESS_STREAMING,
       kVickyBitmapWidth, kVickyBitmapHeight));
 
   pixel_format_.reset(SDL_AllocFormat(SDL_PIXELFORMAT_BGRA8888));
@@ -196,7 +196,8 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
     uint16_t register_num = sprite_offset % 0x08;
     if (register_num == 0) /* control register */ {
       uint8_t layer = (v & 0b01110000) >> 4;
-      enabled_sprites_[layer] ^= (1UL << sprite_num);
+      sprites_[sprite_num].layer = layer;
+      sprites_[sprite_num].enabled = v & 0x01;
       sprites_[sprite_num].lut = (v & 0b00001110) >> 1;
       sprites_[sprite_num].tile_striding = (v & 0x80);
     } else if (register_num == 1) {
@@ -365,74 +366,66 @@ void Vicky::RenderLine() {
   SDL_PixelFormat *pixel_format = pixel_format_.get();
   uint32_t *row_pixels = &frame_buffer_[kVickyBitmapWidth * raster_y_];
 
-  // Render order:
-  // Background bitmap
-  // Sprite layers
-  // Tile layer 3
-  // Sprite layers
-  // Tile Layer 2
-  // Sprite layers
-  // Tile Layer 1
-  // Sprite layers
-  // Tile layer 0
-  // Sprites
-  // Text
   for (uint16_t raster_x = 0; raster_x < kVickyBitmapWidth; raster_x++) {
+    uint32_t *row_pixel = &row_pixels[raster_x];
 
     if (border_enabled_) {
       if (raster_x < kBorderWidth) {
-        row_pixels[raster_x] =
+        *row_pixel =
             SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
                         border_colour_.b, border_colour_.a);
         continue;
       }
       if (raster_x > kVickyBitmapWidth - kBorderWidth) {
-        row_pixels[raster_x] =
+        *row_pixel =
             SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
                         border_colour_.b, border_colour_.a);
         continue;
       }
       if (raster_y_ < kBorderHeight) {
-        row_pixels[raster_x] =
+        *row_pixel =
             SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
                         border_colour_.b, border_colour_.a);
         continue;
       }
       if (raster_y_ > kVickyBitmapHeight - kBorderHeight) {
-        row_pixels[raster_x] =
+        *row_pixel =
             SDL_MapRGBA(pixel_format, border_colour_.r, border_colour_.g,
                         border_colour_.b, border_colour_.a);
         continue;
       }
     }
 
-    // 8bpp indexed bitmap goes behind everything.
-    if (mode_ & Mstr_Ctrl_Bitmap_En && bitmap_enabled_) {
-      RenderBitmap(pixel_format, row_pixels, raster_x);
-    }
+    if (mouse_cursor_enable_ && RenderMouseCursor(raster_x, row_pixel))
+      continue;
+    if (run_char_gen && RenderCharacterGenerator(raster_x, row_pixel))
+      continue;
 
-    // Layers back to front, sprites first, tiles next
-    for (uint8_t layer = kNumLayers; layer-- > 0;) {
+    // Layers front to back.
+    bool rendered = false;
+    for (uint8_t layer = 0; layer < kNumLayers; layer++) {
       // Sprites
       if (mode_ & Mstr_Ctrl_Sprite_En) {
-        RenderSprites(pixel_format, row_pixels, raster_x, layer);
+        rendered = RenderSprites(pixel_format, raster_x, layer, row_pixel);
+        if (rendered)
+          break;
       }
 
       if (mode_ & Mstr_Ctrl_TileMap_En) {
-        // Tiles
-        RenderTileMap(pixel_format, row_pixels, raster_x, layer);
+        rendered = RenderTileMap(pixel_format, raster_x, layer, row_pixel);
+
+        if (rendered)
+          break;
       }
     }
+    if (rendered)
+      continue;
 
-    // Character set generator.
-    if (run_char_gen) {
-      RenderCharacterGenerator(row_pixels, raster_x);
-    }
+    if (mode_ & Mstr_Ctrl_Bitmap_En && bitmap_enabled_ &&
+        RenderBitmap(pixel_format, raster_x, row_pixel))
+      continue;
 
-    // Mouse
-    if (mouse_cursor_enable_) {
-      RenderMouseCursor(row_pixels, raster_x);
-    }
+    row_pixels[raster_x] = background_bgr_.v;
   }
 
   // TODO line interrupt
@@ -446,55 +439,52 @@ void Vicky::RenderLine() {
   }
 }
 
-void Vicky::RenderBitmap(const SDL_PixelFormat *pixel_format,
-                         uint32_t *row_pixels, uint16_t raster_x) {
+bool Vicky::RenderBitmap(const SDL_PixelFormat *pixel_format, uint16_t raster_x,
+                         uint32_t *row_pixel) {
   uint8_t *indexed_row =
       video_ram_ + bitmap_addr_offset_ + (raster_y_ * kVickyBitmapWidth);
   uint8_t colour_index = indexed_row[raster_x];
-  if (colour_index != 0) {
-    SDL_Color color = lut_[bitmap_lut_][colour_index];
-    row_pixels[raster_x] =
-        SDL_MapRGBA(pixel_format, color.r, color.g, color.b, color.a);
-  }
+  if (colour_index == 0)
+    return false;
+  SDL_Color color = lut_[bitmap_lut_][colour_index];
+  *row_pixel = SDL_MapRGBA(pixel_format, color.r, color.g, color.b, color.a);
+  return true;
 }
 
-void Vicky::RenderSprites(const SDL_PixelFormat *pixel_format,
-                          uint32_t *row_pixels, uint16_t raster_x,
-                          uint8_t layer) {
+bool Vicky::RenderSprites(const SDL_PixelFormat *pixel_format,
+                          uint16_t raster_x, uint8_t layer,
+                          uint32_t *row_pixel) {
   // TODO this sprite routine can't keep up to 14mhz emulation on my
   // PC if lots of sprites were enabled in many layers.
-  uint32_t enabled_sprites = enabled_sprites_[layer];
-
-  // No sprites in this layer?  Move on.
-  if (!enabled_sprites)
-    return;
 
   // Keep drawing until we run out of sprites in this layer.
-  for (uint8_t sprite_num = 0; enabled_sprites != 0;
-       sprite_num++, enabled_sprites <<= 1) {
-    if (!(enabled_sprites & 1UL << sprite_num))
-      return;
-
+  uint32_t pixel_val = 0;
+  for (int sprite_num = 0; sprite_num < 32 && !pixel_val; sprite_num++) {
     Sprite &sprite = sprites_[sprite_num];
+    if (!sprite.enabled || sprite.layer != layer)
+      continue;
 
     if (raster_x < sprite.x || raster_x > sprite.x + kSpriteSize ||
         raster_y_ < sprite.y || raster_y_ > sprite.y + kSpriteSize)
-      return;
+      continue;
 
-    uint8_t *sprite_mem = video_ram_ + sprite.start_addr;
+    const uint8_t *sprite_mem = video_ram_ + sprite.start_addr;
     uint8_t colour_index =
         sprite_mem[raster_x - sprite.x + (raster_y_ - sprite.y) * kSpriteSize];
     if (colour_index == 0)
-      return;
-    SDL_Color color1 = lut_[sprite.lut][colour_index];
-    row_pixels[raster_x] =
-        SDL_MapRGBA(pixel_format, color1.r, color1.g, color1.b, color1.a);
+      return false;
+    SDL_Color colour = lut_[sprite.lut][colour_index];
+
+    *row_pixel =
+        SDL_MapRGBA(pixel_format, colour.r, colour.g, colour.b, colour.a);
+    return true;
   }
+  return false;
 }
 
-void Vicky::RenderTileMap(const SDL_PixelFormat *pixel_format,
-                          uint32_t *row_pixels, uint16_t raster_x,
-                          uint8_t layer) {
+bool Vicky::RenderTileMap(const SDL_PixelFormat *pixel_format,
+                          uint16_t raster_x, uint8_t layer,
+                          uint32_t *row_pixel) {
   if (tile_sets_[layer].enabled) {
 
     // TODO support for linear tile sheets.  this assumes a 256x256 sheet
@@ -526,14 +516,17 @@ void Vicky::RenderTileMap(const SDL_PixelFormat *pixel_format,
         &tile_bitmap_row[tile_sheet_column * kTileSize];
 
     uint8_t colour_index = tile_bitmap_column[screen_tile_sub_col];
-    if (colour_index != 0) {
-      SDL_Color color = lut_[tile_set.lut][colour_index];
-      row_pixels[raster_x] =
-          SDL_MapRGBA(pixel_format, color.r, color.g, color.b, color.a);
-    }
+    if (colour_index == 0)
+      return false;
+
+    SDL_Color color = lut_[tile_set.lut][colour_index];
+    *row_pixel = SDL_MapRGBA(pixel_format, color.r, color.g, color.b, color.a);
+    return true;
   }
+  return false;
 }
-void Vicky::RenderMouseCursor(uint32_t *row_pixels, uint16_t raster_x) {
+
+bool Vicky::RenderMouseCursor(uint16_t raster_x, uint32_t *row_pixel) {
   SDL_GetMouseState(&mouse_pos_x_, &mouse_pos_y_);
   if ((raster_x >= mouse_pos_x_ && raster_x <= mouse_pos_x_ + 16) &&
       (raster_y_ >= mouse_pos_y_ && raster_y_ <= mouse_pos_y_ + 16)) {
@@ -542,12 +535,15 @@ void Vicky::RenderMouseCursor(uint32_t *row_pixels, uint16_t raster_x) {
     uint8_t mouse_sub_col = raster_x % 16;
     uint8_t mouse_sub_row = raster_y_ % 16;
     uint8_t pixel_val = mouse_mem[mouse_sub_col + (mouse_sub_row * 16)];
-    if (pixel_val != 0) {
-      row_pixels[raster_x] = pixel_val | (pixel_val << 8) | (pixel_val << 16);
-    }
+    if (pixel_val == 0)
+      return false;
+    *row_pixel = pixel_val | (pixel_val << 8) | (pixel_val << 16);
+    return true;
   }
+  return false;
 }
-void Vicky::RenderCharacterGenerator(uint32_t *row_pixels, uint16_t raster_x) {
+
+bool Vicky::RenderCharacterGenerator(uint16_t raster_x, uint32_t *row_pixel) {
   uint16_t bitmap_x = raster_x;
   uint16_t bitmap_y = raster_y_;
 
@@ -578,15 +574,17 @@ void Vicky::RenderCharacterGenerator(uint32_t *row_pixels, uint16_t raster_x) {
   bool is_cursor_cell = cursor_state_ && cursor_reg_ & Vky_Cursor_Enable &&
                         (cursor_x == column && cursor_y == row);
 
-  uint32_t *char_pixels = &row_pixels[raster_x];
-
   int pixel_pos = 1 << (7 - sub_column);
   if (is_cursor_cell && cursor_font[sub_row] & pixel_pos) {
-    *char_pixels = fg_colour;
+    *row_pixel = fg_colour;
+    return true;
   } else if (character_font[sub_row] & pixel_pos) {
-    *char_pixels = is_cursor_cell ? bg_colour : fg_colour;
+    *row_pixel = is_cursor_cell ? bg_colour : fg_colour;
+    return true;
   } else if (mode_ & Mstr_Ctrl_Text_Mode_En && !is_cursor_cell) {
     // note no bg color in overlay or when cursor on
-    *char_pixels = bg_colour;
+    *row_pixel = bg_colour;
+    return true;
   }
+  return false;
 }
