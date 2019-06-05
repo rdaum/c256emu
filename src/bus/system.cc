@@ -138,16 +138,18 @@ void System::Run(bool profile, bool automation) {
   uint64_t profile_last_cycles = 0;
   auto frame_clock = std::chrono::high_resolution_clock::now();
 
+  int cycle_jitter_adjust = 0;
   while (is_cpu_executing_) {
 
     // Execute the number of instruction's we'd expect to get done in a
     // scanline.
     const uint64_t next_cycle_break =
         cpu_.total_cycles_counter() + kCyclesPerScanline;
-    while (cpu_.total_cycles_counter() < next_cycle_break) {
+    while (cpu_.total_cycles_counter() < next_cycle_break - cycle_jitter_adjust) {
       std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
       CHECK(cpu_.ExecuteNextInstruction());
     }
+    cycle_jitter_adjust = cpu_.total_cycles_counter() - next_cycle_break;
 
     // Render a line.
     {
@@ -159,6 +161,7 @@ void System::Run(bool profile, bool automation) {
       }
       // If it's frame end...
       if (frame_end) {
+        cycle_jitter_adjust = 0;
         // Sleep amount of time until next frame to get 60fps, if not in
         // turbo mode.
         if (!FLAGS_turbo) {
