@@ -89,7 +89,7 @@ System::System()
            &native_mode_interrupts_) {
 
   automation_ =
-      std::make_unique<Automation>(&cpu_, this, system_bus_->int_controller());
+      std::make_unique<Automation>(&cpu_, this);
 }
 
 System::~System() {}

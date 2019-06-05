@@ -18,8 +18,7 @@ class System;
 // automation actions can be triggered from the running program.
 class Automation {
 public:
-  Automation(Cpu65816 *cpu, System *system,
-             InterruptController *interrupt_controller);
+  Automation(Cpu65816 *cpu, System *system);
   ~Automation();
 
   // Called by the CPU before each instruction, when automation/debug mode is on.
@@ -61,8 +60,6 @@ private:
   std::recursive_mutex lua_mutex_;
 
   Cpu65816 *cpu_;
-  System *system_;
-  InterruptController *interrupt_controller_;
 
   lua_State *lua_state_;
 

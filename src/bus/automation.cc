@@ -24,9 +24,8 @@ void PushTable(lua_State *L, const std::string &label, bool val) {
 
 } // namespace
 
-Automation::Automation(Cpu65816 *cpu, System *system,
-                       InterruptController *interrupt_controller)
-    : cpu_(cpu), system_(system), interrupt_controller_(interrupt_controller) {
+Automation::Automation(Cpu65816 *cpu, System *system)
+    : cpu_(cpu) {
   lua_state_ = luaL_newstate();
   luaL_openlibs(lua_state_);
   lua_pushlightuserdata(lua_state_, system);
