@@ -2,8 +2,8 @@
 
 This is a work in progress emulator for the [C256 Foenix](https://c256foenix.com/) microcomputer.
 
-It is written in C++ and renders to a window via SDL2. It's relatively fast, and on my i5 workstation emulates the C256
-at around 30mhz and a full 60fps.
+It is written in C++ and renders to a window via SDL2. It's relatively fast, 
+and on my i5 workstation easily emulates the C256 at full 14mhz and full 60fps.
 
 It supports the following features at the moment. There are definitely bugs and missing pieces. There are definitely
 going to be mismatches with the hardware as I do not have a board to compare against yet. When the Rev C boards are
@@ -106,6 +106,7 @@ Below are the set of arguments the program accepts:
   * `-script` (Lua script to run on start (automation only)) type: string
      default: ""
   * `-profile` (enable CPU performance profiling) type: bool default: false
+  * `-turbo` (turn off frame rate / CPU throttling, go as fast as possible)
 
 To run the emulator you will need to at minimum provide either a `-kernel_bin` argument or `kernel_hex` argument. Both
 arguments are for loading a bootable kernel into the emulated C256's
