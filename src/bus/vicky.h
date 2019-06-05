@@ -60,9 +60,8 @@ private:
   bool RenderTileMap(const SDL_PixelFormat *pixel_format, uint16_t raster_x,
                      uint8_t layer, uint32_t *pixel);
   bool RenderSprites(const SDL_PixelFormat *pixel_format, uint16_t raster_x,
-                     uint8_t layer, uint32_t *pixel);
+                     uint8_t layer, uint32_t sprite_mask, uint32_t *pixel);
 
-  std::atomic_bool is_dirty_;
   System *sys_;
   InterruptController *int_controller_;
 

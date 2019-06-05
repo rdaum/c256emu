@@ -46,10 +46,14 @@ bool Set24(const Address &addr, const Address &start_addr, uint32_t *dest,
   return true;
 }
 
+void Set32(uint32_t *value, uint8_t bit_number) {
+  auto mask = static_cast<uint32_t>(1 << bit_number);
+  *value = *value | mask;
+}
 } // namespace
 
 Vicky::Vicky(System *system, InterruptController *int_controller)
-    : is_dirty_(false), sys_(system), int_controller_(int_controller) {
+    : sys_(system), int_controller_(int_controller) {
   bzero(fg_colour_mem_, sizeof(fg_colour_mem_));
   bzero(bg_colour_mem_, sizeof(bg_colour_mem_));
   bzero(video_ram_, sizeof(video_ram_));
@@ -194,29 +198,27 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
     uint16_t sprite_offset = offset - SP00_CONTROL_REG.offset_;
     uint16_t sprite_num = sprite_offset / 0x08;
     uint16_t register_num = sprite_offset % 0x08;
+    Sprite &sprite = sprites_[sprite_num];
     if (register_num == 0) /* control register */ {
       uint8_t layer = (v & 0b01110000) >> 4;
-      sprites_[sprite_num].layer = layer;
-      sprites_[sprite_num].enabled = v & 0x01;
-      sprites_[sprite_num].lut = (v & 0b00001110) >> 1;
-      sprites_[sprite_num].tile_striding = (v & 0x80);
+      sprite.layer = layer;
+      sprite.enabled = v & 0x01;
+      sprite.lut = (v & 0b00001110) >> 1;
+      sprite.tile_striding = (v & 0x80);
     } else if (register_num == 1) {
-      sprites_[sprite_num].start_addr =
-          (sprites_[sprite_num].start_addr & 0x00ffff00) | v;
+      sprite.start_addr = (sprite.start_addr & 0x00ffff00) | v;
     } else if (register_num == 2) {
-      sprites_[sprite_num].start_addr =
-          (sprites_[sprite_num].start_addr & 0x00ff00ff) | (v << 8);
+      sprite.start_addr = (sprite.start_addr & 0x00ff00ff) | (v << 8);
     } else if (register_num == 3) {
-      sprites_[sprite_num].start_addr =
-          (sprites_[sprite_num].start_addr & 0x0000ffff) | (v << 16);
+      sprite.start_addr = (sprite.start_addr & 0x0000ffff) | (v << 16);
     } else if (register_num == 4) {
-      Binary::setLower8BitsOf16BitsValue(&sprites_[sprite_num].x, v);
+      Binary::setLower8BitsOf16BitsValue(&sprite.x, v);
     } else if (register_num == 5) {
-      Binary::setHigher8BitsOf16BitsValue(&sprites_[sprite_num].x, v);
+      Binary::setHigher8BitsOf16BitsValue(&sprite.x, v);
     } else if (register_num == 6) {
-      Binary::setLower8BitsOf16BitsValue(&sprites_[sprite_num].y, v);
+      Binary::setLower8BitsOf16BitsValue(&sprite.y, v);
     } else if (register_num == 7) {
-      Binary::setHigher8BitsOf16BitsValue(&sprites_[sprite_num].y, v);
+      Binary::setHigher8BitsOf16BitsValue(&sprite.y, v);
     } else {
       LOG(ERROR) << "Unsupported sprite reg: " << register_num;
     }
@@ -331,8 +333,8 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
 }
 
 void Vicky::RenderLine() {
-  if (mode_ & Mstr_Ctrl_Disable_Vid)
-    return;
+  //  if (mode_ & Mstr_Ctrl_Disable_Vid)
+  //    return;
 
   bool run_char_gen =
       mode_ & Mstr_Ctrl_Text_Mode_En || mode_ & Mstr_Ctrl_Text_Overlay;
@@ -358,7 +360,6 @@ void Vicky::RenderLine() {
         std::chrono::steady_clock::now() - last_cursor_flash_;
     if (time_since_flash > std::chrono::milliseconds(flash_interval_ms)) {
       cursor_state_ = !cursor_state_;
-      is_dirty_ = !is_dirty_;
       last_cursor_flash_ = std::chrono::steady_clock::now();
     }
   }
@@ -366,8 +367,48 @@ void Vicky::RenderLine() {
   SDL_PixelFormat *pixel_format = pixel_format_.get();
   uint32_t *row_pixels = &frame_buffer_[kVickyBitmapWidth * raster_y_];
 
+  // Calculate sprites valid for this row before scanning.
+  uint32_t sprite_masks[4]{0, 0, 0, 0};
+  if (mode_ & Mstr_Ctrl_Sprite_En) {
+    for (uint8_t sprite_num = 0; sprite_num < 32; sprite_num++) {
+      Sprite &sprite = sprites_[sprite_num];
+      if (!sprite.enabled || sprite.y < raster_y_ ||
+          sprite.y > raster_y_ + kSpriteSize || sprite.x > 479)
+        continue;
+      Set32(&sprite_masks[sprite.layer], sprite_num);
+    }
+  }
+
   for (uint16_t raster_x = 0; raster_x < kVickyBitmapWidth; raster_x++) {
     uint32_t *row_pixel = &row_pixels[raster_x];
+
+    // Background colour
+    row_pixels[raster_x] = background_bgr_.v;
+
+    // Bitmap
+    if (mode_ & Mstr_Ctrl_Bitmap_En && bitmap_enabled_)
+      RenderBitmap(pixel_format, raster_x, row_pixel);
+
+    // Layers back to front, sprites first, tiles next
+    for (uint8_t layer = kNumLayers; layer-- > 0;) {
+      // Sprites
+      if (sprite_masks[layer]) {
+        RenderSprites(pixel_format, raster_x, layer, sprite_masks[layer],
+                      row_pixel);
+      }
+
+      if (mode_ & Mstr_Ctrl_TileMap_En) {
+        RenderTileMap(pixel_format, raster_x, layer, row_pixel);
+      }
+    }
+
+    // Characters
+    if (run_char_gen)
+      RenderCharacterGenerator(raster_x, row_pixel);
+
+    // Mouse
+    if (mouse_cursor_enable_)
+      RenderMouseCursor(raster_x, row_pixel);
 
     if (border_enabled_) {
       if (raster_x < kBorderWidth) {
@@ -395,37 +436,6 @@ void Vicky::RenderLine() {
         continue;
       }
     }
-
-    if (mouse_cursor_enable_ && RenderMouseCursor(raster_x, row_pixel))
-      continue;
-    if (run_char_gen && RenderCharacterGenerator(raster_x, row_pixel))
-      continue;
-
-    // Layers front to back.
-    bool rendered = false;
-    for (uint8_t layer = 0; layer < kNumLayers; layer++) {
-      // Sprites
-      if (mode_ & Mstr_Ctrl_Sprite_En) {
-        rendered = RenderSprites(pixel_format, raster_x, layer, row_pixel);
-        if (rendered)
-          break;
-      }
-
-      if (mode_ & Mstr_Ctrl_TileMap_En) {
-        rendered = RenderTileMap(pixel_format, raster_x, layer, row_pixel);
-
-        if (rendered)
-          break;
-      }
-    }
-    if (rendered)
-      continue;
-
-    if (mode_ & Mstr_Ctrl_Bitmap_En && bitmap_enabled_ &&
-        RenderBitmap(pixel_format, raster_x, row_pixel))
-      continue;
-
-    row_pixels[raster_x] = background_bgr_.v;
   }
 
   // TODO line interrupt
@@ -453,18 +463,15 @@ bool Vicky::RenderBitmap(const SDL_PixelFormat *pixel_format, uint16_t raster_x,
 
 bool Vicky::RenderSprites(const SDL_PixelFormat *pixel_format,
                           uint16_t raster_x, uint8_t layer,
-                          uint32_t *row_pixel) {
+                          uint32_t sprite_mask, uint32_t *row_pixel) {
   // TODO this sprite routine can't keep up to 14mhz emulation on my
   // PC if lots of sprites were enabled in many layers.
 
   // Keep drawing until we run out of sprites in this layer.
-  uint32_t pixel_val = 0;
-  for (int sprite_num = 0; sprite_num < 32 && !pixel_val; sprite_num++) {
+  for (int sprite_num = 0; sprite_mask; sprite_num++, sprite_mask >>= 1) {
     Sprite &sprite = sprites_[sprite_num];
-    if (!sprite.enabled || sprite.layer != layer)
-      continue;
 
-    if (raster_x < sprite.x || raster_x > sprite.x + kSpriteSize ||
+    if (!sprite.enabled || raster_x < sprite.x || raster_x > sprite.x + kSpriteSize ||
         raster_y_ < sprite.y || raster_y_ > sprite.y + kSpriteSize)
       continue;
 
@@ -474,7 +481,6 @@ bool Vicky::RenderSprites(const SDL_PixelFormat *pixel_format,
     if (colour_index == 0)
       return false;
     SDL_Color colour = lut_[sprite.lut][colour_index];
-
     *row_pixel =
         SDL_MapRGBA(pixel_format, colour.r, colour.g, colour.b, colour.a);
     return true;
