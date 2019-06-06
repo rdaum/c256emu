@@ -138,6 +138,9 @@ std::vector<SystemBusDevice::MemoryRegion> Vicky::GetMemoryRegions() {
       SystemBusDevice::MemoryRegion{GRPH_LUT0_PTR.AsInt(),
                                     (GAMMA_B_LUT_PTR - 1).AsInt(),
                                     reinterpret_cast<uint8_t *>(lut_)},
+      SystemBusDevice::MemoryRegion{GAMMA_B_LUT_PTR.AsInt(),
+                                    (GAMMA_R_LUT_PTR + 0xff).AsInt(),
+                                    reinterpret_cast<uint8_t *>(&gamma_)},
       SystemBusDevice::MemoryRegion{
           FG_CHAR_LUT_PTR.AsInt(), (BG_CHAR_LUT_PTR - 1).AsInt(),
           reinterpret_cast<uint8_t *>(fg_colour_mem_)},
@@ -237,36 +240,6 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
     return;
   }
 
-  // Gamma set.
-
-  if (addr.InRange(GAMMA_B_LUT_PTR, GAMMA_G_LUT_PTR - 1)) {
-    if (address)
-      *address = reinterpret_cast<uint8_t *>(
-          &gamma_b_[offset - GAMMA_B_LUT_PTR.offset_]);
-    gamma_b_[offset - GAMMA_B_LUT_PTR.offset_] = ((uint16_t)v) << 8;
-    SDL_SetWindowGammaRamp(window_, gamma_r_, gamma_g_, gamma_b_);
-
-    return;
-  }
-  if (addr.InRange(GAMMA_G_LUT_PTR, GAMMA_R_LUT_PTR - 1)) {
-    if (address)
-      *address = reinterpret_cast<uint8_t *>(
-          &gamma_g_[offset - GAMMA_B_LUT_PTR.offset_]);
-    gamma_g_[offset - GAMMA_G_LUT_PTR.offset_] = ((uint16_t)v) << 8;
-    SDL_SetWindowGammaRamp(window_, gamma_r_, gamma_g_, gamma_b_);
-
-    return;
-  }
-  if (addr.InRange(GAMMA_R_LUT_PTR, TILE_MAP0 - 1)) {
-    if (address)
-      *address = reinterpret_cast<uint8_t *>(
-          &gamma_r_[offset - GAMMA_B_LUT_PTR.offset_]);
-    gamma_r_[offset - GAMMA_R_LUT_PTR.offset_] = ((uint16_t)v) << 8;
-    SDL_SetWindowGammaRamp(window_, gamma_r_, gamma_g_, gamma_b_);
-
-    return;
-  }
-
   if (addr == VKY_TXT_CURSOR_CTRL_REG) {
     cursor_reg_ = v;
     return;
@@ -342,7 +315,7 @@ void Vicky::RenderLine() {
     uint32_t *row_pixel = &row_pixels[raster_x];
 
     // Background colour
-    row_pixels[raster_x] = background_bgr_.v;
+    row_pixels[raster_x] = ApplyGamma(background_bgr_.v);
 
     // Bitmap
     if (mode_ & Mstr_Ctrl_Bitmap_En && bitmap_enabled_)
@@ -369,22 +342,23 @@ void Vicky::RenderLine() {
       RenderMouseCursor(raster_x, row_pixel);
 
     if (border_enabled_) {
+      uint32_t border_colour = ApplyGamma(border_colour_.v);
       if (raster_x < kBorderWidth) {
-        *row_pixel = border_colour_.v;
+        *row_pixel = border_colour;
         continue;
       }
       if (raster_x > kVickyBitmapWidth - kBorderWidth) {
-        *row_pixel = border_colour_.v;
+        *row_pixel = border_colour;
 
         continue;
       }
       if (raster_y_ < kBorderHeight) {
-        *row_pixel = border_colour_.v;
+        *row_pixel = border_colour;
 
         continue;
       }
       if (raster_y_ > kVickyBitmapHeight - kBorderHeight) {
-        *row_pixel = border_colour_.v;
+        *row_pixel = border_colour;
 
         continue;
       }
@@ -408,7 +382,7 @@ bool Vicky::RenderBitmap(uint16_t raster_x, uint32_t *row_pixel) {
   uint8_t colour_index = indexed_row[raster_x];
   if (colour_index == 0)
     return false;
-  *row_pixel = lut_[bitmap_lut_][colour_index].v;
+  *row_pixel = ApplyGamma(lut_[bitmap_lut_][colour_index].v);
   return true;
 }
 
@@ -431,7 +405,7 @@ bool Vicky::RenderSprites(uint16_t raster_x, uint8_t layer,
         sprite_mem[raster_x - sprite.x + (raster_y_ - sprite.y) * kSpriteSize];
     if (colour_index == 0)
       return false;
-    *row_pixel = lut_[sprite.lut][colour_index].v;
+    *row_pixel = ApplyGamma(lut_[sprite.lut][colour_index].v);
     return true;
   }
   return false;
@@ -473,7 +447,7 @@ bool Vicky::RenderTileMap(uint16_t raster_x, uint8_t layer,
     if (colour_index == 0)
       return false;
 
-    *row_pixel = lut_[tile_set.lut][colour_index].v;
+    *row_pixel = ApplyGamma(lut_[tile_set.lut][colour_index].v);
     return true;
   }
   return false;
@@ -490,7 +464,7 @@ bool Vicky::RenderMouseCursor(uint16_t raster_x, uint32_t *row_pixel) {
     uint8_t pixel_val = mouse_mem[mouse_sub_col + (mouse_sub_row * 16)];
     if (pixel_val == 0)
       return false;
-    *row_pixel = pixel_val | (pixel_val << 8) | (pixel_val << 16);
+    *row_pixel = ApplyGamma(pixel_val | (pixel_val << 8) | (pixel_val << 16));
     return true;
   }
   return false;
@@ -529,15 +503,32 @@ bool Vicky::RenderCharacterGenerator(uint16_t raster_x, uint32_t *row_pixel) {
 
   int pixel_pos = 1 << (7 - sub_column);
   if (is_cursor_cell && cursor_font[sub_row] & pixel_pos) {
-    *row_pixel = fg_colour;
+    *row_pixel = ApplyGamma(fg_colour);
     return true;
   } else if (character_font[sub_row] & pixel_pos) {
-    *row_pixel = is_cursor_cell ? bg_colour : fg_colour;
+    *row_pixel = ApplyGamma(is_cursor_cell ? bg_colour : fg_colour);
     return true;
   } else if (mode_ & Mstr_Ctrl_Text_Mode_En && !is_cursor_cell) {
     // note no bg color in overlay or when cursor on
-    *row_pixel = bg_colour;
+    *row_pixel = ApplyGamma(bg_colour);
     return true;
   }
   return false;
+}
+
+uint32_t Vicky::ApplyGamma(uint32_t colour_val) {
+  // Seems like GAMMA_en is always off? But too dim if we won't use it.
+
+  //  if (!(mode_ & Mstr_Ctrl_GAMMA_En)) return colour_val;
+  BGRAColour colour { .v = colour_val };
+  BGRAColour corrected {
+    .bgra = {
+        gamma_.b[colour.bgra[0]],
+        gamma_.g[colour.bgra[1]],
+        gamma_.r[colour.bgra[2]],
+        colour.bgra[0],
+    }
+  };
+
+  return corrected.v;
 }

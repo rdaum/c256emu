@@ -60,6 +60,8 @@ private:
   bool RenderSprites(uint16_t raster_x, uint8_t layer, uint32_t sprite_mask,
                      uint32_t *pixel);
 
+  uint32_t ApplyGamma(uint32_t colour_val);
+
   System *sys_;
   InterruptController *int_controller_;
 
@@ -73,9 +75,11 @@ private:
   BGRAColour lut_[8][256];
   BGRAColour background_bgr_;
 
-  uint16_t gamma_r_[256];
-  uint16_t gamma_g_[256];
-  uint16_t gamma_b_[256];
+  struct {
+    uint8_t b[256];
+    uint8_t g[256];
+    uint8_t r[256];
+  } gamma_;
 
   uint16_t mode_ = 0;
 
