@@ -165,8 +165,6 @@ int Automation::LuaClearBreakpoint(lua_State *L) {
 int Automation::LuaGetBreakpoints(lua_State *L) {
   lua_getglobal(L, kAutomationLuaObj);
   Automation *automation = (Automation *)lua_touserdata(L, -1);
-  uint32_t addr = lua_tointeger(L, -1);
-  Address break_addr(addr);
   auto breakpoints = automation->GetBreakpoints();
 
   lua_createtable(L, breakpoints.size(), 0);
@@ -193,7 +191,7 @@ int Automation::LuaPeek(lua_State *L) {
 int Automation::LuaPoke(lua_State *L) {
   System *sys = GetSystem(L);
   lua_pop(L, 1);
-  uint32_t addr = lua_tointeger(L, -1);
+  uint32_t addr = lua_tointeger(L, -2);
   uint32_t v = lua_tointeger(L, -1);
   sys->StoreByte(Address(addr), v);
   return 0;
@@ -213,7 +211,7 @@ int Automation::LuaPeek16(lua_State *L) {
 int Automation::LuaPoke16(lua_State *L) {
   System *sys = GetSystem(L);
   lua_pop(L, 1);
-  uint32_t addr = lua_tointeger(L, -1);
+  uint32_t addr = lua_tointeger(L, -2);
   uint32_t v = lua_tointeger(L, -1);
   sys->StoreByte(Address(addr), v);
   return 0;
@@ -223,14 +221,13 @@ int Automation::LuaPoke16(lua_State *L) {
 int Automation::LuaPeekBuf(lua_State *L) {
   System *sys = GetSystem(L);
   lua_pop(L, 1);
-  uint32_t start_addr = lua_tointeger(L, -1);
+  uint32_t start_addr = lua_tointeger(L, -2);
   uint32_t buf_size = lua_tointeger(L, -1);
 
-  Address addr(start_addr);
+  Address end_addr(start_addr + buf_size);
   std::vector<uint8_t> buffer;
-  for (size_t i = 0; i < buf_size; i++) {
-    buffer.push_back(sys->ReadByte(addr));
-    addr = addr + 1;
+  for (auto i = Address(start_addr); i < end_addr; i = i.WithOffset(1)) {
+    buffer.push_back(sys->ReadByte(i));
   }
 
   lua_pushlstring(L, (const char*)buffer.data(), buf_size);
