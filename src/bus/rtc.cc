@@ -3,6 +3,8 @@
 #include <chrono>
 #include <ctime>
 
+namespace {
+
 constexpr Address kRtcSec(0xaf, 0x0800);      // Seconds Register
 constexpr Address kRtcSecAlarm(0xaf, 0x0801); // Seconds Alarm Register
 constexpr Address kRtcMin(0xaf, 0x0802);      // Minutes Register
@@ -20,7 +22,6 @@ constexpr Address kRtcFlags(0xaf, 0x080D);    // Flags Register
 constexpr Address kRtcCtrl(0xaf, 0x080E);     // Control Register
 constexpr Address kRtcCentury(0xaf, 0x080F);  // Century Register
 
-namespace {
 uint8_t Trunc(int val) { return val % 10 | (val / 10) << 4; }
 } // namespace
 

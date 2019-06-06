@@ -7,6 +7,7 @@
 #include "bus/sdl_to_atset_keymap.h"
 #include "bus/system.h"
 
+namespace {
 // status register bits
 constexpr uint8_t kOutputBufferStatus = 0; // clear if empty, 1 if readable
 constexpr uint8_t kInputBufferStatus =
@@ -50,6 +51,8 @@ constexpr uint8_t kMaxInputBufferSize = 64;
 
 constexpr Address kKeyboardStatusRegister(0xaf, 0x1064);
 constexpr Address kKeyboardBufferRegister(0xaf, 0x1060);
+
+} // namespace
 
 Keyboard::Keyboard(System *sys, InterruptController *int_controller)
     : sys_(sys), int_controller_(int_controller) {

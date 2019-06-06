@@ -54,11 +54,11 @@ void Set32(uint32_t *value, uint8_t bit_number) {
 
 Vicky::Vicky(System *system, InterruptController *int_controller)
     : sys_(system), int_controller_(int_controller) {
-  bzero(fg_colour_mem_, sizeof(fg_colour_mem_));
-  bzero(bg_colour_mem_, sizeof(bg_colour_mem_));
-  bzero(video_ram_, sizeof(video_ram_));
-  bzero(tile_sets_, sizeof(tile_sets_));
-  bzero(sprites_, sizeof(sprites_));
+  memset(fg_colour_mem_, 0, sizeof(fg_colour_mem_));
+  memset(bg_colour_mem_, 0, sizeof(bg_colour_mem_));
+  memset(video_ram_, 0, sizeof(video_ram_));
+  memset(tile_sets_, 0, sizeof(tile_sets_));
+  memset(sprites_, 0, sizeof(sprites_));
 }
 
 void Vicky::Start() {

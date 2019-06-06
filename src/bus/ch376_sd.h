@@ -70,6 +70,4 @@ private:
   std::string root_directory_;
 
   CH376_FileInfo current_file_;
-
-  bool streaming_ = false;
 };
