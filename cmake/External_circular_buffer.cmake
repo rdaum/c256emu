@@ -11,7 +11,6 @@ ExternalProject_Add(
 ExternalProject_Get_Property(circular_buffer source_dir)
 set(CIRCULAR_BUFFER_INCLUDE_DIRS ${source_dir}/include)
 
-message(OUT ${CIRCULAR_BUFFER_INCLUDE_DIRS})
 # The cloning of the above repo doesn't happen until make, however if the dir doesn't
 # exist, INTERFACE_INCLUDE_DIRECTORIES will throw an error.
 # To make it work, we just create the directory now during config.

@@ -69,12 +69,8 @@ Embedded Lua interpretter that can do the following:
 
 To build, you will need a C++17 compliant compiler (clang or GCC should work), CMake 3.10 or greater, and will need to install the following build dependencies (Debian packages listed):
 
-  * libsdl2-dev
-  * liblua5.1-0-dev
-  * libgflags-dev
   * libadplug-dev
   * libsrecord-dev
-  * libgoogle-glog-dev
 
 Then kick off cmake as usual:
 

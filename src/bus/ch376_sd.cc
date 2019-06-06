@@ -388,7 +388,7 @@ bool CH376_ReadLong::HasValue() const {
 
 uint32_t CH376_ReadLong::value() const {
   CHECK(HasValue());
-  CHECK_LT(values_.size(), 5);
+  CHECK_LT(values_.size(), 5u);
   uint32_t v = 0;
   for (int i = values_.size(); i-- > 0;) {
     v |= values_[i] << (i * 8);

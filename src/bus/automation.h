@@ -4,7 +4,7 @@
 #include <vector>
 #include <optional>
 
-#include <lua5.1/lua.hpp>
+#include <lua.hpp>
 
 #include "bus/int_controller.h"
 #include "cpu/cpu_65816.h"
@@ -55,13 +55,13 @@ private:
   static int LuaLoadHex(lua_State *L);
   static int LuaLoadBin(lua_State *L);
 
-  static const luaL_reg c256emu_methods[];
+  static const ::luaL_Reg c256emu_methods[];
 
   std::recursive_mutex lua_mutex_;
 
   Cpu65816 *cpu_;
 
-  lua_State *lua_state_;
+  ::lua_State *lua_state_;
 
   std::vector<Breakpoint> breakpoints_;
   std::optional<uint32_t> stop_steps_;

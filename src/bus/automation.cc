@@ -24,6 +24,24 @@ void PushTable(lua_State *L, const std::string &label, bool val) {
 
 } // namespace
 
+// static
+const ::luaL_Reg Automation::c256emu_methods[] = {
+    {"stop", Automation::LuaStopCpu},
+    {"continue", Automation::LuaContCpu},
+    {"step", Automation::LuaStep},
+    {"add_breakpoint", Automation::LuaAddBreakpoint},
+    {"clear_breakpoint", Automation::LuaClearBreakpoint},
+    {"breakpoints", Automation::LuaGetBreakpoints},
+    {"cpu_state", Automation::LuaGetCpuState},
+    {"peek", Automation::LuaPeek},
+    {"poke", Automation::LuaPoke},
+    {"peek16", Automation::LuaPeek16},
+    {"poke16", Automation::LuaPoke16},
+    {"peekbuf", Automation::LuaPeekBuf},
+    {"load_hex", Automation::LuaLoadHex},
+    {"load_bin", Automation::LuaLoadBin},
+    {0, 0}};
+
 Automation::Automation(Cpu65816 *cpu, System *system)
     : cpu_(cpu) {
   lua_state_ = luaL_newstate();
@@ -33,7 +51,8 @@ Automation::Automation(Cpu65816 *cpu, System *system)
   lua_pushlightuserdata(lua_state_, this);
   lua_setglobal(lua_state_, kAutomationLuaObj);
 
-  luaL_openlib(lua_state_, "c256emu", c256emu_methods, 0);
+  luaL_newlib(lua_state_, c256emu_methods);
+  lua_setglobal(lua_state_, "c256emu");
 }
 
 Automation::~Automation() { lua_close(lua_state_); }
@@ -117,24 +136,6 @@ void Automation::ClearBreakpoint(const Address &address) {
 std::vector<Automation::Breakpoint> Automation::GetBreakpoints() const {
   return breakpoints_;
 }
-
-// static
-const luaL_reg Automation::c256emu_methods[] = {
-    {"stop", Automation::LuaStopCpu},
-    {"continue", Automation::LuaContCpu},
-    {"step", Automation::LuaStep},
-    {"add_breakpoint", Automation::LuaAddBreakpoint},
-    {"clear_breakpoint", Automation::LuaClearBreakpoint},
-    {"breakpoints", Automation::LuaGetBreakpoints},
-    {"cpu_state", Automation::LuaGetCpuState},
-    {"peek", Automation::LuaPeek},
-    {"poke", Automation::LuaPoke},
-    {"peek16", Automation::LuaPeek16},
-    {"poke16", Automation::LuaPoke16},
-    {"peekbuf", Automation::LuaPeekBuf},
-    {"load_hex", Automation::LuaLoadHex},
-    {"load_bin", Automation::LuaLoadBin},
-    {0, 0}};
 
 // static
 int Automation::LuaAddBreakpoint(lua_State *L) {
@@ -248,7 +249,7 @@ int Automation::LuaLoadHex(lua_State *L) {
 int Automation::LuaLoadBin(lua_State *L) {
   System *sys = GetSystem(L);
   lua_pop(L, 1);
-  const std::string path = lua_tostring(L, -1);
+  const std::string path = lua_tostring(L, -2);
   uint32_t addr = lua_tointeger(L, -1);
   sys->LoadBin(path, Address(addr));
   return 0;
