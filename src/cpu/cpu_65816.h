@@ -52,8 +52,9 @@ public:
   void SetNMIPin(bool value) { pins_.NMI = value; }
   void SetABORTPin(bool value) { pins_.ABORT = value; }
 
-  // Temporary
   bool ExecuteNextInstruction();
+
+  void Jump(const Address &address);
 
   Address program_address() const;
   const Stack *stack() const;

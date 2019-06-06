@@ -40,6 +40,7 @@ const ::luaL_Reg Automation::c256emu_methods[] = {
     {"peekbuf", Automation::LuaPeekBuf},
     {"load_hex", Automation::LuaLoadHex},
     {"load_bin", Automation::LuaLoadBin},
+    {"sys", Automation::LuaSys},
     {0, 0}};
 
 Automation::Automation(Cpu65816 *cpu, System *system)
@@ -252,9 +253,18 @@ int Automation::LuaLoadBin(lua_State *L) {
   const std::string path = lua_tostring(L, -2);
   uint32_t addr = lua_tointeger(L, -1);
   sys->LoadBin(path, Address(addr));
+
   return 0;
 }
 
+// static
+int Automation::LuaSys(lua_State *L) {
+  System *sys = GetSystem(L);
+  lua_pop(L, 1);
+  uint32_t addr = lua_tointeger(L, -1);
+  sys->Sys(Address(addr));
+  return 0;
+}
 
 // static
 int Automation::LuaGetCpuState(lua_State *L) {

@@ -132,6 +132,13 @@ void System::Initialize(const std::string &automation_script) {
   }
 }
 
+void System::Sys(const Address &address) {
+  std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
+  Stop();
+  cpu_.Jump(address);
+  Resume();
+}
+
 void System::Run(bool profile, bool automation) {
   uint64_t frames = 0;
   auto profile_previous_time = std::chrono::high_resolution_clock::now();

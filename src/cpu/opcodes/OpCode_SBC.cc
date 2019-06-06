@@ -288,3 +288,5 @@ void Cpu65816::executeSBC(OpCode &opCode) {
   }
   }
 }
+
+void Cpu65816::Jump(const Address &address) { program_address_ = address; }

@@ -39,6 +39,9 @@ public:
   void StoreByte(const Address &addr, uint8_t val);
   void StoreTwoBytes(const Address &addr, uint16_t val);
 
+  // Jump to address.
+  void Sys(const Address &address);
+
   Automation *automation() const { return automation_.get(); }
   Cpu65816 *cpu() { return &cpu_; }
 

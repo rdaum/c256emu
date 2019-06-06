@@ -75,7 +75,7 @@ To build, you will need a C++17 compliant compiler (clang or GCC should work), C
 Then kick off cmake as usual:
 
   ```shell
-  cmake .
+  cmake -DCMAKE_BUILD_TYPE=Release .
   make
   ```
 
@@ -145,6 +145,8 @@ c256emu.peakbuf(<address>, <num_bytes>)
 
 c256emu.load_bin(<file>, <address>)
 c256emu.load_hex(<file>)
+
+c256emu.sys(<address>)
 
 c256emu.cpu_state.pc
 c256emu.cpu_state.a
