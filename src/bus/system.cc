@@ -70,17 +70,17 @@ private:
 System::System()
     : system_bus_(std::make_unique<C256SystemBus>(this)),
       native_mode_interrupts_({
-          0x0000, // coprocessor enable
-          0xfffe, // brk
-          0x0000, // abort
-          0xfffa, // nmi
-          0xfffc, // reset
-          0xfffe, // irq
+          0xffe4, // coprocessor enable
+          0xffee, // brk
+          0xffeb, // abort
+          0xffea, // nmi
+          0xffec, // reset
+          0xffee, // irq
       }),
       emulation_mode_interrupts_({
-          0x0000, // coprocessor enable
+          0xfff4, // coprocessor enable
           0x0000, // unused
-          0x0000, // abort
+          0xffe6, // abort
           0xfffa, // NMI
           0xfffc, // reset
           0xfffe, // brkIrq
