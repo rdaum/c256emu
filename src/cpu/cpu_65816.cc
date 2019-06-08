@@ -145,7 +145,6 @@ uint16_t Cpu65816::indexWithYRegister() const {
 void Cpu65816::Jump(const Address &address) {
   stack_.Push8Bit(program_address_.bank_);
   stack_.Push16Bit(program_address_.offset_);
-  stack_.Push8Bit(cpu_status_.register_value());
   cpu_status_.emulation_flag = false;
   cpu_status_.accumulator_width_flag = false;
   cpu_status_.index_width_flag = true;

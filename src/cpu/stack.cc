@@ -24,12 +24,10 @@
 
 Stack::Stack(SystemBus *system_bus)
     : system_bus_(system_bus), stack_address_(0x00, STACK_POINTER_DEFAULT) {
-  LOG(INFO) << "Initialized at default location " << stack_address_;
 }
 
 Stack::Stack(SystemBus *systemBus, uint16_t stack_pointer)
     : system_bus_(systemBus), stack_address_(0x00, stack_pointer) {
-  LOG(INFO) << "Initialized at location " << stack_address_;
 }
 
 void Stack::Push8Bit(uint8_t value) {
