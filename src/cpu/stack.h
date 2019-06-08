@@ -20,7 +20,8 @@
 #ifndef __STACK__
 #define __STACK__
 
-#include <stdint.h>
+#include <cstdint>
+#include <vector>
 
 #include "cpu/system_bus.h"
 
@@ -39,7 +40,9 @@ class Stack {
 
   uint16_t stack_pointer() const;
 
- private:
+  std::string Peek(size_t num);
+
+private:
   SystemBus* system_bus_;
   Address stack_address_;
 };

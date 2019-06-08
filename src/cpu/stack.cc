@@ -18,39 +18,52 @@
  */
 
 #include <glog/logging.h>
+#include <iomanip>
 
 #include "cpu/stack.h"
 
-Stack::Stack(SystemBus* system_bus)
+Stack::Stack(SystemBus *system_bus)
     : system_bus_(system_bus), stack_address_(0x00, STACK_POINTER_DEFAULT) {
-  LOG(INFO) << "Initialized at default location " << stack_address_.offset_;
+  LOG(INFO) << "Initialized at default location " << stack_address_;
 }
 
-Stack::Stack(SystemBus* systemBus, uint16_t stack_pointer)
+Stack::Stack(SystemBus *systemBus, uint16_t stack_pointer)
     : system_bus_(systemBus), stack_address_(0x00, stack_pointer) {
-  LOG(INFO) << "Initialized at location " << stack_address_.offset_;
+  LOG(INFO) << "Initialized at location " << stack_address_;
 }
 
 void Stack::Push8Bit(uint8_t value) {
   system_bus_->StoreByte(stack_address_, value);
-  stack_address_.offset_ += sizeof(uint8_t);
+  stack_address_.offset_ -= sizeof(uint8_t);
 }
 
 void Stack::Push16Bit(uint16_t value) {
-  system_bus_->StoreWord(stack_address_, value);
-  stack_address_.offset_ += sizeof(uint16_t);
+  system_bus_->StoreWord(stack_address_ - 1, value);
+  stack_address_.offset_ -= sizeof(uint16_t);
 }
 
 uint8_t Stack::Pull8Bit() {
-  stack_address_.offset_ -= sizeof(uint8_t);
-  return system_bus_->ReadByte(stack_address_);
+  stack_address_.offset_ += sizeof(uint8_t);
+  uint8_t v = system_bus_->ReadByte(stack_address_);
+  return v;
 }
 
 uint16_t Stack::Pull16Bit() {
-  stack_address_.offset_ -= sizeof(uint16_t);
-  return system_bus_->ReadWord(stack_address_);
+  stack_address_.offset_++;
+  uint16_t v = system_bus_->ReadWord(stack_address_);
+  stack_address_.offset_++;
+  return v;
 }
 
-uint16_t Stack::stack_pointer() const {
-  return stack_address_.offset_;
+uint16_t Stack::stack_pointer() const { return stack_address_.offset_; }
+
+std::string Stack::Peek(size_t num) {
+  std::stringstream r;
+  Address s = stack_address_ + 1;
+  while (num--) {
+    r << "0x" << std::setfill('0') << std::setw(2) << std::hex
+      << (int)system_bus_->ReadByte(s) << " ";
+    s.offset_++;
+  }
+  return r.str();
 }
