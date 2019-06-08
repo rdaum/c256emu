@@ -88,8 +88,7 @@ System::System()
       cpu_(*system_bus_, &emulation_mode_interrupts_,
            &native_mode_interrupts_) {
 
-  automation_ =
-      std::make_unique<Automation>(&cpu_, this);
+  automation_ = std::make_unique<Automation>(&cpu_, this);
 }
 
 System::~System() {}
@@ -152,9 +151,11 @@ void System::Run(bool profile, bool automation) {
     // scanline.
     const uint64_t next_cycle_break =
         cpu_.total_cycles_counter() + kCyclesPerScanline;
-    while (cpu_.total_cycles_counter() < next_cycle_break - cycle_jitter_adjust) {
+    while (cpu_.total_cycles_counter() <
+           next_cycle_break - cycle_jitter_adjust) {
       std::lock_guard<std::recursive_mutex> bus_lock(system_bus_mutex_);
-      CHECK(cpu_.ExecuteNextInstruction());
+      CHECK(cpu_.ExecuteNextInstruction())
+          << "Instruction execution fail @ " << cpu_.program_address();
     }
     cycle_jitter_adjust = cpu_.total_cycles_counter() - next_cycle_break;
 
