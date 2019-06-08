@@ -41,6 +41,7 @@ const ::luaL_Reg Automation::c256emu_methods[] = {
     {"load_hex", Automation::LuaLoadHex},
     {"load_bin", Automation::LuaLoadBin},
     {"sys", Automation::LuaSys},
+    {"trace_log", Automation::LuaTraceLog},
     {0, 0}};
 
 Automation::Automation(Cpu65816 *cpu, System *system)
@@ -267,6 +268,15 @@ int Automation::LuaSys(lua_State *L) {
 }
 
 // static
+int Automation::LuaTraceLog(lua_State *L) {
+  System *sys = GetSystem(L);
+  lua_pop(L, 1);
+  bool trace = lua_toboolean(L, -1);
+  sys->cpu()->set_trace_log(trace);
+  return 0;
+}
+
+// static
 int Automation::LuaGetCpuState(lua_State *L) {
   System *system = GetSystem(L);
   const CpuStatus *cpu_status = system->cpu()->cpu_status();
@@ -327,3 +337,6 @@ int Automation::LuaStep(lua_State *L) {
 
   return 0;
 }
+
+
+

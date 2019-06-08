@@ -66,6 +66,7 @@ public:
   uint16_t x() const { return x_; }
   uint16_t y() const { return y_; }
 
+  void set_trace_log(bool trace_log) { trace_log_ = trace_log; }
 private:
   bool accumulatorIs8BitWide() const;
   bool accumulatorIs16BitWide() const;
@@ -203,8 +204,8 @@ private:
 
   // Total number of cycles
   std::atomic<uint64_t> total_cycles_counter_ = 0;
-  struct timespec last_time_;
-  uint64_t previous_cycles_;
+
+  bool trace_log_ = false;
 };
 
 #endif

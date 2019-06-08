@@ -21,6 +21,7 @@
 #include "cpu_65816.h"
 
 #include <cmath>
+#include <iomanip>
 
 Cpu65816::Cpu65816(SystemBus &systemBus,
                    EmulationModeInterrupts *emulationInterrupts,
@@ -94,6 +95,13 @@ bool Cpu65816::ExecuteNextInstruction() {
   const uint8_t instruction = system_bus_.ReadByte(program_address_);
   OpCode opCode = OP_CODE_TABLE[instruction];
 
+  if (trace_log_) {
+    LOG(INFO) << program_address_ << " :" << opCode.name() << " ("
+              << "0x" << std::setfill('0') << std::setw(2) << std::hex
+              << (int)opCode.code() << ") "
+              << "stack@" << std::hex << stack_.stack_pointer() << ": "
+              << stack_.Peek(8);
+  }
   return opCode.execute(*this);
 }
 
@@ -132,4 +140,14 @@ uint16_t Cpu65816::indexWithXRegister() const {
 
 uint16_t Cpu65816::indexWithYRegister() const {
   return indexIs8BitWide() ? Binary::lower8BitsOf(y_) : y_;
+}
+
+void Cpu65816::Jump(const Address &address) {
+  stack_.Push8Bit(program_address_.bank_);
+  stack_.Push16Bit(program_address_.offset_);
+  stack_.Push8Bit(cpu_status_.register_value());
+  cpu_status_.emulation_flag = false;
+  cpu_status_.accumulator_width_flag = false;
+  cpu_status_.index_width_flag = true;
+  program_address_ = address;
 }
