@@ -18,7 +18,7 @@ constexpr auto kVickyFrameDelayDuration =
     std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::seconds(1)) /
     kVickyTargetFps;
-constexpr int kTargetClockRate = 14000000;
+constexpr int kTargetClockRate = 14318000;
 constexpr int kRasterLinesPerSecond = kVickyBitmapHeight * kVickyTargetFps;
 constexpr int kCyclesPerScanline = kTargetClockRate / kRasterLinesPerSecond;
 
