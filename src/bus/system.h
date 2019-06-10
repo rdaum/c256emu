@@ -27,7 +27,7 @@ class System {
   void Start(bool profile);
 
   // Stop the loop thread completely.
-  void Stop();
+  void SetStop();
 
   // Ask the bus to read or write addresses in a thread safe way.
   uint16_t ReadTwoBytes(uint32_t addr);

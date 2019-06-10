@@ -55,22 +55,10 @@ constexpr uint32_t kKeyboardBufferRegister = 0xaf1060;
 } // namespace
 
 Keyboard::Keyboard(System *sys, InterruptController *int_controller)
-    : sys_(sys), int_controller_(int_controller) {
-  // TODO move all timers to one timer manager.
-  poll_thread_ = std::thread([this] {
-    running_ = true;
-
-    while (running_) {
-      PollKeyboard();
-      std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    }
-  });
-  poll_thread_.detach();
-}
+    : sys_(sys), int_controller_(int_controller) {}
 
 void Keyboard::StoreByte(uint32_t addr, uint8_t v) {
   if (addr == 0x1060) {
-    std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
     if (expect_command_byte_) {
       ccb_ = v;
       expect_command_byte_ = false;
@@ -86,7 +74,6 @@ void Keyboard::StoreByte(uint32_t addr, uint8_t v) {
   }
   if (addr == 0x1064) {
     if (v == kSelfTest) {
-      std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
       output_buffer_.push_back(0x55); // test passed
       status_register_ = 0;
       status_register_ |= (1 << kCommandData);
@@ -95,8 +82,6 @@ void Keyboard::StoreByte(uint32_t addr, uint8_t v) {
       return;
     }
     if (v == kInterfaceTest) {
-      std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
-
       output_buffer_.push_back(0x00); // test passed
       status_register_ = 0;
       status_register_ |= (1 << kCommandData);
@@ -104,14 +89,12 @@ void Keyboard::StoreByte(uint32_t addr, uint8_t v) {
       return;
     }
     if (v == kEnableMousePort) {
-      std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
       status_register_ = 0;
       status_register_ |= (1 << kCommandData);
       status_register_ |= (1 << kSystemFlag);
       return;
     }
     if (v == kTestMousePort) {
-      std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
       output_buffer_.push_back(0x00); // test passed
       status_register_ = 0;
       status_register_ |= (1 << kCommandData);
@@ -126,7 +109,6 @@ void Keyboard::StoreByte(uint32_t addr, uint8_t v) {
       return;
     }
     if (v == kWriteCommandByte) {
-      std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
       // Command will go on 0x1060, next.
       status_register_ = 0;
       status_register_ |= (1 << kCommandData);
@@ -134,13 +116,11 @@ void Keyboard::StoreByte(uint32_t addr, uint8_t v) {
       expect_command_byte_ = true;
       return;
     }
-    { std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_); }
   }
 }
 
 uint8_t Keyboard::ReadByte(const uint32_t addr) {
   if (addr == 0x1064) {
-    std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
     uint8_t status_register = status_register_;
     status_register |= (1 << kKeyboardLock);
     if (!output_buffer_.empty())
@@ -154,7 +134,6 @@ uint8_t Keyboard::ReadByte(const uint32_t addr) {
     uint8_t return_byte = 0;
     bool is_empty = true;
     {
-      std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
       if (output_buffer_.empty()) {
         return_byte = 0;
         LOG(WARNING) << "attempt to read empty keyboard output buffer";
@@ -172,8 +151,6 @@ uint8_t Keyboard::ReadByte(const uint32_t addr) {
   return 0;
 }
 
-void Keyboard::PushKey(uint8_t key) { output_buffer_.push_back(key); }
-
 Keybinding FindKey(SDL_Scancode scan_code) {
   for (auto keymap_key : keymap) {
     if (keymap_key.scancode == scan_code) {
@@ -185,70 +162,42 @@ Keybinding FindKey(SDL_Scancode scan_code) {
 
 void Keyboard::PollKeyboard() {
   SDL_Event event;
-  std::chrono::steady_clock clock;
   while (SDL_PollEvent(&event)) {
-    switch (event.type) {
-    case SDL_KEYDOWN: {
-      auto key = FindKey(event.key.keysym.scancode);
-      if (key.at_set1_code == kNoKey.at_set1_code) {
-        LOG(ERROR) << "Unhandled key: " << event.key.keysym.scancode;
-      } else {
-        {
-          std::lock_guard<std::mutex> repeat_key_lock(
-              repeat_key_.repeat_mutex_);
-          repeat_key_.key = key;
-          repeat_key_.last_key_output_time =
-              std::chrono::time_point_cast<std::chrono::milliseconds>(
-                  clock.now());
-        }
-        PushKey(key, false);
-      }
-    } break;
-    case SDL_KEYUP: {
-      auto key = FindKey(event.key.keysym.scancode);
-      if (key.at_set1_code == kNoKey.at_set1_code) {
-        LOG(ERROR) << "Unhandled key: " << event.key.keysym.scancode;
-      } else {
-        PushKey(key, true);
-        {
-          std::lock_guard<std::mutex> repeat_key_lock(
-              repeat_key_.repeat_mutex_);
-          if (key.at_set1_code == repeat_key_.key.at_set1_code) {
-            repeat_key_.key = kNoKey;
-            repeat_key_.repeats = 0;
-          }
-        }
-      }
+    HandleSDLEvent(event);
+  }
+}
 
-    } break;
-    case SDL_QUIT:
-      sys_->Stop();
-      {
-        std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
-        running_ = false;
-      }
-      break;
+void Keyboard::HandleSDLEvent(const SDL_Event &event) {
+  switch (event.type) {
+  case SDL_KEYDOWN: {
+    auto key = FindKey(event.key.keysym.scancode);
+    if (key.at_set1_code == kNoKey.at_set1_code) {
+      LOG(ERROR) << "Unhandled key: " << event.key.keysym.scancode;
+    } else {
+      repeat_key_.key = key;
+      repeat_key_.last_key_output_time =
+          std::chrono::time_point_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now());
+      PushKey(key, false);
     }
-    {
-      std::lock_guard<std::mutex> repeat_key_lock(repeat_key_.repeat_mutex_);
-      if (repeat_key_.key.at_set1_code) {
-        auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(
-            clock.now());
-        auto time_since_press = now - repeat_key_.last_key_output_time;
-        if ((!repeat_key_.repeats && time_since_press.count() > 600) ||
-            (repeat_key_.repeats > 1 && time_since_press.count() > 50)) {
-          PushKey(repeat_key_.key, false);
-          repeat_key_.repeats++;
-        }
-        repeat_key_.last_key_output_time = now;
+  } break;
+  case SDL_KEYUP: {
+    auto key = FindKey(event.key.keysym.scancode);
+    if (key.at_set1_code == kNoKey.at_set1_code) {
+      LOG(ERROR) << "Unhandled key: " << event.key.keysym.scancode;
+    } else {
+      PushKey(key, true);
+      if (key.at_set1_code == repeat_key_.key.at_set1_code) {
+        repeat_key_.key = kNoKey;
+        repeat_key_.repeats = 0;
       }
     }
+  } break;
   }
 }
 
 void Keyboard::PushKey(const Keybinding &key, bool release) {
   {
-    std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
     if (key.extended) {
       output_buffer_.push_back(0xe0);
     }

@@ -25,10 +25,10 @@ constexpr int kRasterLinesPerSecond = kVickyBitmapHeight * kVickyTargetFps;
 
 DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
 
-}  // namespace
+} // namespace
 
 class C256SystemBus : public SystemBus {
- public:
+public:
   explicit C256SystemBus(System *sys) {
     math_co_ = std::make_unique<MathCoprocessor>();
     int_controller_ = std::make_unique<InterruptController>(sys);
@@ -44,8 +44,9 @@ class C256SystemBus : public SystemBus {
 
   InterruptController *int_controller() const { return int_controller_.get(); }
   Vicky *vicky() const { return vicky_.get(); }
+  Keyboard *keyboard() const { return keyboard_.get(); }
 
- private:
+private:
   void InitBus();
   static bool IsIoDeviceAddress(void *context, cpuaddr_t addr);
   static void IoRead(void *context, cpuaddr_t addr, uint8_t *data,
@@ -130,7 +131,8 @@ void C256SystemBus::InitBus() {
         p.io_mask = 0xFF00;
         p.io_eq = 0x100;
       }
-      if (i >= 0xF0) p.flags = Page::kReadOnly;
+      if (i >= 0xF0)
+        p.flags = Page::kReadOnly;
     }
   }
 
@@ -194,10 +196,17 @@ DebugInterface *System::GetDebugInterface() { return &debug_; }
 
 void System::DrawNextLine() {
   system_bus_->vicky()->RenderLine();
-  ScheduleNextScanline();
 
   bool frame_end = system_bus_->vicky()->is_vertical_end();
   if (frame_end) {
+    SDL_Event event;
+    if (SDL_PollEvent(&event)) {
+      system_bus_->keyboard()->HandleSDLEvent(event);
+      if (event.type == SDL_QUIT) {
+        SetStop();
+        return;
+      }
+    }
     current_frame_++;
     system_bus_->int_controller()->RaiseFrameStart();
 
@@ -226,13 +235,14 @@ void System::DrawNextLine() {
     frame_clock = now;
     next_frame_clock += kVickyFrameDelayDurationNs;
   }
+  ScheduleNextScanline();
 }
 
 void System::ScheduleNextScanline() {
   total_scanlines_++;
-  events_.ScheduleNoLock(
-      (kTargetClockRate * total_scanlines_) / kRasterLinesPerSecond,
-      std::bind(&System::DrawNextLine, this));
+  events_.ScheduleNoLock((kTargetClockRate * total_scanlines_) /
+                             kRasterLinesPerSecond,
+                         std::bind(&System::DrawNextLine, this));
 }
 
 void System::Run(bool profile) {
@@ -264,6 +274,4 @@ void System::ClearIRQ() { cpu_.cpu_state.ClearInterruptSource(1); }
 
 void System::Start(bool profile) { Run(profile); }
 
-void System::Stop() {
-  events_.Schedule(0, [this]() { cpu_.cpu_state.cycle_stop = 0; });
-}
+void System::SetStop() { cpu_.cpu_state.cycle_stop = 0; }

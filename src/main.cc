@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
       free(buf);
     }
     linenoiseHistoryFree();
-    system.Stop();
+    system.SetStop();
   }
 
   run_thread.join();
