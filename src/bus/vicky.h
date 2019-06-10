@@ -38,7 +38,6 @@ class Vicky {
   // Render a single scan line and advance to the next.
   void RenderLine();
 
-  // SystemBusDevice implementation
   void StoreByte(uint32_t addr, uint8_t v);
   uint8_t ReadByte(uint32_t addr);
 
@@ -63,8 +62,8 @@ class Vicky {
   System *sys_;
   InterruptController *int_controller_;
 
-  SDL_Window *window_;
-  SDL_Renderer *renderer_;
+  SDL_Window *window_{};
+  SDL_Renderer *renderer_{};
 
   union BGRAColour {
     uint32_t v;
@@ -77,31 +76,31 @@ class Vicky {
     uint8_t b[256];
     uint8_t g[256];
     uint8_t r[256];
-  } gamma_;
+  } gamma_{};
 
   uint16_t mode_ = 0;
 
-  uint8_t font_bank_[4096];
-  uint8_t text_mem_[8192];
-  uint8_t text_colour_mem_[8192];
+  uint8_t font_bank_[4096]{};
+  uint8_t text_mem_[8192]{};
+  uint8_t text_colour_mem_[8192]{};
 
-  uint32_t fg_colour_mem_[16];
-  uint32_t bg_colour_mem_[16];
+  uint32_t fg_colour_mem_[16]{};
+  uint32_t bg_colour_mem_[16]{};
 
-  uint8_t cursor_colour_;
-  uint8_t cursor_char_;
-  uint8_t cursor_reg_;
+  uint8_t cursor_colour_{};
+  uint8_t cursor_char_{};
+  uint8_t cursor_reg_{};
   uint16_t cursor_x_ = 0;
   uint16_t cursor_y_ = 0;
 
   bool mouse_cursor_enable_ = false;
   bool mouse_cursor_select_ = false;  // false = 0, true = 1
-  uint8_t mouse_cursor_0_[256];
-  uint8_t mouse_cursor_1_[256];
+  uint8_t mouse_cursor_0_[256]{};
+  uint8_t mouse_cursor_1_[256]{};
 
   // Set by SDL
-  int mouse_pos_x_;
-  int mouse_pos_y_;
+  int mouse_pos_x_{};
+  int mouse_pos_y_{};
 
   bool cursor_state_ = false;
   std::chrono::time_point<std::chrono::steady_clock> last_cursor_flash_;
@@ -109,7 +108,7 @@ class Vicky {
   bool bitmap_enabled_ = false;
   uint8_t bitmap_lut_ = 0;
   uint32_t bitmap_addr_offset_ = 0;
-  uint8_t video_ram_[0x400000];
+  uint8_t video_ram_[0x400000]{};
 
   struct TileSet {
     bool enabled = false;
@@ -137,14 +136,14 @@ class Vicky {
   };
   Sprite sprites_[32];
 
-  bool border_enabled_;
+  bool border_enabled_{};
   BGRAColour border_colour_;
 
   uint16_t raster_y_ = 0;
 
   // Our physical frame buffer
-  uint32_t frame_buffer_[kRasterSize];
+  uint32_t frame_buffer_[kRasterSize]{};
 
   // Which is uploaded to this texture each frame.
-  SDL_Texture* vicky_texture_;
+  SDL_Texture* vicky_texture_{};
 };

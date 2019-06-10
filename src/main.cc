@@ -38,7 +38,11 @@ int main(int argc, char *argv[]) {
   });
 
   if (FLAGS_automation) {
-    Automation automation(system.cpu(), system.GetDebugInterface());
+    Automation automation(system.cpu(), &system, system.GetDebugInterface());
+
+    if (!FLAGS_script.empty()) {
+      automation.LoadScript(FLAGS_script);
+    }
 
     linenoiseInstallWindowChangeHandler();
 

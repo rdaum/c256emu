@@ -21,12 +21,8 @@ class System;
 // automation actions can be triggered from the running program.
 class Automation {
  public:
-  Automation(WDC65C816 *cpu, DebugInterface *debug_interface);
+  Automation(WDC65C816 *cpu, System *sys, DebugInterface *debug_interface);
   ~Automation();
-
-  // Called by the CPU before each instruction, when automation/debug mode is
-  // on.
-  bool Step();
 
   bool LoadScript(const std::string &path);
   bool Eval(const std::string &expression);
@@ -43,8 +39,6 @@ class Automation {
   System *system() { return system_; }
 
  private:
-  void SetStopSteps(uint32_t steps);
-
   static int LuaStopCpu(lua_State *L);
   static int LuaContCpu(lua_State *L);
   static int LuaAddBreakpoint(lua_State *L);
@@ -60,18 +54,16 @@ class Automation {
   static int LuaLoadHex(lua_State *L);
   static int LuaLoadBin(lua_State *L);
   static int LuaSys(lua_State *L);
-  static int LuaTraceLog(lua_State *L);
 
   static const ::luaL_Reg c256emu_methods[];
 
   std::recursive_mutex lua_mutex_;
 
-  DebugInterface *debug_interface_;
   WDC65C816 *cpu_;
   System *system_;
+  DebugInterface *debug_interface_;
 
   ::lua_State *lua_state_;
 
   std::vector<Breakpoint> breakpoints_;
-  std::optional<uint32_t> stop_steps_;
 };

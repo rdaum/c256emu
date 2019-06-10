@@ -40,11 +40,10 @@ const ::luaL_Reg Automation::c256emu_methods[] = {
     {"load_hex", Automation::LuaLoadHex},
     {"load_bin", Automation::LuaLoadBin},
     {"sys", Automation::LuaSys},
-    {"trace_log", Automation::LuaTraceLog},
     {0, 0}};
 
-Automation::Automation(WDC65C816 *cpu, DebugInterface *debug_interface)
-    : debug_interface_(debug_interface), cpu_(cpu) {
+Automation::Automation(WDC65C816 *cpu, System *sys, DebugInterface *debug_interface)
+    : cpu_(cpu), system_(sys), debug_interface_(debug_interface) {
   lua_state_ = luaL_newstate();
   luaL_openlibs(lua_state_);
   lua_pushlightuserdata(lua_state_, this);
@@ -79,32 +78,6 @@ bool Automation::Eval(const std::string &expression) {
   if (result != 0) {
     LOG(ERROR) << "Eval failure: " << lua_tostring(lua_state_, -1);
     return false;
-  }
-  return true;
-}
-
-void Automation::SetStopSteps(uint32_t steps) {
-  std::lock_guard<std::recursive_mutex> lua_lock(lua_mutex_);
-
-  stop_steps_ = steps;
-}
-
-bool Automation::Step() {
-  std::lock_guard<std::recursive_mutex> lua_lock(lua_mutex_);
-
-  if (stop_steps_) {
-    if (!stop_steps_.value() || !(stop_steps_.value()--)) {
-      return false;
-    }
-  }
-  for (auto &breakpoint : breakpoints_) {
-    if (breakpoint.address == cpu_->program_address()) {
-      lua_getglobal(lua_state_, breakpoint.lua_function_name.c_str());
-      lua_pushinteger(lua_state_, cpu_->program_address());
-      lua_call(lua_state_, 1, 1);
-      bool lua_result = lua_toboolean(lua_state_, -1);
-      return lua_result;
-    }
   }
   return true;
 }
@@ -262,15 +235,6 @@ int Automation::LuaSys(lua_State *L) {
   lua_pop(L, 1);
   uint32_t addr = lua_tointeger(L, -1);
   sys->Sys(addr);
-  return 0;
-}
-
-// static
-int Automation::LuaTraceLog(lua_State *L) {
-  // System *sys = GetSystem(L);
-  lua_pop(L, 1);
-  // bool trace = lua_toboolean(L, -1);
-  // sys->cpu()->set_trace_log(trace);
   return 0;
 }
 
