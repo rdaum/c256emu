@@ -1,11 +1,11 @@
 #pragma once
 
-#include "cpu/cpu_65816.h"
+#include <stdint.h>
 
 class System;
 
 // TODO: polarity/edge/mask
-class InterruptController : public SystemBusDevice {
+class InterruptController {
 public:
   explicit InterruptController(System *sys);
 
@@ -17,9 +17,8 @@ public:
   void LowerCH376();
 
   // SystemBusDevice implementation.
-  void StoreByte(const Address &addr, uint8_t v, uint8_t **address) override;
-  uint8_t ReadByte(const Address &addr, uint8_t **address) override;
-  bool DecodeAddress(const Address &from_addr, Address &to_addr) override;
+  void StoreByte(uint32_t addr, uint8_t v);
+  uint8_t ReadByte(uint32_t addr);
 
 private:
   union InterruptSet1 {

@@ -1,7 +1,7 @@
 #include "bus/math_copro.h"
 
 #include <functional>
-
+#include <glog/logging.h>
 namespace {
 template <typename T, typename R> R Multiply(T a, T b) { return a * b; }
 template <typename T, typename R> R Divide(T a, T b) {
@@ -16,18 +16,18 @@ template <typename T, typename R> R Remainder(T a, T b) {
 }
 template <typename T, typename R> R Add(T a, T b) { return a + b; }
 
-bool Set16(const Address &addr, const Address &start_addr,
+bool Set16(uint32_t addr, uint32_t start_addr,
            MathCoprocessor::IVal *d, uint8_t v) {
-  uint16_t o = addr.offset_ - start_addr.offset_;
+  uint16_t o = addr - start_addr;
   if (o > 1)
     return false;
   d->bytes[o] = v;
   return true;
 }
 
-bool Set32(const Address &addr, const Address &start_addr, int32_t *d,
+bool Set32(uint32_t addr, uint32_t start_addr, int32_t *d,
            uint8_t v) {
-  uint16_t o = addr.offset_ - start_addr.offset_;
+  uint16_t o = addr - start_addr;
   if (o > 3)
     return false;
   if (o == 3) {
@@ -49,18 +49,18 @@ bool Set32(const Address &addr, const Address &start_addr, int32_t *d,
   return false;
 }
 
-bool Get32(const Address &addr, const Address &start_addr,
+bool Get32(uint32_t addr, uint32_t start_addr,
            const MathCoprocessor::LongVal &r, uint8_t *result) {
-  uint16_t o = addr.offset_ - start_addr.offset_;
+  uint16_t o = addr - start_addr;
   if (o > 3)
     return false;
   *result = r.bytes[o];
   return true;
 }
 
-bool Get16(const Address &addr, const Address &start_addr,
+bool Get16(uint32_t addr, uint32_t start_addr,
            const MathCoprocessor::WordVal &r, uint8_t *result) {
-  uint16_t o = addr.offset_ - start_addr.offset_;
+  uint16_t o = addr - start_addr;
   if (o > 2)
     return false;
   *result = r.bytes[o];
@@ -91,8 +91,7 @@ MathCoprocessor::MathCoprocessor()
   adder32_r_.uint_32 = 0;
 }
 
-void MathCoprocessor::StoreByte(const Address &addr, uint8_t v,
-                                uint8_t **address) {
+void MathCoprocessor::StoreByte(uint32_t addr, uint8_t v) {
   if (Set16(addr, M0_OPERAND_A, &m0_.a, v) ||
       Set16(addr, M0_OPERAND_B, &m0_.b, v)) {
     m0_.result.uint_32 = Multiply<uint16_t, uint32_t>(m0_.a.u_int, m0_.b.u_int);
@@ -124,7 +123,7 @@ void MathCoprocessor::StoreByte(const Address &addr, uint8_t v,
   }
 }
 
-uint8_t MathCoprocessor::ReadByte(const Address &addr, uint8_t **address) {
+uint8_t MathCoprocessor::ReadByte(uint32_t addr) {
   uint8_t result = 0;
   if (Get32(addr, M0_RESULT, m0_.result, &result))
     return result;
@@ -142,13 +141,4 @@ uint8_t MathCoprocessor::ReadByte(const Address &addr, uint8_t **address) {
     return result;
 
   return 0;
-}
-
-bool MathCoprocessor::DecodeAddress(const Address &from_addr,
-                                    Address &to_addr) {
-  if (from_addr.InRange(Address(0x00, 0100), Address(0x00, 0x012c))) {
-    to_addr = from_addr;
-    return true;
-  }
-  return false;
 }

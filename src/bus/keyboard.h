@@ -7,7 +7,6 @@
 #include <mutex>
 #include <thread>
 #include "bus/sdl_to_atset_keymap.h"
-#include "cpu/cpu_65816.h"
 #include <atomic>
 #include <circular_buffer.hpp>
 
@@ -15,17 +14,16 @@ class System;
 class InterruptController;
 
 // Emulate an 8042-style keyboard controller. Mostly works.
-class Keyboard : public SystemBusDevice {
+class Keyboard {
  public:
   Keyboard(System* system, InterruptController* int_controller);
-  ~Keyboard() override = default;
+  ~Keyboard() = default;
 
   void PushKey(uint8_t key);
 
   // SystemBusDevice implementation
-  void StoreByte(const Address& addr, uint8_t v, uint8_t** address) override;
-  uint8_t ReadByte(const Address& addr, uint8_t** address) override;
-  bool DecodeAddress(const Address& from_addr, Address& to_addr) override;
+  void StoreByte(uint32_t addr, uint8_t v);
+  uint8_t ReadByte(uint32_t addr);
 
  private:
   void PollKeyboard();

@@ -10,10 +10,9 @@ constexpr const char kSystemLuaObj[] = "System";
 constexpr const char kAutomationLuaObj[] = "Automation";
 
 System *GetSystem(lua_State *L) {
-  lua_getglobal(L, kSystemLuaObj);
-  System *system = (System *)lua_touserdata(L, -1);
-  CHECK(system);
-  return system;
+  lua_getglobal(L, kAutomationLuaObj);
+  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  return automation->system();
 }
 
 void PushTable(lua_State *L, const std::string &label, bool val) {
@@ -22,7 +21,7 @@ void PushTable(lua_State *L, const std::string &label, bool val) {
   lua_settable(L, -3);
 }
 
-} // namespace
+}  // namespace
 
 // static
 const ::luaL_Reg Automation::c256emu_methods[] = {
@@ -44,12 +43,10 @@ const ::luaL_Reg Automation::c256emu_methods[] = {
     {"trace_log", Automation::LuaTraceLog},
     {0, 0}};
 
-Automation::Automation(Cpu65816 *cpu, System *system)
-    : cpu_(cpu) {
+Automation::Automation(WDC65C816 *cpu, DebugInterface *debug_interface)
+    : debug_interface_(debug_interface), cpu_(cpu) {
   lua_state_ = luaL_newstate();
   luaL_openlibs(lua_state_);
-  lua_pushlightuserdata(lua_state_, system);
-  lua_setglobal(lua_state_, kSystemLuaObj);
   lua_pushlightuserdata(lua_state_, this);
   lua_setglobal(lua_state_, kAutomationLuaObj);
 
@@ -72,13 +69,6 @@ bool Automation::LoadScript(const std::string &path) {
     return false;
   }
   LOG(INFO) << "Loaded automation script: " << path;
-  return true;
-}
-
-bool Automation::Run() {
-  std::lock_guard<std::recursive_mutex> lua_lock(lua_mutex_);
-  stop_steps_.reset();
-
   return true;
 }
 
@@ -110,7 +100,7 @@ bool Automation::Step() {
   for (auto &breakpoint : breakpoints_) {
     if (breakpoint.address == cpu_->program_address()) {
       lua_getglobal(lua_state_, breakpoint.lua_function_name.c_str());
-      lua_pushinteger(lua_state_, cpu_->program_address().AsInt());
+      lua_pushinteger(lua_state_, cpu_->program_address());
       lua_call(lua_state_, 1, 1);
       bool lua_result = lua_toboolean(lua_state_, -1);
       return lua_result;
@@ -119,14 +109,24 @@ bool Automation::Step() {
   return true;
 }
 
-void Automation::AddBreakpoint(const Address &address,
+void Automation::AddBreakpoint(uint32_t address,
                                const std::string &function_name) {
   std::lock_guard<std::recursive_mutex> lua_lock(lua_mutex_);
 
   breakpoints_.push_back({address, function_name});
+  debug_interface_->SetBreakpoint(address, [this, address](EmulatedCpu *) {
+    std::lock_guard<std::recursive_mutex> lua_lock(lua_mutex_);
+    for (auto &bp : breakpoints_) {
+      if (bp.address == address) {
+        lua_getglobal(lua_state_, bp.lua_function_name.c_str());
+        lua_pcall(lua_state_, 0, 0, 0);
+        break;
+      }
+    }
+  });
 }
 
-void Automation::ClearBreakpoint(const Address &address) {
+void Automation::ClearBreakpoint(uint32_t address) {
   auto bp = std::find_if(
       breakpoints_.begin(), breakpoints_.end(),
       [address](const Breakpoint &b) { return b.address == address; });
@@ -144,11 +144,10 @@ int Automation::LuaAddBreakpoint(lua_State *L) {
   lua_getglobal(L, kAutomationLuaObj);
   Automation *automation = (Automation *)lua_touserdata(L, -1);
   uint32_t addr = lua_tointeger(L, -1);
-  Address break_addr(addr);
   size_t len;
   const char *function_cstr = lua_tolstring(L, -1, &len);
   std::string function(function_cstr, len);
-  automation->AddBreakpoint(break_addr, function);
+  automation->AddBreakpoint(addr, function);
 
   return 0;
 }
@@ -158,8 +157,7 @@ int Automation::LuaClearBreakpoint(lua_State *L) {
   lua_getglobal(L, kAutomationLuaObj);
   Automation *automation = (Automation *)lua_touserdata(L, -1);
   uint32_t addr = lua_tointeger(L, -1);
-  Address break_addr(addr);
-  automation->ClearBreakpoint(break_addr);
+  automation->ClearBreakpoint(addr);
 
   return 0;
 }
@@ -173,7 +171,7 @@ int Automation::LuaGetBreakpoints(lua_State *L) {
   lua_createtable(L, breakpoints.size(), 0);
   for (size_t i = 0; i < breakpoints.size(); i++) {
     const auto breakpoint = breakpoints[i];
-    lua_pushinteger(L, breakpoint.address.AsInt());
+    lua_pushinteger(L, breakpoint.address);
     lua_settable(L, i);
   }
 
@@ -185,7 +183,7 @@ int Automation::LuaPeek(lua_State *L) {
   System *sys = GetSystem(L);
   lua_pop(L, 1);
   uint32_t addr = lua_tointeger(L, -1);
-  auto v = sys->ReadByte(Address(addr));
+  auto v = sys->ReadByte(addr);
   lua_pushinteger(L, v);
   return 1;
 }
@@ -196,7 +194,7 @@ int Automation::LuaPoke(lua_State *L) {
   lua_pop(L, 1);
   uint32_t addr = lua_tointeger(L, -2);
   uint32_t v = lua_tointeger(L, -1);
-  sys->StoreByte(Address(addr), v);
+  sys->StoreByte(addr, v);
   return 0;
 }
 
@@ -205,7 +203,7 @@ int Automation::LuaPeek16(lua_State *L) {
   System *sys = GetSystem(L);
   lua_pop(L, 1);
   uint32_t addr = lua_tointeger(L, -1);
-  auto v = sys->ReadTwoBytes(Address(addr));
+  auto v = sys->ReadTwoBytes(addr);
   lua_pushinteger(L, v);
   return 1;
 }
@@ -216,7 +214,7 @@ int Automation::LuaPoke16(lua_State *L) {
   lua_pop(L, 1);
   uint32_t addr = lua_tointeger(L, -2);
   uint32_t v = lua_tointeger(L, -1);
-  sys->StoreByte(Address(addr), v);
+  sys->StoreByte(addr, v);
   return 0;
 }
 
@@ -227,13 +225,13 @@ int Automation::LuaPeekBuf(lua_State *L) {
   uint32_t start_addr = lua_tointeger(L, -2);
   uint32_t buf_size = lua_tointeger(L, -1);
 
-  Address end_addr(start_addr + buf_size);
+  uint32_t end_addr(start_addr + buf_size);
   std::vector<uint8_t> buffer;
-  for (auto i = Address(start_addr); i < end_addr; i = i.WithOffset(1)) {
+  for (auto i = start_addr; i < end_addr; i++) {
     buffer.push_back(sys->ReadByte(i));
   }
 
-  lua_pushlstring(L, (const char*)buffer.data(), buf_size);
+  lua_pushlstring(L, (const char *)buffer.data(), buf_size);
 
   return 1;
 }
@@ -247,13 +245,13 @@ int Automation::LuaLoadHex(lua_State *L) {
   return 0;
 }
 
-//static
+// static
 int Automation::LuaLoadBin(lua_State *L) {
   System *sys = GetSystem(L);
   lua_pop(L, 1);
   const std::string path = lua_tostring(L, -2);
   uint32_t addr = lua_tointeger(L, -1);
-  sys->LoadBin(path, Address(addr));
+  sys->LoadBin(path, addr);
 
   return 0;
 }
@@ -263,52 +261,53 @@ int Automation::LuaSys(lua_State *L) {
   System *sys = GetSystem(L);
   lua_pop(L, 1);
   uint32_t addr = lua_tointeger(L, -1);
-  sys->Sys(Address(addr));
+  sys->Sys(addr);
   return 0;
 }
 
 // static
 int Automation::LuaTraceLog(lua_State *L) {
-  System *sys = GetSystem(L);
+  // System *sys = GetSystem(L);
   lua_pop(L, 1);
-  bool trace = lua_toboolean(L, -1);
-  sys->cpu()->set_trace_log(trace);
+  // bool trace = lua_toboolean(L, -1);
+  // sys->cpu()->set_trace_log(trace);
   return 0;
 }
 
 // static
 int Automation::LuaGetCpuState(lua_State *L) {
-  System *system = GetSystem(L);
-  const CpuStatus *cpu_status = system->cpu()->cpu_status();
+  lua_getglobal(L, kAutomationLuaObj);
+  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  const auto &cpu_state = automation->cpu_->cpu_state;
 
   lua_createtable(L, 0, 5);
   lua_pushstring(L, "a");
-  lua_pushinteger(L, system->cpu()->a());
+  lua_pushinteger(L, automation->cpu_->a());
   lua_settable(L, -3);
   lua_pushstring(L, "x");
-  lua_pushinteger(L, system->cpu()->x());
+  lua_pushinteger(L, automation->cpu_->x());
   lua_settable(L, -3);
   lua_pushstring(L, "y");
-  lua_pushinteger(L, system->cpu()->y());
+  lua_pushinteger(L, automation->cpu_->y());
   lua_settable(L, -3);
   lua_pushstring(L, "pc");
-  lua_pushinteger(L, system->cpu()->program_address().AsInt());
+  lua_pushinteger(L, automation->cpu_->program_address());
   lua_settable(L, -3);
   lua_pushstring(L, "cycle_count");
-  lua_pushinteger(L, system->cpu()->total_cycles_counter());
+  lua_pushinteger(L, cpu_state.cycle);
   lua_settable(L, -3);
   lua_pushstring(L, "status");
   lua_createtable(L, 0, 10);
-  PushTable(L, "carry_flag", cpu_status->carry_flag);
-  PushTable(L, "zero_flag", cpu_status->zero_flag);
-  PushTable(L, "interrupt_disable_flag", cpu_status->interrupt_disable_flag);
-  PushTable(L, "decimal_flag", cpu_status->decimal_flag);
-  PushTable(L, "break_flag", cpu_status->break_flag);
-  PushTable(L, "accumulator_width_flag", cpu_status->accumulator_width_flag);
-  PushTable(L, "index_width_flag", cpu_status->index_width_flag);
-  PushTable(L, "emulation_flag", cpu_status->emulation_flag);
-  PushTable(L, "overflow_flag", cpu_status->overflow_flag);
-  PushTable(L, "sign_flag", cpu_status->sign_flag);
+  PushTable(L, "carry_flag", cpu_state.is_carry());
+  PushTable(L, "zero_flag", cpu_state.is_zero());
+  PushTable(L, "interrupt_disable_flag", !cpu_state.interrupts_enabled());
+  PushTable(L, "decimal_flag", cpu_state.is_decimal());
+  PushTable(L, "break_flag", 1);
+  PushTable(L, "accumulator_width_flag", !automation->cpu_->mode_long_a);
+  PushTable(L, "index_width_flag", !automation->cpu_->mode_long_xy);
+  PushTable(L, "emulation_flag", automation->cpu_->mode_emulation);
+  PushTable(L, "overflow_flag", cpu_state.is_overflow());
+  PushTable(L, "sign_flag", cpu_state.is_negative());
   lua_settable(L, -3);
 
   return 1;
@@ -316,14 +315,18 @@ int Automation::LuaGetCpuState(lua_State *L) {
 
 // static
 int Automation::LuaStopCpu(lua_State *L) {
-  GetSystem(L)->Suspend();
+  lua_getglobal(L, kAutomationLuaObj);
+  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  automation->debug_interface_->Pause();
 
   return 0;
 }
 
 // static
 int Automation::LuaContCpu(lua_State *L) {
-  GetSystem(L)->Resume();
+  lua_getglobal(L, kAutomationLuaObj);
+  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  automation->debug_interface_->Resume();
 
   return 0;
 }
@@ -333,10 +336,7 @@ int Automation::LuaStep(lua_State *L) {
   lua_getglobal(L, kAutomationLuaObj);
   Automation *automation = (Automation *)lua_touserdata(L, -1);
 
-  automation->SetStopSteps(1);
+  automation->debug_interface_->SingleStep(1);
 
   return 0;
 }
-
-
-

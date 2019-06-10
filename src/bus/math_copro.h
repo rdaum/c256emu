@@ -1,38 +1,37 @@
 #pragma once
 
-#include "cpu/cpu_65816.h"
+#include <stdint.h>
 
-constexpr Address M0_OPERAND_A(0x00, 0x100);
-constexpr Address M0_OPERAND_B(0x00, 0x102);
-constexpr Address M0_RESULT(0x00, 0x104);
+constexpr uint32_t M0_OPERAND_A = 0x100;
+constexpr uint32_t M0_OPERAND_B = 0x102;
+constexpr uint32_t M0_RESULT = 0x104;
 
-constexpr Address M1_OPERAND_A(0x00, 0x108);
-constexpr Address M1_OPERAND_B(0x00, 0x10A);
-constexpr Address M1_RESULT(0x00, 0x10C);
+constexpr uint32_t M1_OPERAND_A = 0x108;
+constexpr uint32_t M1_OPERAND_B = 0x10A;
+constexpr uint32_t M1_RESULT = 0x10C;
 
-constexpr Address D0_OPERAND_A(0x00, 0x110);
-constexpr Address D0_OPERAND_B(0x00, 0x112);
-constexpr Address D0_RESULT(0x00, 0x114);
-constexpr Address D0_REMAINDER(0x00, 0x116);
+constexpr uint32_t D0_OPERAND_A = 0x110;
+constexpr uint32_t D0_OPERAND_B = 0x112;
+constexpr uint32_t D0_RESULT = 0x114;
+constexpr uint32_t D0_REMAINDER = 0x116;
 
-constexpr Address D1_OPERAND_A(0x00, 0x118);
-constexpr Address D1_OPERAND_B(0x00, 0x11A);
-constexpr Address D1_RESULT(0x00, 0x11C);
-constexpr Address D1_REMAINDER(0x00, 0x11E);
+constexpr uint32_t D1_OPERAND_A = 0x118;
+constexpr uint32_t D1_OPERAND_B = 0x11A;
+constexpr uint32_t D1_RESULT = 0x11C;
+constexpr uint32_t D1_REMAINDER = 0x11E;
 
-constexpr Address ADDER32_OPERAND_A(0x00, 0x120);
-constexpr Address ADDER32_OPERAND_B(0x00, 0x124);
-constexpr Address ADDER32_RESULT(0x00, 0x128);
+constexpr uint32_t ADDER32_OPERAND_A = 0x120;
+constexpr uint32_t ADDER32_OPERAND_B = 0x124;
+constexpr uint32_t ADDER32_RESULT = 0x128;
 
 
-class MathCoprocessor : public SystemBusDevice {
+class MathCoprocessor {
  public:
   MathCoprocessor();
 
   // SystemBusDevice implementation
-  void StoreByte(const Address& addr, uint8_t v, uint8_t** address) override;
-  uint8_t ReadByte(const Address& addr, uint8_t** address) override;
-  bool DecodeAddress(const Address& from_addr, Address& to_addr) override;
+  void StoreByte(uint32_t addr, uint8_t v);
+  uint8_t ReadByte(uint32_t addr);
 
   union IVal {
     int16_t s_int;

@@ -1,12 +1,11 @@
 #pragma once
 
-#include "cpu/cpu_65816.h"
+#include <stdint.h>
+#include <glog/logging.h>
 
-class Rtc : public SystemBusDevice {
+class Rtc {
  public:
-  void StoreByte(const Address& addr, uint8_t v, uint8_t** address) override;
+  void StoreByte(uint32_t addr, uint8_t v);
 
-  uint8_t ReadByte(const Address& addr, uint8_t** address) override;
-
-  bool DecodeAddress(const Address& from_addr, Address& to_addr) override;
+  uint8_t ReadByte(uint32_t addr);
 };
