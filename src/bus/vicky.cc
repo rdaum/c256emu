@@ -91,16 +91,16 @@ void Vicky::Start() {
 
   CHECK(window_);
   renderer_ = SDL_CreateRenderer(window_, -1, 0);
-  vicky_texture_.reset(SDL_CreateTexture(
+  vicky_texture_ = SDL_CreateTexture(
       renderer_, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-      kVickyBitmapWidth, kVickyBitmapHeight));
+      kVickyBitmapWidth, kVickyBitmapHeight);
 
-  pixel_format_.reset(SDL_AllocFormat(SDL_PIXELFORMAT_ARGB8888));
   CHECK(renderer_);
 }
 
 Vicky::~Vicky() {
   if (window_) {
+    SDL_DestroyTexture(vicky_texture_);
     SDL_DestroyRenderer(renderer_);
     SDL_DestroyWindow(window_);
     SDL_Quit();
@@ -380,9 +380,9 @@ void Vicky::RenderLine() {
   // TODO line interrupt
   raster_y_++;
   if (raster_y_ == kVickyBitmapHeight) {
-    SDL_UpdateTexture(vicky_texture_.get(), nullptr, frame_buffer_,
+    SDL_UpdateTexture(vicky_texture_, nullptr, frame_buffer_,
                       kVickyBitmapWidth * sizeof(uint32_t));
-    SDL_RenderCopy(renderer_, vicky_texture_.get(), nullptr, nullptr);
+    SDL_RenderCopy(renderer_, vicky_texture_, nullptr, nullptr);
     SDL_RenderPresent(renderer_);
     raster_y_ = 0;
   }

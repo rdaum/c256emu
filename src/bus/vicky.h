@@ -14,12 +14,6 @@
 class System;
 class InterruptController;
 
-using UniqueTexturePtr =
-    std::unique_ptr<SDL_Texture, std::function<void(SDL_Texture *)>>;
-
-using UniquePixelFormatPtr =
-    std::unique_ptr<SDL_PixelFormat, std::function<void(SDL_PixelFormat *)>>;
-
 constexpr uint8_t kBorderWidth = 16;
 constexpr uint8_t kBorderHeight = 16;
 
@@ -152,7 +146,5 @@ class Vicky {
   uint32_t frame_buffer_[kRasterSize];
 
   // Which is uploaded to this texture each frame.
-  UniqueTexturePtr vicky_texture_;
-
-  UniquePixelFormatPtr pixel_format_;
+  SDL_Texture* vicky_texture_;
 };
