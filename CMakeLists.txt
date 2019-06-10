@@ -41,9 +41,9 @@ include(cmake/External_LinenoiseNG.cmake)
 # Configure circular_buffer a downloadable library.
 include(cmake/External_circular_buffer.cmake)
 
-add_subdirectory(retro_cpu)
+# Add RetroCpu as an external library.
+include(cmake/External_RetroCpu.cmake)
 
-message(PUBLIC " ${gflags_INCLUDE_DIRS} -- ${GLOG_INCLUDE_DIR}")
 # The c256 bus devices
 set(BUS_SOURCES
         src/bus/automation.cc
@@ -73,11 +73,13 @@ set(BUS_HEADERS
         src/bus/vicky.h
         )
 add_library(bus ${BUS_SOURCES} ${BUS_HEADERS})
-add_dependencies(bus circular_buffer retro_cpu_65816 retro_host_linux retro_cpu_core)
+add_dependencies(bus circular_buffer retrocpu)
 target_include_directories(bus PUBLIC ${SDL2_INCLUDE_DIRS}
         ${GLOG_ROOT}/include ${SREC_INCLUDE_DIR}
         ${CIRCULAR_BUFFER_INCLUDE_DIRS}
-        ${ADPLUG_INCLUDE_DIRS} ./src ./retro_cpu)
+        ${RETROCPU_INCLUDE_DIRS}
+        ${ADPLUG_INCLUDE_DIRS}
+        ./src)
 target_compile_options(bus PUBLIC ${SDL2_CFLAGS_OTHER} ${glog_CFLAGS_OTHER}
         -Werror -Wall -Wextra -Wno-unused-parameter)
 
@@ -88,13 +90,17 @@ target_include_directories(c256emu PUBLIC
         ${CIRCULAR_BUFFER_INCLUDE_DIRS}
         ${LINENOISENG_INCLUDE_DIR}
         ${SREC_INCLUDE_DIR}
+        ${RETROCPU_INCLUDE_DIRS}
         ./src)
-target_link_libraries(c256emu bus retro_cpu_65816 retro_cpu_65816 retro_host_linux retro_cpu_core pthread rt
+target_link_libraries(c256emu
+        bus
+        pthread rt
         glog::glog
         gflags
         SDL2::SDL2main
         SDL2::SDL2
         Lua::lua_lib
+        ${RETROCPU_LIBRARY_PATH}
         ${CIRCULAR_BUFFER_LIBRARIES}
         ${ADPLUG_LIBRARY}
         ${SREC_LIBRARIES}
@@ -104,12 +110,15 @@ target_compile_options(c256emu PUBLIC -Werror -Wall -Wextra)
 # Unit tests.
 include(GoogleTest)
 add_executable(c256_tests src/bus/math_copro_test.cc)
-add_dependencies(c256_tests bus retro_cpu_core)
+add_dependencies(c256_tests bus retrocpu)
 target_include_directories(c256_tests PUBLIC
-        ${GTEST_INCLUDE_DIRS})
-target_link_libraries(c256_tests bus retro_cpu_core
+        ${GTEST_INCLUDE_DIRS}
+        ${RETROCPU_INCLUDE_DIRS})
+target_link_libraries(c256_tests bus
         glog::glog gflags GTest::main
-        ${GTEST_MAIN_LIBRARY})
+        ${GTEST_MAIN_LIBRARY}
+        ${RETROCPU_LIBRARY_PATH}
+        )
 target_compile_options(c256_tests PUBLIC
         ${GLOG_CFLAGS_OTHER}
         ${GFLAGS_CFLAGS_OTHER} -Werror -Wall -Wextra)
