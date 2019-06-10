@@ -29,7 +29,7 @@ DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
 
 class C256SystemBus : public SystemBus {
  public:
-  C256SystemBus(System *sys) {
+  explicit C256SystemBus(System *sys) {
     math_co_ = std::make_unique<MathCoprocessor>();
     int_controller_ = std::make_unique<InterruptController>(sys);
     // TODO: Timers 0x160 - 0x17f
@@ -238,7 +238,6 @@ void System::ScheduleNextScanline() {
 void System::Run(bool profile) {
   total_scanlines_ = 0;
   profile_ = profile;
-  run_start_ = 0;
   cpu_.cpu_state.cycle = 0;
   current_frame_ = 0;
   profile_last_cycles = 0;
@@ -257,11 +256,6 @@ uint16_t System::ReadByte(uint32_t addr) { return system_bus_->ReadByte(addr); }
 
 void System::StoreByte(uint32_t addr, uint8_t val) {
   system_bus_->WriteByte(addr, val);
-}
-
-void System::StoreTwoBytes(uint32_t addr, uint16_t val) {
-  system_bus_->WriteByte(addr, val & 0xFF);
-  system_bus_->WriteByte(addr + 1, val >> 8);
 }
 
 void System::RaiseIRQ() { cpu_.cpu_state.SetInterruptSource(1); }

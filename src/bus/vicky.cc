@@ -276,7 +276,7 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
     border_enabled_ = v & (1 << Border_Ctrl_Enable);
     return;
   }
-  LOG(INFO) << "Unknown Vicky register: " << addr;
+  LOG(INFO) << "Unknown Vicky register: " << std::hex << addr;
 }
 
 void Vicky::RenderLine() {

@@ -33,7 +33,6 @@ class System {
   uint16_t ReadTwoBytes(uint32_t addr);
   uint16_t ReadByte(uint32_t addr);
   void StoreByte(uint32_t addr, uint8_t val);
-  void StoreTwoBytes(uint32_t addr, uint16_t val);
 
   // Jump to address.
   void Sys(uint32_t address);
@@ -53,10 +52,9 @@ class System {
   void DrawNextLine();
   void ScheduleNextScanline();
 
-  uint32_t current_frame_;
-  uint64_t total_scanlines_;
-  uint64_t run_start_;
-  uint64_t profile_last_cycles;
+  uint32_t current_frame_ = 0;
+  uint64_t total_scanlines_ = 0;
+  uint64_t profile_last_cycles = 0;
 
   bool profile_;
   std::chrono::time_point<std::chrono::high_resolution_clock>
