@@ -8,8 +8,9 @@
 #include <sys/types.h>
 
 #include <deque>
-
-#include "cpu/cpu_65816.h"
+#include <vector>
+#include <gtest/gtest.h>
+#include <glog/logging.h>
 
 class InterruptController;
 
@@ -44,16 +45,15 @@ struct CH376_FileInfo {
 
 // Emulate the CH376 SD/USB storage controller.
 // Incomplete.
-class CH376SD : public SystemBusDevice {
+class CH376SD {
 public:
   CH376SD(InterruptController *int_controller,
           const std::string &root_directory)
       : int_controller_(int_controller), root_directory_(root_directory) {}
 
   // SystemBusDevice implementation.
-  void StoreByte(const Address &addr, uint8_t v, uint8_t **address) override;
-  uint8_t ReadByte(const Address &addr, uint8_t **address) override;
-  bool DecodeAddress(const Address &from_addr, Address &to_addr) override;
+  void StoreByte(uint32_t addr, uint8_t v);
+  uint8_t ReadByte(uint32_t addr);
 
 private:
   void PushDirectoryListing();

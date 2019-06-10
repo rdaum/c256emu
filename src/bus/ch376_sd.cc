@@ -7,14 +7,9 @@
 #include "ch376_sd.h"
 
 namespace {
-constexpr Address
-    SDCARD_DATA(0xAF,
-                0xE808); // (R/W) SDCARD (CH376S) Data PORT_A (A0 = 0)
-constexpr Address
-    SDCARD_CMD(0xAF,
-               0xE809); // (R/W) SDCARD (CH376S) CMD/STATUS Port (A0 = 1)
-constexpr Address SDCARD_STAT(0xAF,
-                              0xE810); // (R) SDCARD (Bit[0] = CD, Bit[1] = WP)
+constexpr uint32_t SDCARD_DATA = 0xE808; // (R/W) SDCARD (CH376S) Data PORT_A (A0 = 0)
+constexpr uint32_t SDCARD_CMD = 0xE809; // (R/W) SDCARD (CH376S) CMD/STATUS Port (A0 = 1)
+constexpr uint32_t SDCARD_STAT = 0xE810; // (R) SDCARD (Bit[0] = CD, Bit[1] = WP)
 
 enum SdCommands {
   GET_IC_VER = 0x01,
@@ -86,7 +81,7 @@ void Push32(uint32_t v, std::deque<uint8_t> *out) {
 }
 } // namespace
 
-void CH376SD::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
+void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
   LOG(INFO) << "WRITE: " << addr << " 0x" << std::hex << (int)v;
 
   if (addr == SDCARD_CMD) {
@@ -266,7 +261,7 @@ void CH376SD::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
   }
 }
 
-uint8_t CH376SD::ReadByte(const Address &addr, uint8_t **address) {
+uint8_t CH376SD::ReadByte(uint32_t addr) {
   LOG(INFO) << "READ: " << addr;
   if (addr == SDCARD_DATA) {
     CHECK(!out_data_.empty());
@@ -281,15 +276,6 @@ uint8_t CH376SD::ReadByte(const Address &addr, uint8_t **address) {
     return int_status_;
   }
   return 0;
-}
-
-bool CH376SD::DecodeAddress(const Address &from_addr, Address &to_addr) {
-  if (from_addr == SDCARD_DATA || from_addr == SDCARD_CMD ||
-      from_addr == SDCARD_STAT) {
-    to_addr = from_addr;
-    return true;
-  }
-  return false;
 }
 
 void CH376SD::PushDirectoryListing() {

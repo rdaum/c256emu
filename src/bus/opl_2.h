@@ -4,25 +4,22 @@
 #include <glog/logging.h>
 #include <memory>
 
-#include "cpu/cpu_65816.h"
+constexpr uint32_t kOplLeftBase = 0xe500;
+constexpr uint32_t kOplLeftTop = 0xe5ff;
+constexpr uint32_t kOplRightBase = 0xe600;
+constexpr uint32_t kOplRightTop = 0xe6ff;
+constexpr uint32_t kOplBothBase = 0xe700;
+constexpr uint32_t kOplBothTop = 0xe7ff;
 
-constexpr Address kOplLeftBase(0xaf, 0xe500);
-constexpr Address kOplLeftTop(0xaf, 0xe5ff);
-constexpr Address kOplRightBase(0xaf, 0xe600);
-constexpr Address kOplRightTop(0xaf, 0xe6ff);
-constexpr Address kOplBothBase(0xaf, 0xe700);
-constexpr Address kOplBothTop(0xaf, 0xe7ff);
-
-class OPL2 : public SystemBusDevice {
+class OPL2 {
 public:
   OPL2();
 
   void Start();
 
   // SystemBusDevice implementation
-  void StoreByte(const Address &addr, uint8_t v, uint8_t **address) override;
-  uint8_t ReadByte(const Address &addr, uint8_t **address) override;
-  bool DecodeAddress(const Address &from_addr, Address &to_addr) override;
+  void StoreByte(uint32_t addr, uint8_t v);
+  uint8_t ReadByte(uint32_t addr);
 
 private:
   std::unique_ptr<CEmuopl> opl_left_;

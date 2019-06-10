@@ -5,21 +5,21 @@
 
 namespace {
 
-constexpr Address kIntPendingReg0(0x00, 0x0140);
-constexpr Address kIntPendingReg1(0x00, 0x0141);
-constexpr Address kIntPendingReg2(0x00, 0x0142);
+constexpr uint32_t kIntPendingReg0 = 0x0140;
+constexpr uint32_t kIntPendingReg1 = 0x0141;
+constexpr uint32_t kIntPendingReg2 = 0x0142;
 
-constexpr Address kIntPolReg0(0x00, 0x0144);
-constexpr Address kIntPolReg1(0x00, 0x0145);
-constexpr Address kIntPolReg2(0x00, 0x0146);
+constexpr uint32_t kIntPolReg0 = 0x0144;
+constexpr uint32_t kIntPolReg1 = 0x0145;
+constexpr uint32_t kIntPolReg2 = 0x0146;
 
-constexpr Address kIntEdgeReg0(0x00, 0x0147);
-constexpr Address kIntEdgeReg1(0x00, 0x0148);
-constexpr Address kIntEdgeReg2(0x00, 0x0149);
+constexpr uint32_t kIntEdgeReg0 = 0x0147;
+constexpr uint32_t kIntEdgeReg1 = 0x0148;
+constexpr uint32_t kIntEdgeReg2 = 0x0149;
 
-constexpr Address kIntMaskReg0(0x00, 0x014C);
-constexpr Address kIntMaskReg1(0x00, 0x014D);
-constexpr Address kIntMaskReg2(0x00, 0x014E);
+constexpr uint32_t kIntMaskReg0 = 0x014C;
+constexpr uint32_t kIntMaskReg1 = 0x014D;
+constexpr uint32_t kIntMaskReg2 = 0x014E;
 
 } // namespace
 
@@ -88,17 +88,7 @@ void InterruptController::LowerCH376() {
   }
 }
 
-bool InterruptController::DecodeAddress(const Address &from_addr,
-                                        Address &to_addr) {
-  if (from_addr.InRange(kIntPendingReg0, kIntMaskReg2)) {
-    to_addr = from_addr;
-    return true;
-  }
-  return false;
-}
-
-void InterruptController::StoreByte(const Address &addr, uint8_t v,
-                                    uint8_t **address) {
+void InterruptController::StoreByte(uint32_t addr, uint8_t v) {
   if (addr == kIntPendingReg0) {
     pending_reg0_.val &= ~v;
   } else if (addr == kIntPendingReg1) {
@@ -130,7 +120,7 @@ void InterruptController::StoreByte(const Address &addr, uint8_t v,
   }
 }
 
-uint8_t InterruptController::ReadByte(const Address &addr, uint8_t **address) {
+uint8_t InterruptController::ReadByte(uint32_t addr) {
   if (addr == kIntPendingReg0) {
     return pending_reg0_.val;
   } else if (addr == kIntPendingReg1) {

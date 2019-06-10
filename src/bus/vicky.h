@@ -3,13 +3,13 @@
 #include <SDL2/SDL.h>
 #include <glog/logging.h>
 
-#include "cpu/cpu_65816.h"
-
 #include <atomic>
 #include <chrono>
 #include <functional>
 #include <mutex>
 #include <thread>
+
+#include "cpu.h"
 
 class System;
 class InterruptController;
@@ -32,11 +32,11 @@ constexpr uint8_t kNumLayers = 4;
 
 // Emulate the Vicky VDP.
 // Text mode only for now.
-class Vicky : public SystemBusDevice {
-public:
+class Vicky {
+ public:
   Vicky(System *system, InterruptController *int_controller);
 
-  ~Vicky() override;
+  ~Vicky();
 
   // Initialize.
   void Start();
@@ -45,14 +45,18 @@ public:
   void RenderLine();
 
   // SystemBusDevice implementation
-  std::vector<MemoryRegion> GetMemoryRegions() override;
-  void StoreByte(const Address &addr, uint8_t v, uint8_t **address) override;
-  uint8_t ReadByte(const Address &addr, uint8_t **address) override;
-  bool DecodeAddress(const Address &from_addr, Address &to_addr) override;
+  void StoreByte(uint32_t addr, uint8_t v);
+  uint8_t ReadByte(uint32_t addr);
+
+  void InitPages(Page *vicky_page_start);
 
   inline bool is_vertical_end() { return raster_y_ == 479; }
+  inline int current_scanline() { return raster_y_; }
+  inline int max_scanline() { return kVickyBitmapHeight; }
 
-private:
+  uint8_t *vram() { return video_ram_; }
+
+ private:
   bool RenderBitmap(uint16_t raster_x, uint32_t *pixel);
   bool RenderCharacterGenerator(uint16_t raster_x, uint32_t *pixel);
   bool RenderMouseCursor(uint16_t raster_x, uint32_t *pixel);
@@ -70,7 +74,7 @@ private:
 
   union BGRAColour {
     uint32_t v;
-    uint8_t bgra[4] { 0, 0 ,0 , 0 };
+    uint8_t bgra[4]{0, 0, 0, 0};
   };
   BGRAColour lut_[8][256];
   BGRAColour background_bgr_;
@@ -83,8 +87,7 @@ private:
 
   uint16_t mode_ = 0;
 
-  uint8_t font_bank_0_[2048];
-  uint8_t font_bank_1_[2048];
+  uint8_t font_bank_[4096];
   uint8_t text_mem_[8192];
   uint8_t text_colour_mem_[8192];
 
@@ -98,7 +101,7 @@ private:
   uint16_t cursor_y_ = 0;
 
   bool mouse_cursor_enable_ = false;
-  bool mouse_cursor_select_ = false; // false = 0, true = 1
+  bool mouse_cursor_select_ = false;  // false = 0, true = 1
   uint8_t mouse_cursor_0_[256];
   uint8_t mouse_cursor_1_[256];
 
@@ -117,8 +120,8 @@ private:
   struct TileSet {
     bool enabled = false;
     uint8_t lut = 0;
-    bool tiled_sheet = false; // true if a 256x256 sheet of 16x16 tiles
-                              // otherwise a sequential row of 16x16 tiles
+    bool tiled_sheet = false;  // true if a 256x256 sheet of 16x16 tiles
+                               // otherwise a sequential row of 16x16 tiles
     uint32_t start_addr = 0;
     uint16_t stride_x;
     uint16_t stride_y;

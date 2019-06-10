@@ -1,13 +1,16 @@
 #pragma once
 
-#include <mutex>
-#include <vector>
-#include <optional>
+#include <glog/logging.h>
+#include <gtest/gtest.h>
 
 #include <lua.hpp>
+#include <mutex>
+#include <optional>
+#include <vector>
 
 #include "bus/int_controller.h"
-#include "cpu/cpu_65816.h"
+#include "cpu/65816/cpu_65c816.h"
+#include "debug_interface.h"
 
 class System;
 
@@ -17,34 +20,36 @@ class System;
 // clear breakpoints, etc. Will be memory addressable as well, so that
 // automation actions can be triggered from the running program.
 class Automation {
-public:
-  Automation(Cpu65816 *cpu, System *system);
+ public:
+  Automation(WDC65C816 *cpu, DebugInterface *debug_interface);
   ~Automation();
 
-  // Called by the CPU before each instruction, when automation/debug mode is on.
+  // Called by the CPU before each instruction, when automation/debug mode is
+  // on.
   bool Step();
 
   bool LoadScript(const std::string &path);
-  bool Run();
   bool Eval(const std::string &expression);
 
-  void AddBreakpoint(const Address& address, const std::string &function_name);
-  void ClearBreakpoint(const Address& address);
+  void AddBreakpoint(uint32_t address, const std::string &function_name);
+  void ClearBreakpoint(uint32_t address);
 
   struct Breakpoint {
-    Address address;
+    uint32_t address;
     std::string lua_function_name;
   };
   std::vector<Breakpoint> GetBreakpoints() const;
 
-private:
+  System *system() { return system_; }
+
+ private:
   void SetStopSteps(uint32_t steps);
 
   static int LuaStopCpu(lua_State *L);
-  static int LuaContCpu(lua_State *L) ;
-  static int LuaAddBreakpoint(lua_State *L) ;
+  static int LuaContCpu(lua_State *L);
+  static int LuaAddBreakpoint(lua_State *L);
   static int LuaClearBreakpoint(lua_State *L);
-  static int LuaGetBreakpoints(lua_State *L) ;
+  static int LuaGetBreakpoints(lua_State *L);
   static int LuaGetCpuState(lua_State *L);
   static int LuaStep(lua_State *L);
   static int LuaPeek(lua_State *L);
@@ -61,7 +66,9 @@ private:
 
   std::recursive_mutex lua_mutex_;
 
-  Cpu65816 *cpu_;
+  DebugInterface *debug_interface_;
+  WDC65C816 *cpu_;
+  System *system_;
 
   ::lua_State *lua_state_;
 

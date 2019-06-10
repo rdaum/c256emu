@@ -9,6 +9,7 @@
 #include "bus/sdl_to_atset_keymap.h"
 #include "bus/system.h"
 #include "bus/vicky_def.h"
+#include "cpu/binary.h"
 #include "vicky.h"
 
 namespace {
@@ -20,11 +21,9 @@ constexpr uint8_t kSpriteSize = 32;
 using UniqueTexturePtr =
     std::unique_ptr<SDL_Texture, std::function<void(SDL_Texture *)>>;
 
-bool Set16(const Address &addr, const Address &start_addr, uint16_t *dest,
-           uint8_t v) {
-  uint16_t o = addr.offset_ - start_addr.offset_;
-  if (o > 1)
-    return false;
+bool Set16(uint32_t addr, uint32_t start_addr, uint16_t *dest, uint8_t v) {
+  uint16_t o = addr - start_addr;
+  if (o > 1) return false;
   if (o == 0)
     *dest = (*dest & 0xff00) | v;
   else
@@ -32,11 +31,9 @@ bool Set16(const Address &addr, const Address &start_addr, uint16_t *dest,
   return true;
 }
 
-bool Set24(const Address &addr, const Address &start_addr, uint32_t *dest,
-           uint8_t v) {
-  uint16_t o = addr.offset_ - start_addr.offset_;
-  if (o > 2)
-    return false;
+bool Set24(uint32_t addr, uint32_t start_addr, uint32_t *dest, uint8_t v) {
+  uint16_t o = addr - start_addr;
+  if (o > 2) return false;
   if (o == 0)
     *dest = (*dest & 0x00ffff00) | v;
   else if (o == 1)
@@ -50,7 +47,7 @@ void Set32(uint32_t *value, uint8_t bit_number) {
   auto mask = static_cast<uint32_t>(1 << bit_number);
   *value = *value | mask;
 }
-} // namespace
+}  // namespace
 
 Vicky::Vicky(System *system, InterruptController *int_controller)
     : sys_(system), int_controller_(int_controller) {
@@ -59,6 +56,22 @@ Vicky::Vicky(System *system, InterruptController *int_controller)
   memset(video_ram_, 0, sizeof(video_ram_));
   memset(tile_sets_, 0, sizeof(tile_sets_));
   memset(sprites_, 0, sizeof(sprites_));
+}
+
+void Vicky::InitPages(Page *vicky_page_start) {
+  auto map = [vicky_page_start](uint32_t addr, uint8_t *ptr, uint32_t size) {
+    auto *start = vicky_page_start + (addr >> 12);
+    CHECK((size & 0xFFF) == 0);
+    for (uint32_t i = 0; i<size>> 12; i++) {
+      start[i].ptr = ptr + (i * (1 << 12));
+      start[i].io_eq = 1;
+      start[i].io_mask = 0;
+    }
+  };
+  map(CS_TEXT_MEM_PTR, text_mem_, CS_COLOR_MEM_PTR - CS_TEXT_MEM_PTR);
+  map(CS_COLOR_MEM_PTR, text_colour_mem_, BTX_START - CS_COLOR_MEM_PTR);
+  map(FONT_MEMORY_BANK0, font_bank_, 0x1000);
+  map(GRPH_LUT0_PTR, (uint8_t *)lut_, GAMMA_B_LUT_PTR - GRPH_LUT0_PTR);
 }
 
 void Vicky::Start() {
@@ -77,20 +90,6 @@ void Vicky::Start() {
   CHECK(renderer_);
 }
 
-bool Vicky::DecodeAddress(const Address &from_addr, Address &to_addr) {
-  if (from_addr.InRange(MASTER_CTRL_REG_L, VDMA_RESERVED_1) ||
-      from_addr.InRange(FG_CHAR_LUT_PTR, CS_COLOUR_MEM_END)) {
-    to_addr = from_addr;
-    return true;
-  }
-
-  if (from_addr.InRange(Address(0xb0, 0000), Address(0xef, 0xffff))) {
-    to_addr = from_addr;
-    return true;
-  }
-  return false;
-}
-
 Vicky::~Vicky() {
   if (window_) {
     SDL_DestroyRenderer(renderer_);
@@ -99,61 +98,67 @@ Vicky::~Vicky() {
   }
 }
 
-uint8_t Vicky::ReadByte(const Address &addr, uint8_t **address) { return 0; }
+uint8_t Vicky::ReadByte(uint32_t addr) { return 0; }
 
-std::vector<SystemBusDevice::MemoryRegion> Vicky::GetMemoryRegions() {
-  // Chunks of memory that can be written directly into, to avoid calls to
-  // StoreByte.
-  return {
-      SystemBusDevice::MemoryRegion{0xb00000, 0xf00000, video_ram_},
-      SystemBusDevice::MemoryRegion{CS_TEXT_MEM_PTR.AsInt(),
-                                    CS_COLOR_MEM_PTR.WithOffset(-1).AsInt(),
-                                    text_mem_},
-      SystemBusDevice::MemoryRegion{CS_COLOR_MEM_PTR.AsInt(),
-                                    BTX_START.WithOffset(-1).AsInt(),
-                                    text_colour_mem_},
-      SystemBusDevice::MemoryRegion{VKY_TXT_CURSOR_X_REG_L.AsInt(),
-                                    VKY_TXT_CURSOR_X_REG_H.AsInt(),
-                                    reinterpret_cast<uint8_t *>(&cursor_x_)},
-      SystemBusDevice::MemoryRegion{VKY_TXT_CURSOR_Y_REG_L.AsInt(),
-                                    VKY_TXT_CURSOR_Y_REG_H.AsInt(),
-                                    reinterpret_cast<uint8_t *>(&cursor_y_)},
-      SystemBusDevice::MemoryRegion{MOUSE_PTR_X_POS_L.AsInt(),
-                                    MOUSE_PTR_X_POS_H.AsInt(),
-                                    reinterpret_cast<uint8_t *>(&mouse_pos_x_)},
-      SystemBusDevice::MemoryRegion{MOUSE_PTR_Y_POS_L.AsInt(),
-                                    MOUSE_PTR_Y_POS_H.AsInt(),
-                                    reinterpret_cast<uint8_t *>(&mouse_pos_y_)},
-      SystemBusDevice::MemoryRegion{FONT_MEMORY_BANK0.AsInt(),
-                                    FONT_MEMORY_BANK1.WithOffset(-1).AsInt(),
-                                    font_bank_0_},
-      SystemBusDevice::MemoryRegion{FONT_MEMORY_BANK1.AsInt(), 0xaf8fff,
-                                    font_bank_1_},
-      SystemBusDevice::MemoryRegion{MOUSE_PTR_GRAP0_START.AsInt(),
-                                    MOUSE_PTR_GRAP0_END.WithOffset(-1).AsInt(),
-                                    mouse_cursor_0_},
-      SystemBusDevice::MemoryRegion{MOUSE_PTR_GRAP1_START.AsInt(),
-                                    MOUSE_PTR_GRAP1_END.WithOffset(-1).AsInt(),
-                                    mouse_cursor_1_},
-      SystemBusDevice::MemoryRegion{GRPH_LUT0_PTR.AsInt(),
-                                    (GAMMA_B_LUT_PTR - 1).AsInt(),
-                                    reinterpret_cast<uint8_t *>(lut_)},
-      SystemBusDevice::MemoryRegion{GAMMA_B_LUT_PTR.AsInt(),
-                                    (GAMMA_R_LUT_PTR + 0xff).AsInt(),
-                                    reinterpret_cast<uint8_t *>(&gamma_)},
-      SystemBusDevice::MemoryRegion{
-          FG_CHAR_LUT_PTR.AsInt(), (BG_CHAR_LUT_PTR - 1).AsInt(),
-          reinterpret_cast<uint8_t *>(fg_colour_mem_)},
-      SystemBusDevice::MemoryRegion{
-          BG_CHAR_LUT_PTR.AsInt(), 0xaf1fc0,
-          reinterpret_cast<uint8_t *>(bg_colour_mem_)},
-      SystemBusDevice::MemoryRegion{
-          BORDER_COLOR_B.AsInt(), BORDER_COLOR_R.AsInt(), border_colour_.bgra},
-  };
-}
+void Vicky::StoreByte(uint32_t addr, uint8_t v) {
+  uint16_t offset = addr;
 
-void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
-  uint16_t offset = addr.offset_;
+  switch (offset) {
+    case VKY_TXT_CURSOR_X_REG_L:
+      cursor_x_ = (cursor_x_ & 0xFF00) | v;
+      return;
+    case VKY_TXT_CURSOR_X_REG_H:
+      cursor_x_ = (cursor_x_ & 0xFF) | ((uint16_t)v << 8);
+      return;
+    case VKY_TXT_CURSOR_Y_REG_L:
+      cursor_y_ = (cursor_y_ & 0xFF00) | v;
+      return;
+    case VKY_TXT_CURSOR_Y_REG_H:
+      cursor_y_ = (cursor_y_ & 0xFF) | ((uint16_t)v << 8);
+      return;
+    case BORDER_COLOR_B:
+      border_colour_.bgra[0] = v;
+      return;
+    case BORDER_COLOR_G:
+      border_colour_.bgra[1] = v;
+      return;
+    case BORDER_COLOR_R:
+      border_colour_.bgra[2] = v;
+      return;
+    case MOUSE_PTR_X_POS_L:
+      mouse_pos_x_ = (mouse_pos_x_ & 0xFF00) | v;
+      return;
+    case MOUSE_PTR_X_POS_H:
+      mouse_pos_x_ = (mouse_pos_x_ & 0xFF) | ((uint16_t)v << 8);
+      return;
+    case MOUSE_PTR_Y_POS_L:
+      mouse_pos_y_ = (mouse_pos_y_ & 0xFF00) | v;
+      return;
+    case MOUSE_PTR_Y_POS_H:
+      mouse_pos_y_ = (mouse_pos_y_ & 0xFF) | ((uint16_t)v << 8);
+      return;
+  }
+
+  if (addr >= FG_CHAR_LUT_PTR && addr < BG_CHAR_LUT_PTR) {
+    memcpy((uint8_t *)fg_colour_mem_ + addr - FG_CHAR_LUT_PTR, &v, 1);
+    return;
+  } else if (addr >= BG_CHAR_LUT_PTR && addr < 0x1fc0) {
+    memcpy((uint8_t *)bg_colour_mem_ + addr - BG_CHAR_LUT_PTR, &v, 1);
+    return;
+  } else if (addr >= GAMMA_B_LUT_PTR && addr < GAMMA_G_LUT_PTR) {
+    gamma_.b[addr & 0xFF] = v;
+    return;
+  } else if (addr >= GAMMA_G_LUT_PTR && addr < GAMMA_R_LUT_PTR) {
+    gamma_.g[addr & 0xFF] = v;
+    return;
+  } else if (addr >= GAMMA_R_LUT_PTR && addr < 0x4300) {
+    gamma_.r[addr & 0xFF] = v;
+    return;
+  } else if (addr >= MOUSE_PTR_GRAP0_START && addr <= MOUSE_PTR_GRAP0_END) {
+    mouse_cursor_0_[addr - MOUSE_PTR_GRAP0_START] = v;
+  } else if (addr >= MOUSE_PTR_GRAP1_START && addr <= MOUSE_PTR_GRAP1_END) {
+    mouse_cursor_1_[addr - MOUSE_PTR_GRAP1_START] = v;
+  }
 
   if (addr == BM_CONTROL_REG) {
     bitmap_enabled_ = v & 0x01;
@@ -166,8 +171,8 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
     return;
   }
 
-  if (addr.InRange(TL0_CONTROL_REG, TL3_MAP_Y_STRIDE_H)) {
-    uint16_t sprite_offset = offset - TL0_CONTROL_REG.offset_;
+  if (addr >= TL0_CONTROL_REG && addr <= TL3_MAP_Y_STRIDE_H) {
+    uint16_t sprite_offset = offset - TL0_CONTROL_REG;
     uint8_t tile_num = sprite_offset / 8;
     uint8_t register_num = sprite_offset % 8;
     if (register_num == 0) {
@@ -197,8 +202,8 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
     return;
   }
 
-  if (addr.InRange(TILE_MAP0, TILE_MAP3 + 2048)) {
-    uint16_t tile_offset = offset - TILE_MAP0.offset_;
+  if (addr >= TILE_MAP0 && addr <= TILE_MAP3 + 2048) {
+    uint16_t tile_offset = offset - TILE_MAP0;
     uint8_t tile_num = tile_offset / 0x800;
     uint8_t map_offset = tile_offset % 0x800;
     tile_sets_[tile_num].tile_map.mem[map_offset] = v;
@@ -209,8 +214,8 @@ void Vicky::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
     return;
   }
 
-  if (addr.InRange(SP00_CONTROL_REG, SP31_CONTROL_REG + 8)) {
-    uint16_t sprite_offset = offset - SP00_CONTROL_REG.offset_;
+  if (addr >= SP00_CONTROL_REG && addr <= SP31_CONTROL_REG + 8) {
+    uint16_t sprite_offset = offset - SP00_CONTROL_REG;
     uint16_t sprite_num = sprite_offset / 0x08;
     uint16_t register_num = sprite_offset % 0x08;
     Sprite &sprite = sprites_[sprite_num];
@@ -276,18 +281,18 @@ void Vicky::RenderLine() {
   if (run_char_gen && (cursor_reg_ & Vky_Cursor_Enable)) {
     uint16_t flash_interval_ms = 0;
     switch (cursor_reg_ >> 1) {
-    case 0b00:
-      flash_interval_ms = 1000;
-      break;
-    case 0b01:
-      flash_interval_ms = 500;
-      break;
-    case 0b10:
-      flash_interval_ms = 250;
-      break;
-    case 0b11:
-      flash_interval_ms = 200;
-      break;
+      case 0b00:
+        flash_interval_ms = 1000;
+        break;
+      case 0b01:
+        flash_interval_ms = 500;
+        break;
+      case 0b10:
+        flash_interval_ms = 250;
+        break;
+      case 0b11:
+        flash_interval_ms = 200;
+        break;
     }
     auto time_since_flash =
         std::chrono::steady_clock::now() - last_cursor_flash_;
@@ -334,12 +339,10 @@ void Vicky::RenderLine() {
     }
 
     // Characters
-    if (run_char_gen)
-      RenderCharacterGenerator(raster_x, row_pixel);
+    if (run_char_gen) RenderCharacterGenerator(raster_x, row_pixel);
 
     // Mouse
-    if (mouse_cursor_enable_)
-      RenderMouseCursor(raster_x, row_pixel);
+    if (mouse_cursor_enable_) RenderMouseCursor(raster_x, row_pixel);
 
     if (border_enabled_) {
       uint32_t border_colour = ApplyGamma(border_colour_.v);
@@ -380,8 +383,7 @@ bool Vicky::RenderBitmap(uint16_t raster_x, uint32_t *row_pixel) {
   uint8_t *indexed_row =
       video_ram_ + bitmap_addr_offset_ + (raster_y_ * kVickyBitmapWidth);
   uint8_t colour_index = indexed_row[raster_x];
-  if (colour_index == 0)
-    return false;
+  if (colour_index == 0) return false;
   *row_pixel = ApplyGamma(lut_[bitmap_lut_][colour_index].v);
   return true;
 }
@@ -403,8 +405,7 @@ bool Vicky::RenderSprites(uint16_t raster_x, uint8_t layer,
     const uint8_t *sprite_mem = video_ram_ + sprite.start_addr;
     uint8_t colour_index =
         sprite_mem[raster_x - sprite.x + (raster_y_ - sprite.y) * kSpriteSize];
-    if (colour_index == 0)
-      return false;
+    if (colour_index == 0) return false;
     *row_pixel = ApplyGamma(lut_[sprite.lut][colour_index].v);
     return true;
   }
@@ -414,7 +415,6 @@ bool Vicky::RenderSprites(uint16_t raster_x, uint8_t layer,
 bool Vicky::RenderTileMap(uint16_t raster_x, uint8_t layer,
                           uint32_t *row_pixel) {
   if (tile_sets_[layer].enabled) {
-
     // TODO support for linear tile sheets.  this assumes a 256x256 sheet
     // of 16x16 tiles for now.
 
@@ -429,8 +429,8 @@ bool Vicky::RenderTileMap(uint16_t raster_x, uint8_t layer,
     uint8_t *tile_sheet_bitmap = &video_ram_[tile_set.start_addr];
 
     uint8_t tile_sheet_column =
-        tile_num % kTileSize; // the column in the tile sheet
-    uint8_t tile_sheet_row = tile_num / kTileSize; // the row in the tile sheet
+        tile_num % kTileSize;  // the column in the tile sheet
+    uint8_t tile_sheet_row = tile_num / kTileSize;  // the row in the tile sheet
 
     // the physical memory location of the row in the sheet our tile is
     // in
@@ -444,8 +444,7 @@ bool Vicky::RenderTileMap(uint16_t raster_x, uint8_t layer,
         &tile_bitmap_row[tile_sheet_column * kTileSize];
 
     uint8_t colour_index = tile_bitmap_column[screen_tile_sub_col];
-    if (colour_index == 0)
-      return false;
+    if (colour_index == 0) return false;
 
     *row_pixel = ApplyGamma(lut_[tile_set.lut][colour_index].v);
     return true;
@@ -462,8 +461,7 @@ bool Vicky::RenderMouseCursor(uint16_t raster_x, uint32_t *row_pixel) {
     uint8_t mouse_sub_col = raster_x % 16;
     uint8_t mouse_sub_row = raster_y_ % 16;
     uint8_t pixel_val = mouse_mem[mouse_sub_col + (mouse_sub_row * 16)];
-    if (pixel_val == 0)
-      return false;
+    if (pixel_val == 0) return false;
     *row_pixel = ApplyGamma(pixel_val | (pixel_val << 8) | (pixel_val << 16));
     return true;
   }
@@ -491,8 +489,8 @@ bool Vicky::RenderCharacterGenerator(uint16_t raster_x, uint32_t *row_pixel) {
   uint8_t colour = text_colour_mem_[column + (row * kColsPerLine)];
   uint8_t fg_colour_num = (uint8_t)((colour & 0xf0) >> 4);
   uint8_t bg_colour_num = (uint8_t)(colour & 0x0f);
-  uint8_t *character_font = &font_bank_0_[character * 8];
-  uint8_t *cursor_font = &font_bank_0_[cursor_char_ * 8];
+  uint8_t *character_font = &font_bank_[character * 8];
+  uint8_t *cursor_font = &font_bank_[cursor_char_ * 8];
 
   uint32_t fg_colour = fg_colour_mem_[fg_colour_num];
   uint32_t bg_colour = bg_colour_mem_[bg_colour_num];
@@ -520,15 +518,13 @@ uint32_t Vicky::ApplyGamma(uint32_t colour_val) {
   // Seems like GAMMA_en is always off? But too dim if we won't use it.
 
   //  if (!(mode_ & Mstr_Ctrl_GAMMA_En)) return colour_val;
-  BGRAColour colour { .v = colour_val };
-  BGRAColour corrected {
-    .bgra = {
-        gamma_.b[colour.bgra[0]],
-        gamma_.g[colour.bgra[1]],
-        gamma_.r[colour.bgra[2]],
-        colour.bgra[0],
-    }
-  };
+  BGRAColour colour{.v = colour_val};
+  BGRAColour corrected{.bgra = {
+                           gamma_.b[colour.bgra[0]],
+                           gamma_.g[colour.bgra[1]],
+                           gamma_.r[colour.bgra[2]],
+                           colour.bgra[0],
+                       }};
 
   return corrected.v;
 }

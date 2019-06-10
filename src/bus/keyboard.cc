@@ -49,8 +49,8 @@ constexpr uint8_t kWriteMousePort = 0xd4;
 
 constexpr uint8_t kMaxInputBufferSize = 64;
 
-constexpr Address kKeyboardStatusRegister(0xaf, 0x1064);
-constexpr Address kKeyboardBufferRegister(0xaf, 0x1060);
+constexpr uint32_t kKeyboardStatusRegister = 0xaf1064;
+constexpr uint32_t kKeyboardBufferRegister = 0xaf1060;
 
 } // namespace
 
@@ -68,8 +68,8 @@ Keyboard::Keyboard(System *sys, InterruptController *int_controller)
   poll_thread_.detach();
 }
 
-void Keyboard::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
-  if (addr.offset_ == 0x1060) {
+void Keyboard::StoreByte(uint32_t addr, uint8_t v) {
+  if (addr == 0x1060) {
     std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
     if (expect_command_byte_) {
       ccb_ = v;
@@ -84,7 +84,7 @@ void Keyboard::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
     }
     return;
   }
-  if (addr.offset_ == 0x1064) {
+  if (addr == 0x1064) {
     if (v == kSelfTest) {
       std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
       output_buffer_.push_back(0x55); // test passed
@@ -138,8 +138,8 @@ void Keyboard::StoreByte(const Address &addr, uint8_t v, uint8_t **address) {
   }
 }
 
-uint8_t Keyboard::ReadByte(const Address &addr, uint8_t **address) {
-  if (addr.offset_ == 0x1064) {
+uint8_t Keyboard::ReadByte(const uint32_t addr) {
+  if (addr == 0x1064) {
     std::lock_guard<std::recursive_mutex> keyboard_lock(keyboard_mutex_);
     uint8_t status_register = status_register_;
     status_register |= (1 << kKeyboardLock);
@@ -150,7 +150,7 @@ uint8_t Keyboard::ReadByte(const Address &addr, uint8_t **address) {
 
     return status_register;
   }
-  if (addr.offset_ == 0x1060) {
+  if (addr == 0x1060) {
     uint8_t return_byte = 0;
     bool is_empty = true;
     {
@@ -170,15 +170,6 @@ uint8_t Keyboard::ReadByte(const Address &addr, uint8_t **address) {
     return return_byte;
   }
   return 0;
-}
-
-bool Keyboard::DecodeAddress(const Address &from_addr, Address &to_addr) {
-  if (from_addr == kKeyboardStatusRegister ||
-      from_addr == kKeyboardBufferRegister) {
-    to_addr = from_addr;
-    return true;
-  }
-  return false;
 }
 
 void Keyboard::PushKey(uint8_t key) { output_buffer_.push_back(key); }

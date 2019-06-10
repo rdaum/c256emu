@@ -6,64 +6,67 @@
 #include <thread>
 
 #include "bus/automation.h"
-
-#include "cpu/cpu_65816.h"
+#include "cpu/65816/cpu_65c816.h"
+#include "debug_interface.h"
 
 class C256SystemBus;
 
 // Owns and configures all bus devices and the CPU.
 class System {
-public:
+ public:
   System();
   ~System();
 
   void LoadHex(const std::string &kernel_hex_file);
 
-  void LoadBin(const std::string &kernel_bin_file, const Address &addr);
+  void LoadBin(const std::string &kernel_bin_file, uint32_t addr);
 
-  void Initialize(const std::string &automation_script = "");
+  void Initialize();
 
   // Launch the loop thread and run the CPU.
-  void Start(bool profile, bool automation);
+  void Start(bool profile);
 
   // Stop the loop thread completely.
   void Stop();
 
-  // Resume or suspend CPU execution.
-  void Resume();
-  void Suspend();
-
   // Ask the bus to read or write addresses in a thread safe way.
-  uint16_t ReadTwoBytes(const Address &addr);
-  uint16_t ReadByte(const Address &addr);
-  void StoreByte(const Address &addr, uint8_t val);
-  void StoreTwoBytes(const Address &addr, uint16_t val);
+  uint16_t ReadTwoBytes(uint32_t addr);
+  uint16_t ReadByte(uint32_t addr);
+  void StoreByte(uint32_t addr, uint8_t val);
+  void StoreTwoBytes(uint32_t addr, uint16_t val);
 
   // Jump to address.
-  void Sys(const Address &address);
+  void Sys(uint32_t address);
 
-  Automation *automation() const { return automation_.get(); }
-  Cpu65816 *cpu() { return &cpu_; }
+  WDC65C816 *cpu() { return &cpu_; }
 
-protected:
+  DebugInterface *GetDebugInterface();
+
+ protected:
   friend class InterruptController;
 
   void RaiseIRQ();
   void ClearIRQ();
 
-private:
-  void Run(bool profile, bool automation);
+ private:
+  void Run(bool profile);
+  void DrawNextLine();
+  void ScheduleNextScanline();
 
-  std::atomic_bool is_main_loop_running_; // is the main loop thread running?
-  std::atomic_bool is_cpu_executing_;     // is the cpu currently executing?
+  uint32_t current_frame_;
+  uint64_t total_scanlines_;
+  uint64_t run_start_;
+  uint64_t profile_last_cycles;
 
-  std::recursive_mutex system_bus_mutex_;
+  bool profile_;
+  std::chrono::time_point<std::chrono::high_resolution_clock>
+      profile_previous_time;
+  std::chrono::time_point<std::chrono::high_resolution_clock> frame_clock;
+  std::chrono::time_point<std::chrono::high_resolution_clock> next_frame_clock;
+
   std::unique_ptr<C256SystemBus> system_bus_;
 
-  NativeModeInterrupts native_mode_interrupts_;
-  EmulationModeInterrupts emulation_mode_interrupts_;
-
-  std::unique_ptr<Automation> automation_;
-
-  Cpu65816 cpu_;
+  WDC65C816 cpu_;
+  EventQueue events_;
+  DebugInterface debug_;
 };
