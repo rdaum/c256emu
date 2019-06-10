@@ -137,7 +137,9 @@ c256emu.peek(<address>)
 c256emu.peek16(<address>)
 c256emu.poke(<address>, <byte>)
 c256emu.poke16(<address>, <word>)
-c256emu.peakbuf(<address>, <num_bytes>)
+c256emu.peekbuf(<address>, <num_bytes>)
+
+c256emu.disassemble(<address>, <count>)
 
 c256emu.load_bin(<file>, <address>)
 c256emu.load_hex(<file>)

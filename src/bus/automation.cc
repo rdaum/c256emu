@@ -21,7 +21,7 @@ void PushTable(lua_State *L, const std::string &label, bool val) {
   lua_settable(L, -3);
 }
 
-}  // namespace
+} // namespace
 
 // static
 const ::luaL_Reg Automation::c256emu_methods[] = {
@@ -39,10 +39,12 @@ const ::luaL_Reg Automation::c256emu_methods[] = {
     {"peekbuf", Automation::LuaPeekBuf},
     {"load_hex", Automation::LuaLoadHex},
     {"load_bin", Automation::LuaLoadBin},
+    {"disassemble", Automation::LuaDisasm},
     {"sys", Automation::LuaSys},
     {0, 0}};
 
-Automation::Automation(WDC65C816 *cpu, System *sys, DebugInterface *debug_interface)
+Automation::Automation(WDC65C816 *cpu, System *sys,
+                       DebugInterface *debug_interface)
     : cpu_(cpu), system_(sys), debug_interface_(debug_interface) {
   lua_state_ = luaL_newstate();
   luaL_openlibs(lua_state_);
@@ -105,6 +107,7 @@ void Automation::ClearBreakpoint(uint32_t address) {
       [address](const Breakpoint &b) { return b.address == address; });
   if (bp != breakpoints_.end()) {
     breakpoints_.erase(bp);
+    debug_interface_->ClearBreakpoint(address);
   }
 }
 
@@ -239,6 +242,66 @@ int Automation::LuaSys(lua_State *L) {
 }
 
 // static
+int Automation::LuaDisasm(lua_State *L) {
+  System *sys = GetSystem(L);
+  lua_pop(L, 1);
+
+  lua_getglobal(L, kAutomationLuaObj);
+  Automation *automation = (Automation *)lua_touserdata(L, -1);
+
+  WDC65C816 *cpu = sys->cpu();
+  auto disassembler = cpu->GetDisassembler();
+  cpuaddr_t addr;
+  if (lua_isnumber(L, 1)) {
+    addr = (cpuaddr_t)lua_tointeger(L, 1);
+  } else if (!automation->debug_interface_->paused()) {
+    return luaL_error(
+        L, "c256emu: cannot disassemble current address while not paused");
+  } else {
+    addr = cpu->GetCpuState()->GetCanonicalAddress();
+  }
+  Disassembler::Config config;
+  if (lua_isnumber(L, 2))
+    config.max_instruction_count = (uint32_t)lua_tointeger(L, 2);
+
+  auto list = disassembler->Disassemble(config, addr);
+  lua_newtable(L);
+  for (uint32_t i = 0; i < list.size(); i++) {
+    lua_pushlstring(L, list[i].asm_string.c_str(), list[i].asm_string.size());
+    lua_rawseti(L, -2, i + 1);
+  }
+  return 1;
+}
+
+// static
+int Automation::LuaStopCpu(lua_State *L) {
+  lua_getglobal(L, kAutomationLuaObj);
+  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  automation->debug_interface_->Pause();
+
+  return 0;
+}
+
+// static
+int Automation::LuaContCpu(lua_State *L) {
+  lua_getglobal(L, kAutomationLuaObj);
+  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  automation->debug_interface_->Resume();
+
+  return 0;
+}
+
+// static
+int Automation::LuaStep(lua_State *L) {
+  lua_getglobal(L, kAutomationLuaObj);
+  Automation *automation = (Automation *)lua_touserdata(L, -1);
+
+  automation->debug_interface_->SingleStep(1);
+
+  return 0;
+}
+
+// static
 int Automation::LuaGetCpuState(lua_State *L) {
   lua_getglobal(L, kAutomationLuaObj);
   Automation *automation = (Automation *)lua_touserdata(L, -1);
@@ -275,32 +338,4 @@ int Automation::LuaGetCpuState(lua_State *L) {
   lua_settable(L, -3);
 
   return 1;
-}
-
-// static
-int Automation::LuaStopCpu(lua_State *L) {
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation *automation = (Automation *)lua_touserdata(L, -1);
-  automation->debug_interface_->Pause();
-
-  return 0;
-}
-
-// static
-int Automation::LuaContCpu(lua_State *L) {
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation *automation = (Automation *)lua_touserdata(L, -1);
-  automation->debug_interface_->Resume();
-
-  return 0;
-}
-
-// static
-int Automation::LuaStep(lua_State *L) {
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation *automation = (Automation *)lua_touserdata(L, -1);
-
-  automation->debug_interface_->SingleStep(1);
-
-  return 0;
 }

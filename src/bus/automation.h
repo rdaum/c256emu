@@ -54,6 +54,7 @@ class Automation {
   static int LuaLoadHex(lua_State *L);
   static int LuaLoadBin(lua_State *L);
   static int LuaSys(lua_State *L);
+  static int LuaDisasm(lua_State *L);
 
   static const ::luaL_Reg c256emu_methods[];
 
