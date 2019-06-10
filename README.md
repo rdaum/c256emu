@@ -13,11 +13,7 @@ released, I will test and fix accordingly.
 
 #### CPU
 
-A fork of [Lib65816](https://github.com/FrancescoRigoni/Lib65816) with major changes:
-
-  * Bug fixes (will enumerate once I diff back to the original source)
-  * Code style changes (moving towards Google C++ style)
-  * Optimization changes (mostly in relation to memory addressing / address decoding)
+Uses achaulk's 65c816 emulator from [RetroCpu](https://github.com/achaulk)
 
 #### Debugger / Automation
 
@@ -148,21 +144,21 @@ c256emu.load_hex(<file>)
 
 c256emu.sys(<address>)
 
-c256emu.cpu_state.pc
-c256emu.cpu_state.a
-c256emu.cpu_state.x
-c256emu.cpu_state.y
-c256emu.cpu_state.cycle_count
-c256emu.cpu_state.status.carry_flag
-c256emu.cpu_state.status.zero_flag
-c256emu.cpu_state.status.interrupt_disable_flag
-c256emu.cpu_state.status.decimal_flag
-c256emu.cpu_state.status.break_flag
-c256emu.cpu_state.status.accumulator_width_flag
-c256emu.cpu_state.status.index_width_flag
-c256emu.cpu_state.status.emulation_flag
-c256emu.cpu_state.status.overflow_flag
-c256emu.cpu_state.status.sign_flag
+c256emu.cpu_state().pc
+c256emu.cpu_state().a
+c256emu.cpu_state().x
+c256emu.cpu_state().y
+c256emu.cpu_state().cycle_count
+c256emu.cpu_state().status.carry_flag
+c256emu.cpu_state().status.zero_flag
+c256emu.cpu_state().status.interrupt_disable_flag
+c256emu.cpu_state().status.decimal_flag
+c256emu.cpu_state().status.break_flag
+c256emu.cpu_state().status.accumulator_width_flag
+c256emu.cpu_state().status.index_width_flag
+c256emu.cpu_state().status.emulation_flag
+c256emu.cpu_state().status.overflow_flag
+c256emu.cpu_state().status.sign_flag
 ```
 
 The `-script` argument can be used to read any Lua program, to set up functions, breakpoints, etc. to execute on boot.

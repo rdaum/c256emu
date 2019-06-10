@@ -9,7 +9,6 @@
 #include "bus/sdl_to_atset_keymap.h"
 #include "bus/system.h"
 #include "bus/vicky_def.h"
-#include "cpu/binary.h"
 #include "vicky.h"
 
 namespace {
@@ -46,6 +45,16 @@ bool Set24(uint32_t addr, uint32_t start_addr, uint32_t *dest, uint8_t v) {
 void Set32(uint32_t *value, uint8_t bit_number) {
   auto mask = static_cast<uint32_t>(1 << bit_number);
   *value = *value | mask;
+}
+
+void SetLower8(uint16_t *destination, uint8_t value) {
+  *destination &= 0xFF00;
+  *destination |= value;
+}
+
+void SetHigher8(uint16_t *destination, uint8_t value) {
+  *destination &= 0x00ff;
+  *destination |= (value << 8);
 }
 }  // namespace
 
@@ -189,13 +198,13 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
       tile_sets_[tile_num].start_addr =
           (tile_sets_[tile_num].start_addr & 0x0000ffff) | (v << 16);
     } else if (register_num == 4) {
-      Binary::setLower8BitsOf16BitsValue(&tile_sets_[tile_num].stride_x, v);
+      SetLower8(&tile_sets_[tile_num].stride_x, v);
     } else if (register_num == 5) {
-      Binary::setHigher8BitsOf16BitsValue(&tile_sets_[tile_num].stride_x, v);
+      SetHigher8(&tile_sets_[tile_num].stride_x, v);
     } else if (register_num == 6) {
-      Binary::setLower8BitsOf16BitsValue(&tile_sets_[tile_num].stride_y, v);
+      SetLower8(&tile_sets_[tile_num].stride_y, v);
     } else if (register_num == 7) {
-      Binary::setHigher8BitsOf16BitsValue(&tile_sets_[tile_num].stride_y, v);
+      SetHigher8(&tile_sets_[tile_num].stride_y, v);
     } else {
       LOG(ERROR) << "Unsupported tile reg: " << register_num;
     }
@@ -232,13 +241,13 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
     } else if (register_num == 3) {
       sprite.start_addr = (sprite.start_addr & 0x0000ffff) | (v << 16);
     } else if (register_num == 4) {
-      Binary::setLower8BitsOf16BitsValue(&sprite.x, v);
+      SetLower8(&sprite.x, v);
     } else if (register_num == 5) {
-      Binary::setHigher8BitsOf16BitsValue(&sprite.x, v);
+      SetHigher8(&sprite.x, v);
     } else if (register_num == 6) {
-      Binary::setLower8BitsOf16BitsValue(&sprite.y, v);
+      SetLower8(&sprite.y, v);
     } else if (register_num == 7) {
-      Binary::setHigher8BitsOf16BitsValue(&sprite.y, v);
+      SetHigher8(&sprite.y, v);
     } else {
       LOG(ERROR) << "Unsupported sprite reg: " << register_num;
     }

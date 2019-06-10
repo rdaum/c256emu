@@ -56,7 +56,6 @@ set(BUS_SOURCES
         src/bus/rtc.cc
         src/bus/system.cc
         src/bus/vicky.cc
-        src/cpu/binary.cc
         )
 set(BUS_HEADERS
         src/bus/automation.h
