@@ -126,26 +126,55 @@ read loop with command history and arrow keys and so on, which can execute Lua e
 The following functions / variables are available:
 
 ```lua
+-- Pause the CPU emulator at the current instruciotn.
 c256emu.stop()
+
+-- Continue if paused.
 c256emu.continue()
-c256emu.step() // not currently working
-c256emu.add_breakpoint(<address>, <function>)
-c256emu.clear_breakpoint(<address>)
+
+-- Single step to the next instruction.
+c256emu.step()
+
+-- Add breakpoint to invoke the function <func> when the PC hits <addr>
+c256emu.add_breakpoint(<addr>, <func>)
+
+-- Clear the breakpoint at <addr>
+c256emu.clear_breakpoint(<addr>)
+
+-- Return a list of all breakpoints
 c256emu.breakpoints() 
 
-c256emu.peek(<address>)
-c256emu.peek16(<address>)
-c256emu.poke(<address>, <byte>)
-c256emu.poke16(<address>, <word>)
-c256emu.peekbuf(<address>, <num_bytes>)
+-- Read the byte at <addr>
+c256emu.peek(<addr>)
 
-c256emu.disassemble(<address>, <count>)
+-- Read the word at <addr>
+c256emu.peek16(<addr>)
 
-c256emu.load_bin(<file>, <address>)
+-- Modify the byte at <addr>
+c256emu.poke(<addr>, <byte>)
+
+-- Modify the word at <addr>
+c256emu.poke16(<addr>, <word>)
+
+-- Return a binary dump of <num_bytes> starting at <addr>
+c256emu.peekbuf(<addr>, <num_bytes>)
+
+-- Disassemble the 65816 program at <addr>, up to <count> lines, and return
+-- a table of (line#, code). If <addr> is omitted, disassemble from the 
+-- current PC on (if CPU is stopped.)
+c256emu.disassemble(<addr>, <count>)
+
+-- Load the binary <file> into <addr>
+c256emu.load_bin(<file>, <addr>)
+
+-- Load the Intel Hex, SRec, etc. file. The load address is assumed
+-- to be part of the hex file. 
 c256emu.load_hex(<file>)
 
-c256emu.sys(<address>)
+-- Jump the program counter to <addr>
+c256emu.sys(<addr>)
 
+-- The following are self explanatory.
 c256emu.cpu_state().pc
 c256emu.cpu_state().a
 c256emu.cpu_state().x
