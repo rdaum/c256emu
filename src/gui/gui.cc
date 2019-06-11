@@ -130,6 +130,7 @@ void GUI::Render() {
   glfwMakeContextCurrent(window_);
   glfwSwapBuffers(window_);
 }
+
 void GUI::DrawMemoryInspect() const {
   if (ImGui::CollapsingHeader("Memory Inspect")) {
     static std::vector<std::pair<uint32_t, uint8_t>> inspect_points;
@@ -289,10 +290,16 @@ void GUI::DrawProfiler() const {
     mhz_buffer.push_back(profile_info.mhz_equiv);
     fps_buffer.push_back(profile_info.fps);
     ImGui::BeginGroup();
+
     ImGui::LabelText("FPS", "%f", profile_info.fps);
-    ImGui::PlotLines("", mhz_buffer.data(), fps_buffer.size());
+    std::vector<float> linear_fps(fps_buffer.size());
+    std::copy(fps_buffer.begin(), fps_buffer.end(), linear_fps.begin());
+    ImGui::PlotLines("", linear_fps.data(), linear_fps.size());
     ImGui::LabelText("Mhz", "%f", profile_info.mhz_equiv);
-    ImGui::PlotLines("", mhz_buffer.data(), mhz_buffer.size());
+
+    std::vector<float> linear_mhz(fps_buffer.size());
+    std::copy(mhz_buffer.begin(), mhz_buffer.end(), linear_mhz.begin());
+    ImGui::PlotLines("", linear_mhz.data(), linear_mhz.size());
     ImGui::EndGroup();
   }
 }
