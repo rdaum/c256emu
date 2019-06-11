@@ -17,7 +17,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
 # External dependencies
 find_package(PkgConfig)
 
-pkg_check_modules(ADPLUG REQUIRED adplug)
 pkg_check_modules(SREC REQUIRED srecord)
 
 hunter_add_package(SDL2)
@@ -55,7 +54,6 @@ set(BUS_SOURCES
     src/bus/keyboard.cc
     src/bus/loader.cc
     src/bus/math_copro.cc
-    src/bus/opl_2.cc
     src/bus/rtc.cc
     src/bus/vicky.cc
     src/bus/c256_system_bus.cc
@@ -67,7 +65,6 @@ set(BUS_HEADERS
     src/bus/keyboard.h
     src/bus/loader.h
     src/bus/math_copro.h
-    src/bus/opl_2.h
     src/bus/rtc.h
     src/bus/sdl_to_atset_keymap.h
     src/bus/vicky_def.h
