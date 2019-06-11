@@ -1,7 +1,7 @@
 #include "bus/int_controller.h"
 
-#include "bus/system.h"
 #include "int_controller.h"
+#include "system.h"
 
 namespace {
 

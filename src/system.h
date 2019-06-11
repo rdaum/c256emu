@@ -9,7 +9,13 @@
 #include "cpu/65816/cpu_65c816.h"
 #include "debug_interface.h"
 
+class GUI;
 class C256SystemBus;
+
+struct ProfileInfo {
+  double mhz_equiv;
+  double fps;
+};
 
 // Owns and configures all bus devices and the CPU.
 class System {
@@ -24,7 +30,7 @@ class System {
   void Initialize();
 
   // Launch the loop thread and run the CPU.
-  void Start(bool profile);
+  void Start();
 
   // Stop the loop thread completely.
   void SetStop();
@@ -41,14 +47,16 @@ class System {
 
   DebugInterface *GetDebugInterface();
 
- protected:
+  const ProfileInfo &profile_info() const { return profile_info_; }
+
+protected:
   friend class InterruptController;
 
   void RaiseIRQ();
   void ClearIRQ();
 
  private:
-  void Run(bool profile);
+  void Run();
   void DrawNextLine();
   void ScheduleNextScanline();
 
@@ -56,13 +64,15 @@ class System {
   uint64_t total_scanlines_ = 0;
   uint64_t profile_last_cycles = 0;
 
-  bool profile_;
+  ProfileInfo profile_info_;
+
   std::chrono::time_point<std::chrono::high_resolution_clock>
       profile_previous_time;
   std::chrono::time_point<std::chrono::high_resolution_clock> frame_clock;
   std::chrono::time_point<std::chrono::high_resolution_clock> next_frame_clock;
 
   std::unique_ptr<C256SystemBus> system_bus_;
+  std::unique_ptr<GUI> gui_;
 
   WDC65C816 cpu_;
   EventQueue events_;

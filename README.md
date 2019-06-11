@@ -97,7 +97,6 @@ Below are the set of arguments the program accepts:
      default: false
   * `-script` (Lua script to run on start (automation only)) type: string
      default: ""
-  * `-profile` (enable CPU performance profiling) type: bool default: false
   * `-turbo` (turn off frame rate / CPU throttling, go as fast as possible)
 
 To run the emulator you will need to at minimum provide either a `-kernel_bin` argument or `kernel_hex` argument. Both
@@ -115,8 +114,6 @@ The `-automation` argument turns on a scripting facility which does the followin
     inspecting memory and CPU state, etc.
   * Allows an initial automation script (script argument) to be passed to do the same things the interactive interpreter
     can do.
-
-The `-profile` argument does some primitive measurements of the emulated FPS and Mhz values.
 
 ## Debug / Automation
 
@@ -196,8 +193,9 @@ The `-script` argument can be used to read any Lua program, to set up functions,
 
 ### What missing from the debugger right now:
 
-  * Fix single stepping
+  * GUI
   * Raise / clear interrupts
-  * Disassembly
+  * Breakpoints on interrupts
+  * Assembler
   * Conditional breakpoints
 

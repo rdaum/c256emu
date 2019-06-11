@@ -18,7 +18,7 @@ class Keyboard {
   Keyboard(System* system, InterruptController* int_controller);
   ~Keyboard() = default;
 
-  void HandleSDLEvent(const SDL_Event &event);
+  void ProcessEvent(const SDL_Event &event);
 
   void StoreByte(uint32_t addr, uint8_t v);
   uint8_t ReadByte(uint32_t addr);

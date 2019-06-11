@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "bus/system.h"
+#include "system.h"
 
 namespace {
 

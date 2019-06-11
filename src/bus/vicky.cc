@@ -7,8 +7,8 @@
 #include "bus/int_controller.h"
 #include "bus/keyboard.h"
 #include "bus/sdl_to_atset_keymap.h"
-#include "bus/system.h"
 #include "bus/vicky_def.h"
+#include "system.h"
 #include "vicky.h"
 
 namespace {
@@ -84,12 +84,12 @@ void Vicky::InitPages(Page *vicky_page_start) {
 }
 
 void Vicky::Start() {
-  SDL_Init(SDL_INIT_VIDEO);
   window_ = SDL_CreateWindow("Vicky", SDL_WINDOWPOS_UNDEFINED,
                              SDL_WINDOWPOS_UNDEFINED, kVickyBitmapWidth,
                              kVickyBitmapHeight, SDL_WINDOW_OPENGL);
 
   CHECK(window_);
+  gl_context_ = SDL_GL_CreateContext(window_);
   renderer_ = SDL_CreateRenderer(window_, -1, 0);
   vicky_texture_ = SDL_CreateTexture(
       renderer_, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
@@ -382,6 +382,8 @@ void Vicky::RenderLine() {
   if (raster_y_ == kVickyBitmapHeight) {
     SDL_UpdateTexture(vicky_texture_, nullptr, frame_buffer_,
                       kVickyBitmapWidth * sizeof(uint32_t));
+    SDL_GL_MakeCurrent(window_, gl_context_);
+    SDL_GL_SwapWindow(window_);
     SDL_RenderCopy(renderer_, vicky_texture_, nullptr, nullptr);
     SDL_RenderPresent(renderer_);
     raster_y_ = 0;
@@ -536,4 +538,8 @@ uint32_t Vicky::ApplyGamma(uint32_t colour_val) {
                        }};
 
   return corrected.v;
+}
+
+unsigned int Vicky::window_id() const {
+  return SDL_GetWindowID(window_);
 }

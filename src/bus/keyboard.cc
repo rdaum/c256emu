@@ -5,7 +5,7 @@
 
 #include "bus/int_controller.h"
 #include "bus/sdl_to_atset_keymap.h"
-#include "bus/system.h"
+#include "system.h"
 
 namespace {
 // status register bits
@@ -163,11 +163,11 @@ Keybinding FindKey(SDL_Scancode scan_code) {
 void Keyboard::PollKeyboard() {
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
-    HandleSDLEvent(event);
+    ProcessEvent(event);
   }
 }
 
-void Keyboard::HandleSDLEvent(const SDL_Event &event) {
+void Keyboard::ProcessEvent(const SDL_Event &event) {
   switch (event.type) {
   case SDL_KEYDOWN: {
     auto key = FindKey(event.key.keysym.scancode);

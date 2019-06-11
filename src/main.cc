@@ -6,9 +6,8 @@
 #include <thread>
 
 #include "bus/automation.h"
-#include "bus/system.h"
+#include "system.h"
 
-DEFINE_bool(profile, false, "enable CPU performance profiling");
 DEFINE_bool(automation, false, "enable Lua automation / debug scripting");
 DEFINE_string(kernel_hex, "", "Location of kernel .hex file");
 DEFINE_string(kernel_bin, "", "Location of kernel .bin file");
@@ -34,7 +33,7 @@ int main(int argc, char *argv[]) {
 
   std::thread run_thread([&system]() {
     system.Initialize();
-    system.Start(FLAGS_profile);
+    system.Start();
   });
 
   if (FLAGS_automation) {

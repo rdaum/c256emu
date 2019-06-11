@@ -49,6 +49,8 @@ class Vicky {
 
   uint8_t *vram() { return video_ram_; }
 
+  unsigned int window_id() const;
+
  private:
   bool RenderBitmap(uint16_t raster_x, uint32_t *pixel);
   bool RenderCharacterGenerator(uint16_t raster_x, uint32_t *pixel);
@@ -62,8 +64,9 @@ class Vicky {
   System *sys_;
   InterruptController *int_controller_;
 
-  SDL_Window *window_{};
-  SDL_Renderer *renderer_{};
+  SDL_Window *window_;
+  SDL_Renderer *renderer_;
+  SDL_GLContext gl_context_;
 
   union BGRAColour {
     uint32_t v;
