@@ -24,13 +24,11 @@ class System {
   ~System();
 
   void LoadHex(const std::string &kernel_hex_file);
-
   void LoadBin(const std::string &kernel_bin_file, uint32_t addr);
-
   void Initialize();
 
   // Launch the loop thread and run the CPU.
-  void Start();
+  void Run();
 
   // Stop the loop thread completely.
   void SetStop();
@@ -47,7 +45,9 @@ class System {
 
   DebugInterface *GetDebugInterface();
 
-  const ProfileInfo &profile_info() const { return profile_info_; }
+  ProfileInfo profile_info() const { return profile_info_; }
+
+  Automation *automation();
 
 protected:
   friend class InterruptController;
@@ -56,7 +56,6 @@ protected:
   void ClearIRQ();
 
  private:
-  void Run();
   void DrawNextLine();
   void ScheduleNextScanline();
 
@@ -77,4 +76,5 @@ protected:
   WDC65C816 cpu_;
   EventQueue events_;
   DebugInterface debug_;
+  Automation automation_;
 };

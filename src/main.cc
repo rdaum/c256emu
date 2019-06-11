@@ -8,7 +8,7 @@
 #include "bus/automation.h"
 #include "system.h"
 
-DEFINE_bool(automation, false, "enable Lua automation / debug scripting");
+DEFINE_bool(interpreter, false, "enable Lua command read prompt loop");
 DEFINE_string(kernel_hex, "", "Location of kernel .hex file");
 DEFINE_string(kernel_bin, "", "Location of kernel .bin file");
 DEFINE_string(script, "", "Lua script to run on start (automation only)");
@@ -31,18 +31,17 @@ int main(int argc, char *argv[]) {
 
   if (!FLAGS_program_hex.empty()) system.LoadHex(FLAGS_program_hex);
 
-  std::thread run_thread([&system]() {
+  Automation *automation = system.automation();
+  std::thread run_thread([&system, automation]() {
     system.Initialize();
-    system.Start();
-  });
-
-  if (FLAGS_automation) {
-    Automation automation(system.cpu(), &system, system.GetDebugInterface());
 
     if (!FLAGS_script.empty()) {
-      automation.LoadScript(FLAGS_script);
+      automation->LoadScript(FLAGS_script);
     }
+    system.Run();
+  });
 
+  if (FLAGS_interpreter) {
     linenoiseInstallWindowChangeHandler();
 
     char *buf;
@@ -51,7 +50,7 @@ int main(int argc, char *argv[]) {
         linenoiseHistoryAdd(buf);
       }
 
-      automation.Eval(buf);
+      automation->Eval(buf);
 
       // readline malloc's a new buffer every time.
       free(buf);

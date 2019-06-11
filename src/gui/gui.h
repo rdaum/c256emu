@@ -1,5 +1,9 @@
 #pragma once
 
+#include <atomic>
+#include <mutex>
+#include <thread>
+
 #include <SDL2/SDL.h>
 #include <imgui.h>
 
@@ -11,12 +15,18 @@ public:
   ~GUI();
 
   void Start();
-
-  void Render();
-
+  void Stop();
   void ProcessEvent(const SDL_Event &event);
 
  private:
+  void Render();
+  void Close();
+
+  std::mutex gui_mutex_;
+  std::thread gui_thread_;
+
+  std::atomic_bool running_;
+
   System *system_;
 
   SDL_Window *window_ = nullptr;

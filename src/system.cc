@@ -29,9 +29,10 @@ DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
 System::System()
     : system_bus_(std::make_unique<C256SystemBus>(this)),
       gui_(std::make_unique<GUI>(this)), cpu_(system_bus_.get()),
-      debug_(&cpu_, &events_, system_bus_.get(), true) {}
+      debug_(&cpu_, &events_, system_bus_.get(), true),
+      automation_(&cpu_, this, &debug_) {}
 
-System::~System() {}
+System::~System() = default;
 
 void System::LoadHex(const std::string &kernel_hex_file) {
   // GAVIN copies up to 512k flash mem to kernel mem.
@@ -84,16 +85,19 @@ void System::DrawNextLine() {
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_QUIT) {
         SetStop();
+        gui_->Stop();
         return;
-      } else if (event.window.windowID == system_bus_->vicky()->window_id())
+      } else if (event.window.windowID == system_bus_->vicky()->window_id()) {
+        if (event.window.event == SDL_WINDOWEVENT_CLOSE) {
+          SetStop();
+          gui_->Stop();
+        }
         system_bus_->keyboard()->ProcessEvent(event);
-      else {
+      } else {
         gui_->ProcessEvent(event);
       }
     }
-    // Only update the GUI at 1/4 fps, to save some cycles for the emulator.
-    if (current_frame_ % 4 == 0)
-      gui_->Render();
+
     current_frame_++;
     system_bus_->int_controller()->RaiseFrameStart();
 
@@ -157,6 +161,8 @@ void System::RaiseIRQ() { cpu_.cpu_state.SetInterruptSource(1); }
 
 void System::ClearIRQ() { cpu_.cpu_state.ClearInterruptSource(1); }
 
-void System::Start() { Run(); }
-
 void System::SetStop() { cpu_.cpu_state.cycle_stop = 0; }
+
+Automation *System::automation() {
+  return &automation_;
+}

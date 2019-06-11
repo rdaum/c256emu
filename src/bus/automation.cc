@@ -119,9 +119,9 @@ std::vector<Automation::Breakpoint> Automation::GetBreakpoints() const {
 int Automation::LuaAddBreakpoint(lua_State *L) {
   lua_getglobal(L, kAutomationLuaObj);
   Automation *automation = (Automation *)lua_touserdata(L, -1);
-  uint32_t addr = lua_tointeger(L, -1);
+  uint32_t addr = lua_tointeger(L, -3);
   size_t len;
-  const char *function_cstr = lua_tolstring(L, -1, &len);
+  const char *function_cstr = lua_tolstring(L, -2, &len);
   std::string function(function_cstr, len);
   automation->AddBreakpoint(addr, function);
 
@@ -132,7 +132,7 @@ int Automation::LuaAddBreakpoint(lua_State *L) {
 int Automation::LuaClearBreakpoint(lua_State *L) {
   lua_getglobal(L, kAutomationLuaObj);
   Automation *automation = (Automation *)lua_touserdata(L, -1);
-  uint32_t addr = lua_tointeger(L, -1);
+  uint32_t addr = lua_tointeger(L, -2);
   automation->ClearBreakpoint(addr);
 
   return 0;
