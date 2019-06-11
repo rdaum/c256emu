@@ -99,12 +99,27 @@ void GUI::Render() {
                    ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                        ImGuiWindowFlags_NoCollapse)) {
 
-    // TODO: almost none of this is thread safe with the CPU
+    // TODO: almost none of this is thread safe with the CPU. locking required.
 
     DrawProfiler();
     DrawCPUStatus();
     DrawBreakpoints();
     DrawMemoryInspect();
+    if (ImGui::CollapsingHeader("Disassembler")) {
+      Disassembler *disassembler = system_->cpu()->GetDisassembler();
+      std::vector<CpuInstruction> program = disassembler->Disassemble(
+          Disassembler::Config(), &system_->cpu()->cpu_state);
+      ImGui::Columns(3);
+      for (auto instruction : program) {
+        ImGui::Text("%s", Addr(instruction.canonical_address).c_str());
+        ImGui::NextColumn();
+        ImGui::Text("%s", instruction.asm_string.substr(8, 12).c_str());
+        ImGui::NextColumn();
+        ImGui::Text("%s", instruction.asm_string.substr(20).c_str());
+        ImGui::NextColumn();
+      }
+      ImGui::Columns(0);
+    }
   }
   ImGui::End();
 

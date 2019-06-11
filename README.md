@@ -193,7 +193,6 @@ The `-script` argument can be used to read any Lua program, to set up functions,
 
 ### What missing from the debugger right now:
 
-  * GUI
   * Raise / clear interrupts
   * Breakpoints on interrupts
   * Assembler
