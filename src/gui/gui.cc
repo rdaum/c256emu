@@ -133,15 +133,15 @@ void GUI::Render() {
 
 void GUI::DrawMemoryInspect() const {
   if (ImGui::CollapsingHeader("Memory Inspect")) {
-    static std::vector<std::pair<uint32_t, uint8_t>> inspect_points;
-    static bool adding = false;
+    static std::vector<std::pair<cpuaddr_t, uint8_t>> inspect_points;
+    static bool adding_inspect = false;
     if (ImGui::Button("Add")) {
-      adding = true;
+      adding_inspect = true;
     }
     ImGui::Separator();
-    if (adding) {
-      ImGui::Columns(3);
-      static uint32_t addr = 0;
+    if (adding_inspect) {
+      ImGui::Columns(4);
+      static cpuaddr_t addr = 0;
       static uint8_t bytes = 0x10;
       ImGui::InputScalar("Addr", ImGuiDataType_U32, &addr, nullptr, nullptr,
                          "%06X", ImGuiInputTextFlags_CharsHexadecimal);
@@ -152,16 +152,23 @@ void GUI::DrawMemoryInspect() const {
       if (ImGui::Button("OK")) {
         // Make sure the same address isn't already there.
         auto found = std::find_if(inspect_points.begin(), inspect_points.end(),
-                                  [](const std::pair<uint32_t, uint8_t> &x) {
+                                  [](const std::pair<cpuaddr_t, uint8_t> &x) {
                                     return x.first == addr;
                                   });
         if (found == inspect_points.end()) {
           inspect_points.emplace_back(addr, bytes);
         }
-        adding = false;
+        adding_inspect = false;
       }
+      ImGui::NextColumn();
+      if (ImGui::Button("Cancel")) {
+        adding_inspect = false;
+      }
+      ImGui::NextColumn();
       ImGui::Columns(1);
     }
+
+    // Draw the inspections.
     auto it = inspect_points.begin();
     while (it != inspect_points.end()) {
       auto &item = *it;
@@ -203,9 +210,9 @@ void GUI::DrawBreakpoints() const {
 
   if (ImGui::CollapsingHeader("Breakpoints")) {
     DebugInterface *debug_interface = system_->GetDebugInterface();
-    static bool adding = false;
+    static bool adding_breakpoint = false;
     if (ImGui::Button("Add")) {
-      adding = true;
+      adding_breakpoint = true;
     }
     ImGui::Separator();
     auto it = breakpoints.begin();
@@ -225,8 +232,8 @@ void GUI::DrawBreakpoints() const {
       ImGui::NextColumn();
     }
     ImGui::Columns(1);
-    if (adding) {
-      ImGui::Columns(2);
+    if (adding_breakpoint) {
+      ImGui::Columns(3);
       static cpuaddr_t addr = 0;
       ImGui::InputScalar("Addr", ImGuiDataType_U32, &addr, nullptr, nullptr,
                          "%06X", ImGuiInputTextFlags_CharsHexadecimal);
@@ -234,11 +241,15 @@ void GUI::DrawBreakpoints() const {
       if (ImGui::Button("OK")) {
         breakpoints.push_back(addr);
         debug_interface->SetBreakpoint(addr, [](EmulatedCpu *) {}, true);
-        adding = false;
+        adding_breakpoint = false;
       }
       ImGui::NextColumn();
+      if (ImGui::Button("Cancel")) {
+        adding_breakpoint = false;
+      }
+      ImGui::NextColumn();
+      ImGui::Columns(1);
     }
-    ImGui::Columns(1);
   }
 }
 void GUI::DrawCPUStatus() const {
@@ -249,13 +260,16 @@ void GUI::DrawCPUStatus() const {
     uint32_t program_address = cpu->program_address();
     ImGui::LabelText("PC", "%s (%d)", Addr(program_address).c_str(),
                      program_address);
-    ImGui::LabelText("Stack", "%s (%d)",
-                     Addr(cpu->cpu_state.regs.sp.u16).c_str(),
-                     cpu->cpu_state.regs.sp.u16);
     ImGui::LabelText("Native/Emulation", "%s",
                      cpu->mode_emulation ? "Emulation" : "Native");
     ImGui::LabelText("Accumulator width", "%s", cpu->mode_long_a ? "16" : "8");
     ImGui::LabelText("Index width", "%s", cpu->mode_long_xy ? "16" : "8");
+    ImGui::LabelText("A", "%06x (%d)", cpu->a(), cpu->a());
+    ImGui::LabelText("X", "%06x (%d)", cpu->x(), cpu->x());
+    ImGui::LabelText("Y", "%06x (%d)", cpu->y(), cpu->x());
+    ImGui::LabelText("Stack", "%s (%d)",
+                     Addr(cpu->cpu_state.regs.sp.u16).c_str(),
+                     cpu->cpu_state.regs.sp.u16);
 
     ImGui::Columns(3);
     DebugInterface *debug_interface = system_->GetDebugInterface();
