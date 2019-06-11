@@ -2,6 +2,7 @@
 #include <glog/logging.h>
 #include <linenoise.h>
 
+#include <SDL2/SDL.h>
 #include <iostream>
 #include <thread>
 
@@ -19,6 +20,8 @@ int main(int argc, char *argv[]) {
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, false);
 
+  SDL_Init(SDL_INIT_VIDEO);
+
   LOG(INFO) << "Good morning.";
 
   System system;
@@ -29,7 +32,8 @@ int main(int argc, char *argv[]) {
   else
     LOG(FATAL) << "No kernel";
 
-  if (!FLAGS_program_hex.empty()) system.LoadHex(FLAGS_program_hex);
+  if (!FLAGS_program_hex.empty())
+    system.LoadHex(FLAGS_program_hex);
 
   Automation *automation = system.automation();
   std::thread run_thread([&system, automation]() {
@@ -58,6 +62,7 @@ int main(int argc, char *argv[]) {
     linenoiseHistoryFree();
     system.SetStop();
   }
+
 
   run_thread.join();
 

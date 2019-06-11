@@ -37,6 +37,9 @@ find_package(Lua CONFIG REQUIRED)
 hunter_add_package(imgui)
 find_package(imgui CONFIG REQUIRED)
 
+hunter_add_package(glfw)
+find_package(glfw3 CONFIG REQUIRED)
+
 # Configure liblinenoise-ng as a downloadable library.
 include(cmake/External_LinenoiseNG.cmake)
 
@@ -56,8 +59,7 @@ set(BUS_SOURCES
     src/bus/math_copro.cc
     src/bus/rtc.cc
     src/bus/vicky.cc
-    src/bus/c256_system_bus.cc
-    src/gui/imgui_impl_sdl.cpp)
+    src/bus/c256_system_bus.cc)
 set(BUS_HEADERS
     src/bus/automation.h
     src/bus/ch376_sd.h
@@ -84,7 +86,7 @@ target_compile_options(bus PUBLIC ${SDL2_CFLAGS_OTHER} ${glog_CFLAGS_OTHER}
 
 # Main executable
 add_executable(c256emu src/main.cc src/system.cc src/gui/gui.cc
-               src/gui/imgui_impl_sdl.cpp src/gui/imgui_impl_sdl.h
+               src/gui/imgui_impl_glfw.cpp src/gui/imgui_impl_glfw.h
                src/gui/imgui_impl_opengl2.cpp src/gui/imgui_impl_opengl2.h)
 add_dependencies(c256emu bus gflags)
 target_include_directories(c256emu PUBLIC
@@ -100,6 +102,7 @@ target_link_libraries(c256emu
                       gflags
                       SDL2::SDL2main
                       SDL2::SDL2
+                      glfw
                       imgui::imgui
                       Lua::lua_lib
                       GL

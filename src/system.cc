@@ -80,7 +80,6 @@ void System::DrawNextLine() {
 
   bool frame_end = system_bus_->vicky()->is_vertical_end();
   if (frame_end) {
-
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_QUIT) {
@@ -93,8 +92,6 @@ void System::DrawNextLine() {
           gui_->Stop();
         }
         system_bus_->keyboard()->ProcessEvent(event);
-      } else {
-        gui_->ProcessEvent(event);
       }
     }
 

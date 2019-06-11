@@ -4,8 +4,8 @@
 #include <mutex>
 #include <thread>
 
-#include <SDL2/SDL.h>
 #include <imgui.h>
+#include <GLFW/glfw3.h>
 
 class System;
 
@@ -16,7 +16,6 @@ public:
 
   void Start();
   void Stop();
-  void ProcessEvent(const SDL_Event &event);
 
  private:
   void Render();
@@ -29,7 +28,10 @@ public:
 
   System *system_;
 
-  SDL_Window *window_ = nullptr;
-  SDL_GLContext gl_context_;
+  GLFWwindow *window_ = nullptr;
   ImGuiIO *io_;
+  void DrawProfiler() const;
+  void DrawCPUStatus() const;
+  void DrawBreakpoints() const;
+  void DrawMemoryInspect() const;
 };

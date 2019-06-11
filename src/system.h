@@ -42,11 +42,8 @@ class System {
   void Sys(uint32_t address);
 
   WDC65C816 *cpu() { return &cpu_; }
-
   DebugInterface *GetDebugInterface();
-
   ProfileInfo profile_info() const { return profile_info_; }
-
   Automation *automation();
 
 protected:
