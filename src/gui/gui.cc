@@ -61,9 +61,8 @@ void GUI::Render() {
   ImGui_ImplSDL2_NewFrame(window_);
   ImGui::NewFrame();
 
-  ImGui::SetNextWindowPos({5, 5});
-  ImGui::Begin("Profile", nullptr,
-               ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+  ImGui::Begin("Profile", nullptr, ImGuiWindowFlags_NoResize);
+  ImGui::SetWindowSize({0.0f, 0.0f});
   auto profile_info = system_->profile_info();
   ImGui::BeginGroup();
   ImGui::LabelText("FPS", "%f", profile_info.fps);
