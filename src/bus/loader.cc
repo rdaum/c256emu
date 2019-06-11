@@ -21,7 +21,7 @@ void LoadFromHex(const std::string &filename, SystemBus *system_bus) {
         address++;
       }
     }
-  } catch (std::exception e) {
+  } catch (std::exception &e) {
     CHECK(false) << e.what();
   }
   return;
