@@ -51,7 +51,17 @@ class Vicky {
 
   unsigned int window_id() const;
 
- private:
+  void set_scale(float scale);
+  float scale() const { return scale_; }
+
+  enum class ScalingQuality { NEAREST, LINEAR, BEST };
+  void set_scaling_quality(ScalingQuality scaling_quality);
+  ScalingQuality scaling_quality() const { return scaling_quality_; }
+
+  void set_gamma_override(bool override) { gamma_override_ = override; }
+  bool gamma_override() const { return gamma_override_; }
+
+private:
   bool RenderBitmap(uint16_t raster_x, uint32_t *pixel);
   bool RenderCharacterGenerator(uint16_t raster_x, uint32_t *pixel);
   bool RenderMouseCursor(uint16_t raster_x, uint32_t *pixel);
@@ -63,6 +73,12 @@ class Vicky {
 
   System *sys_;
   InterruptController *int_controller_;
+
+  float scale_ = 1.0;
+  ScalingQuality scaling_quality_ = ScalingQuality::NEAREST;
+
+  // Enable gamma correction even if the video mode doesn't say so.
+  bool gamma_override_ = true;
 
   SDL_Window *window_;
   SDL_Renderer *renderer_;

@@ -22,7 +22,8 @@ using UniqueTexturePtr =
 
 bool Set16(uint32_t addr, uint32_t start_addr, uint16_t *dest, uint8_t v) {
   uint16_t o = addr - start_addr;
-  if (o > 1) return false;
+  if (o > 1)
+    return false;
   if (o == 0)
     *dest = (*dest & 0xff00) | v;
   else
@@ -32,7 +33,8 @@ bool Set16(uint32_t addr, uint32_t start_addr, uint16_t *dest, uint8_t v) {
 
 bool Set24(uint32_t addr, uint32_t start_addr, uint32_t *dest, uint8_t v) {
   uint16_t o = addr - start_addr;
-  if (o > 2) return false;
+  if (o > 2)
+    return false;
   if (o == 0)
     *dest = (*dest & 0x00ffff00) | v;
   else if (o == 1)
@@ -56,7 +58,19 @@ void SetHigher8(uint16_t *destination, uint8_t value) {
   *destination &= 0x00ff;
   *destination |= (value << 8);
 }
-}  // namespace
+
+std::string ScalingQualityStr(Vicky::ScalingQuality scaling_quality) {
+  switch (scaling_quality) {
+  case Vicky::ScalingQuality::NEAREST:
+    return "0";
+  case Vicky::ScalingQuality::LINEAR:
+    return "1";
+  default:
+  case Vicky::ScalingQuality::BEST:
+    return "2";
+  }
+}
+} // namespace
 
 Vicky::Vicky(System *system, InterruptController *int_controller)
     : sys_(system), int_controller_(int_controller) {
@@ -84,16 +98,21 @@ void Vicky::InitPages(Page *vicky_page_start) {
 }
 
 void Vicky::Start() {
-  window_ = SDL_CreateWindow("Vicky", SDL_WINDOWPOS_UNDEFINED,
-                             SDL_WINDOWPOS_UNDEFINED, kVickyBitmapWidth,
-                             kVickyBitmapHeight, SDL_WINDOW_OPENGL);
+  window_ =
+      SDL_CreateWindow("Vicky", SDL_WINDOWPOS_UNDEFINED,
+                       SDL_WINDOWPOS_UNDEFINED, kVickyBitmapWidth * scale_,
+                       kVickyBitmapHeight * scale_, SDL_WINDOW_OPENGL);
 
   CHECK(window_);
   gl_context_ = SDL_GL_CreateContext(window_);
   renderer_ = SDL_CreateRenderer(window_, -1, 0);
-  vicky_texture_ = SDL_CreateTexture(
-      renderer_, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-      kVickyBitmapWidth, kVickyBitmapHeight);
+  vicky_texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_ARGB8888,
+                                     SDL_TEXTUREACCESS_STREAMING,
+
+                                     kVickyBitmapWidth, kVickyBitmapHeight);
+
+  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,
+              ScalingQualityStr(scaling_quality_).c_str());
 
   CHECK(renderer_);
 }
@@ -113,39 +132,39 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
   uint16_t offset = addr;
 
   switch (offset) {
-    case VKY_TXT_CURSOR_X_REG_L:
-      cursor_x_ = (cursor_x_ & 0xFF00) | v;
-      return;
-    case VKY_TXT_CURSOR_X_REG_H:
-      cursor_x_ = (cursor_x_ & 0xFF) | ((uint16_t)v << 8);
-      return;
-    case VKY_TXT_CURSOR_Y_REG_L:
-      cursor_y_ = (cursor_y_ & 0xFF00) | v;
-      return;
-    case VKY_TXT_CURSOR_Y_REG_H:
-      cursor_y_ = (cursor_y_ & 0xFF) | ((uint16_t)v << 8);
-      return;
-    case BORDER_COLOR_B:
-      border_colour_.bgra[0] = v;
-      return;
-    case BORDER_COLOR_G:
-      border_colour_.bgra[1] = v;
-      return;
-    case BORDER_COLOR_R:
-      border_colour_.bgra[2] = v;
-      return;
-    case MOUSE_PTR_X_POS_L:
-      mouse_pos_x_ = (mouse_pos_x_ & 0xFF00) | v;
-      return;
-    case MOUSE_PTR_X_POS_H:
-      mouse_pos_x_ = (mouse_pos_x_ & 0xFF) | ((uint16_t)v << 8);
-      return;
-    case MOUSE_PTR_Y_POS_L:
-      mouse_pos_y_ = (mouse_pos_y_ & 0xFF00) | v;
-      return;
-    case MOUSE_PTR_Y_POS_H:
-      mouse_pos_y_ = (mouse_pos_y_ & 0xFF) | ((uint16_t)v << 8);
-      return;
+  case VKY_TXT_CURSOR_X_REG_L:
+    cursor_x_ = (cursor_x_ & 0xFF00) | v;
+    return;
+  case VKY_TXT_CURSOR_X_REG_H:
+    cursor_x_ = (cursor_x_ & 0xFF) | ((uint16_t)v << 8);
+    return;
+  case VKY_TXT_CURSOR_Y_REG_L:
+    cursor_y_ = (cursor_y_ & 0xFF00) | v;
+    return;
+  case VKY_TXT_CURSOR_Y_REG_H:
+    cursor_y_ = (cursor_y_ & 0xFF) | ((uint16_t)v << 8);
+    return;
+  case BORDER_COLOR_B:
+    border_colour_.bgra[0] = v;
+    return;
+  case BORDER_COLOR_G:
+    border_colour_.bgra[1] = v;
+    return;
+  case BORDER_COLOR_R:
+    border_colour_.bgra[2] = v;
+    return;
+  case MOUSE_PTR_X_POS_L:
+    mouse_pos_x_ = (mouse_pos_x_ & 0xFF00) | v;
+    return;
+  case MOUSE_PTR_X_POS_H:
+    mouse_pos_x_ = (mouse_pos_x_ & 0xFF) | ((uint16_t)v << 8);
+    return;
+  case MOUSE_PTR_Y_POS_L:
+    mouse_pos_y_ = (mouse_pos_y_ & 0xFF00) | v;
+    return;
+  case MOUSE_PTR_Y_POS_H:
+    mouse_pos_y_ = (mouse_pos_y_ & 0xFF) | ((uint16_t)v << 8);
+    return;
   }
 
   if (addr >= FG_CHAR_LUT_PTR && addr < BG_CHAR_LUT_PTR) {
@@ -290,18 +309,18 @@ void Vicky::RenderLine() {
   if (run_char_gen && (cursor_reg_ & Vky_Cursor_Enable)) {
     uint16_t flash_interval_ms = 0;
     switch (cursor_reg_ >> 1) {
-      case 0b00:
-        flash_interval_ms = 1000;
-        break;
-      case 0b01:
-        flash_interval_ms = 500;
-        break;
-      case 0b10:
-        flash_interval_ms = 250;
-        break;
-      case 0b11:
-        flash_interval_ms = 200;
-        break;
+    case 0b00:
+      flash_interval_ms = 1000;
+      break;
+    case 0b01:
+      flash_interval_ms = 500;
+      break;
+    case 0b10:
+      flash_interval_ms = 250;
+      break;
+    case 0b11:
+      flash_interval_ms = 200;
+      break;
     }
     auto time_since_flash =
         std::chrono::steady_clock::now() - last_cursor_flash_;
@@ -348,10 +367,12 @@ void Vicky::RenderLine() {
     }
 
     // Characters
-    if (run_char_gen) RenderCharacterGenerator(raster_x, row_pixel);
+    if (run_char_gen)
+      RenderCharacterGenerator(raster_x, row_pixel);
 
     // Mouse
-    if (mouse_cursor_enable_) RenderMouseCursor(raster_x, row_pixel);
+    if (mouse_cursor_enable_)
+      RenderMouseCursor(raster_x, row_pixel);
 
     if (border_enabled_) {
       uint32_t border_colour = ApplyGamma(border_colour_.v);
@@ -384,7 +405,10 @@ void Vicky::RenderLine() {
                       kVickyBitmapWidth * sizeof(uint32_t));
     SDL_GL_MakeCurrent(window_, gl_context_);
     SDL_GL_SwapWindow(window_);
-    SDL_RenderCopy(renderer_, vicky_texture_, nullptr, nullptr);
+    int w, h;
+    SDL_GetWindowSize(window_, &w, &h);
+    SDL_Rect scaled_rect{0, 0, w, h};
+    SDL_RenderCopy(renderer_, vicky_texture_, nullptr, &scaled_rect);
     SDL_RenderPresent(renderer_);
     raster_y_ = 0;
   }
@@ -394,7 +418,8 @@ bool Vicky::RenderBitmap(uint16_t raster_x, uint32_t *row_pixel) {
   uint8_t *indexed_row =
       video_ram_ + bitmap_addr_offset_ + (raster_y_ * kVickyBitmapWidth);
   uint8_t colour_index = indexed_row[raster_x];
-  if (colour_index == 0) return false;
+  if (colour_index == 0)
+    return false;
   *row_pixel = ApplyGamma(lut_[bitmap_lut_][colour_index].v);
   return true;
 }
@@ -416,7 +441,8 @@ bool Vicky::RenderSprites(uint16_t raster_x, uint8_t layer,
     const uint8_t *sprite_mem = video_ram_ + sprite.start_addr;
     uint8_t colour_index =
         sprite_mem[raster_x - sprite.x + (raster_y_ - sprite.y) * kSpriteSize];
-    if (colour_index == 0) return false;
+    if (colour_index == 0)
+      return false;
     *row_pixel = ApplyGamma(lut_[sprite.lut][colour_index].v);
     return true;
   }
@@ -440,8 +466,8 @@ bool Vicky::RenderTileMap(uint16_t raster_x, uint8_t layer,
     uint8_t *tile_sheet_bitmap = &video_ram_[tile_set.start_addr];
 
     uint8_t tile_sheet_column =
-        tile_num % kTileSize;  // the column in the tile sheet
-    uint8_t tile_sheet_row = tile_num / kTileSize;  // the row in the tile sheet
+        tile_num % kTileSize; // the column in the tile sheet
+    uint8_t tile_sheet_row = tile_num / kTileSize; // the row in the tile sheet
 
     // the physical memory location of the row in the sheet our tile is
     // in
@@ -455,7 +481,8 @@ bool Vicky::RenderTileMap(uint16_t raster_x, uint8_t layer,
         &tile_bitmap_row[tile_sheet_column * kTileSize];
 
     uint8_t colour_index = tile_bitmap_column[screen_tile_sub_col];
-    if (colour_index == 0) return false;
+    if (colour_index == 0)
+      return false;
 
     *row_pixel = ApplyGamma(lut_[tile_set.lut][colour_index].v);
     return true;
@@ -472,7 +499,8 @@ bool Vicky::RenderMouseCursor(uint16_t raster_x, uint32_t *row_pixel) {
     uint8_t mouse_sub_col = raster_x % 16;
     uint8_t mouse_sub_row = raster_y_ % 16;
     uint8_t pixel_val = mouse_mem[mouse_sub_col + (mouse_sub_row * 16)];
-    if (pixel_val == 0) return false;
+    if (pixel_val == 0)
+      return false;
     *row_pixel = ApplyGamma(pixel_val | (pixel_val << 8) | (pixel_val << 16));
     return true;
   }
@@ -526,9 +554,11 @@ bool Vicky::RenderCharacterGenerator(uint16_t raster_x, uint32_t *row_pixel) {
 }
 
 uint32_t Vicky::ApplyGamma(uint32_t colour_val) {
-  // Seems like GAMMA_en is always off? But too dim if we won't use it.
+  // Seems like GAMMA_en is always off? But too dim if we won't use it, so
+  // we allow an override for it, and default it to on.
+  if (!gamma_override_ && !(mode_ & Mstr_Ctrl_GAMMA_En))
+    return colour_val;
 
-  //  if (!(mode_ & Mstr_Ctrl_GAMMA_En)) return colour_val;
   BGRAColour colour{.v = colour_val};
   BGRAColour corrected{.bgra = {
                            gamma_.b[colour.bgra[0]],
@@ -540,6 +570,16 @@ uint32_t Vicky::ApplyGamma(uint32_t colour_val) {
   return corrected.v;
 }
 
-unsigned int Vicky::window_id() const {
-  return SDL_GetWindowID(window_);
+unsigned int Vicky::window_id() const { return SDL_GetWindowID(window_); }
+
+void Vicky::set_scale(float scale) {
+  scale_ = scale;
+  SDL_SetWindowSize(window_, kVickyBitmapWidth * scale,
+                    kVickyBitmapHeight * scale);
+}
+
+void Vicky::set_scaling_quality(Vicky::ScalingQuality scaling_quality) {
+  scaling_quality_ = scaling_quality;
+  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,
+              ScalingQualityStr(scaling_quality).c_str());
 }

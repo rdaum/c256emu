@@ -11,6 +11,7 @@
 
 class GUI;
 class C256SystemBus;
+class Vicky;
 
 struct ProfileInfo {
   double mhz_equiv;
@@ -45,6 +46,7 @@ class System {
   DebugInterface *GetDebugInterface();
   ProfileInfo profile_info() const { return profile_info_; }
   Automation *automation();
+  Vicky *vicky() const;
 
 protected:
   friend class InterruptController;

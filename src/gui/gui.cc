@@ -5,6 +5,7 @@
 #include <circular_buffer.hpp>
 #include <glog/logging.h>
 
+#include "bus/vicky.h"
 #include "gui/imgui_impl_glfw.h"
 #include "gui/imgui_impl_opengl2.h"
 #include "system.h"
@@ -24,6 +25,15 @@ std::string Addr(uint32_t address) {
 void glfw_error_callback(int error, const char *description) {
   LOG(ERROR) << "Glfw Error: " << error << " (" << description << ")";
 }
+
+constexpr const char *kScalingQualitiesLabels[]{"Nearest", "Linear", "Best"};
+
+constexpr std::array<Vicky::ScalingQuality, 3> kScalingQualities{
+    Vicky::ScalingQuality ::NEAREST,
+    Vicky::ScalingQuality ::LINEAR,
+    Vicky::ScalingQuality ::BEST,
+};
+
 } // namespace
 
 GUI::~GUI() { Close(); }
@@ -93,15 +103,13 @@ void GUI::Render() {
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
 
-  ImGui::SetNextWindowPos({0, 0});
-  ImGui::SetNextWindowSize(io_->DisplaySize);
-  if (ImGui::Begin("Debugger", nullptr,
-                   ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                       ImGuiWindowFlags_NoCollapse)) {
-
+  ImGui::SetNextWindowPos({0, 0}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(io_->DisplaySize, ImGuiCond_FirstUseEver);
+  if (ImGui::Begin("System.Ctrl", nullptr)) {
     // TODO: almost none of this is thread safe with the CPU. locking required.
     DrawProfiler();
     DrawCPUStatus();
+    DrawVickySettings();
     DrawBreakpoints();
     DrawMemoryInspect();
     DrawDisassembler();
@@ -130,6 +138,29 @@ void GUI::Render() {
   glfwMakeContextCurrent(window_);
   glfwSwapBuffers(window_);
 }
+void GUI::DrawVickySettings() const {
+  ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Appearing);
+  if (ImGui::CollapsingHeader("Vicky")) {
+    float scale = system_->vicky()->scale();
+    if (ImGui::InputFloat("Screen scale", &scale, 0.1)) {
+      system_->vicky()->set_scale(scale);
+    }
+    bool gamma_overide = system_->vicky()->gamma_override();
+    if (ImGui::Checkbox("Gamma override", &gamma_overide)) {
+      system_->vicky()->set_gamma_override(gamma_overide);
+    }
+    Vicky::ScalingQuality scaling_quality = system_->vicky()->scaling_quality();
+    if (ImGui::BeginCombo("Scaling quality",
+                          kScalingQualitiesLabels[(int)scaling_quality])) {
+      for (Vicky::ScalingQuality quality : kScalingQualities) {
+        if (ImGui::Selectable(kScalingQualitiesLabels[(int)quality])) {
+          system_->vicky()->set_scaling_quality(quality);
+        }
+      }
+      ImGui::EndCombo();
+    }
+  }
+}
 
 void GUI::DrawDisassembler() const {
   if (ImGui::CollapsingHeader("Disassembler")) {
@@ -153,10 +184,9 @@ void GUI::DrawMemoryInspect() const {
   if (ImGui::CollapsingHeader("Memory Inspect")) {
     static std::vector<std::pair<cpuaddr_t, uint8_t>> inspect_points;
     static bool adding_inspect = false;
-    if (ImGui::Button("Add")) {
+    if (!adding_inspect && ImGui::Button("Add")) {
       adding_inspect = true;
     }
-    ImGui::Separator();
     if (adding_inspect) {
       ImGui::Columns(4);
       static cpuaddr_t addr = 0;
@@ -185,6 +215,7 @@ void GUI::DrawMemoryInspect() const {
       ImGui::NextColumn();
       ImGui::Columns(1);
     }
+    ImGui::Separator();
 
     // Draw the inspections.
     auto it = inspect_points.begin();
@@ -230,7 +261,7 @@ void GUI::DrawBreakpoints() const {
   if (ImGui::CollapsingHeader("Breakpoints")) {
     DebugInterface *debug_interface = system_->GetDebugInterface();
     static bool adding_breakpoint = false;
-    if (ImGui::Button("Add")) {
+    if (!adding_breakpoint && ImGui::Button("Add")) {
       adding_breakpoint = true;
     }
     ImGui::Separator();

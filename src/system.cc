@@ -163,3 +163,5 @@ void System::SetStop() { cpu_.cpu_state.cycle_stop = 0; }
 Automation *System::automation() {
   return &automation_;
 }
+
+Vicky *System::vicky() const { return system_bus_->vicky(); }
