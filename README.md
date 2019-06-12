@@ -76,10 +76,11 @@ Embedded Lua interpretter that can do the following:
 
 ## Building
 
-To build, you will need a C++17 compliant compiler (clang or GCC should work), CMake 3.10 or greater, and will need to install the following build dependencies (Debian packages listed):
+To build, you will need a C++17 compliant compiler (a recent clang or GCC should work), CMake 3.10 or greater.
 
-  * libadplug-dev
-  * libsrecord-dev
+CMake should download and compile the third party dependencies it needs.
+
+This may or may not succeed on Windows. Working on that.
 
 Then kick off cmake as usual:
 
@@ -115,7 +116,7 @@ Below are the set of arguments the program accepts:
 To run the emulator you will need to at minimum provide either a `-kernel_bin` argument or `kernel_hex` argument. Both
 arguments are for loading a bootable kernel into the emulated C256's
 memory. `-kernel_bin` takes a raw binary file consisting of a 65816 program that will be loaded into memory at $18:0000.
-kernel_hex takes any format recognized by libsrecord, such as Intel Hex Extended, etc. The hex format itself will
+kernel_hex is expected to be Intel Hex format. The hex format file itself will
 determine where in memory the kernel is loaded, but should be `$18:0000` and up, as described by the `kernel.bin` argument above.
 
 The program_hex argument allows for additional code to be loaded in at the location of your choosing. Loading in at
@@ -177,8 +178,8 @@ c256emu.disassemble(<addr>, <count>)
 -- Load the binary <file> into <addr>
 c256emu.load_bin(<file>, <addr>)
 
--- Load the Intel Hex, SRec, etc. file. The load address is assumed
--- to be part of the hex file. 
+-- Load the Intel Hex, file. The load address is assumed to be part of 
+-- the hex file. 
 c256emu.load_hex(<file>)
 
 -- Jump the program counter to <addr>

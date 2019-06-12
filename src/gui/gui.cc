@@ -335,7 +335,7 @@ void GUI::DrawCPUStatus() const {
       ImGui::NextColumn();
 
       if (ImGui::Button("Step")) {
-        system_->cpu()->SingleStep();
+        debug_interface->SingleStep();
       }
       ImGui::NextColumn();
     }

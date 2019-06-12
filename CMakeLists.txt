@@ -17,8 +17,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
 # External dependencies
 find_package(PkgConfig)
 
-pkg_check_modules(SREC REQUIRED srecord)
-
 hunter_add_package(SDL2)
 find_package(SDL2 CONFIG REQUIRED)
 
@@ -76,7 +74,7 @@ set(BUS_HEADERS
 add_library(bus ${BUS_SOURCES} ${BUS_HEADERS})
 add_dependencies(bus circular_buffer retrocpu)
 target_include_directories(bus PUBLIC ${SDL2_INCLUDE_DIRS}
-                           ${GLOG_ROOT}/include ${SREC_INCLUDE_DIR}
+                           ${GLOG_ROOT}/include
                            ${CIRCULAR_BUFFER_INCLUDE_DIRS}
                            ${RETROCPU_INCLUDE_DIRS}
                            ${ADPLUG_INCLUDE_DIRS}
@@ -92,7 +90,6 @@ add_dependencies(c256emu bus gflags)
 target_include_directories(c256emu PUBLIC
                            ${CIRCULAR_BUFFER_INCLUDE_DIRS}
                            ${LINENOISENG_INCLUDE_DIR}
-                           ${SREC_INCLUDE_DIR}
                            ${RETROCPU_INCLUDE_DIRS}
                            ./src)
 target_link_libraries(c256emu
@@ -109,7 +106,6 @@ target_link_libraries(c256emu
                       ${RETROCPU_LIBRARY_PATH}
                       ${CIRCULAR_BUFFER_LIBRARIES}
                       ${ADPLUG_LIBRARY}
-                      ${SREC_LIBRARIES}
                       ${LINENOISENG_LIBRARY})
 target_compile_options(c256emu PUBLIC -Werror -Wall -Wextra)
 
