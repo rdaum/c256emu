@@ -10,7 +10,7 @@ going to be mismatches with the hardware as I do not have a board to compare aga
 
 Obligatory screenshot:
 
-![screenshot](screenshot.png?raw=true)
+![screenshot](c256emu-screenshot.png?raw=true)
 
 ## Current Functionality
 
