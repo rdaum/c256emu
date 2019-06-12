@@ -100,26 +100,11 @@ void GUI::Render() {
                        ImGuiWindowFlags_NoCollapse)) {
 
     // TODO: almost none of this is thread safe with the CPU. locking required.
-
     DrawProfiler();
     DrawCPUStatus();
     DrawBreakpoints();
     DrawMemoryInspect();
-    if (ImGui::CollapsingHeader("Disassembler")) {
-      Disassembler *disassembler = system_->cpu()->GetDisassembler();
-      std::vector<CpuInstruction> program = disassembler->Disassemble(
-          Disassembler::Config(), &system_->cpu()->cpu_state);
-      ImGui::Columns(3);
-      for (auto instruction : program) {
-        ImGui::Text("%s", Addr(instruction.canonical_address).c_str());
-        ImGui::NextColumn();
-        ImGui::Text("%s", instruction.asm_string.substr(8, 12).c_str());
-        ImGui::NextColumn();
-        ImGui::Text("%s", instruction.asm_string.substr(20).c_str());
-        ImGui::NextColumn();
-      }
-      ImGui::Columns(0);
-    }
+    DrawDisassembler();
   }
   ImGui::End();
 
@@ -144,6 +129,24 @@ void GUI::Render() {
 
   glfwMakeContextCurrent(window_);
   glfwSwapBuffers(window_);
+}
+
+void GUI::DrawDisassembler() const {
+  if (ImGui::CollapsingHeader("Disassembler")) {
+    Disassembler *disassembler = system_->cpu()->GetDisassembler();
+    std::vector<CpuInstruction> program = disassembler->Disassemble(
+        Disassembler::Config(), &system_->cpu()->cpu_state);
+    ImGui::Columns(3);
+    for (auto instruction : program) {
+      ImGui::Text("%s", Addr(instruction.canonical_address).c_str());
+      ImGui::NextColumn();
+      ImGui::Text("%s", instruction.asm_string.substr(8, 12).c_str());
+      ImGui::NextColumn();
+      ImGui::Text("%s", instruction.asm_string.substr(20).c_str());
+      ImGui::NextColumn();
+    }
+    ImGui::Columns(1);
+  }
 }
 
 void GUI::DrawMemoryInspect() const {
@@ -220,6 +223,7 @@ void GUI::DrawMemoryInspect() const {
     }
   }
 }
+
 void GUI::DrawBreakpoints() const {
   static std::vector<cpuaddr_t> breakpoints;
 
@@ -255,7 +259,7 @@ void GUI::DrawBreakpoints() const {
       ImGui::NextColumn();
       if (ImGui::Button("OK")) {
         breakpoints.push_back(addr);
-        debug_interface->SetBreakpoint(addr, [](EmulatedCpu *) {}, true);
+        system_->cpu()->AddBreakpoint(addr, [](EmulatedCpu *) {});
         adding_breakpoint = false;
       }
       ImGui::NextColumn();
@@ -300,7 +304,7 @@ void GUI::DrawCPUStatus() const {
       ImGui::NextColumn();
 
       if (ImGui::Button("Step")) {
-        debug_interface->SingleStep();
+        system_->cpu()->SingleStep();
       }
       ImGui::NextColumn();
     }

@@ -21,6 +21,12 @@ public:
   void Render();
   void Close();
 
+  void DrawProfiler() const;
+  void DrawCPUStatus() const;
+  void DrawBreakpoints() const;
+  void DrawMemoryInspect() const;
+  void DrawDisassembler() const;
+
   std::mutex gui_mutex_;
   std::thread gui_thread_;
 
@@ -30,8 +36,4 @@ public:
 
   GLFWwindow *window_ = nullptr;
   ImGuiIO *io_;
-  void DrawProfiler() const;
-  void DrawCPUStatus() const;
-  void DrawBreakpoints() const;
-  void DrawMemoryInspect() const;
 };
