@@ -112,6 +112,8 @@ void GUI::Render() {
     DrawVickySettings();
     DrawBreakpoints();
     DrawMemoryInspect();
+    DrawStackInspect();
+    DrawDirectPageInspect();
     DrawDisassembler();
   }
   ImGui::End();
@@ -138,6 +140,55 @@ void GUI::Render() {
   glfwMakeContextCurrent(window_);
   glfwSwapBuffers(window_);
 }
+
+void GUI::DrawDirectPageInspect() const {
+  if (ImGui::CollapsingHeader("Direct Page Inspect")) {
+    uint16_t dp = system_->cpu()->cpu_state.regs.d.u16;
+    std::vector<uint8_t> buffer;
+    for (int offset = 0; offset < 0x100; offset++) {
+      buffer.push_back(system_->ReadByte(dp + offset));
+    }
+
+    ImGui::Columns(5);
+    for (size_t i = 0; i < buffer.size(); i += 4) {
+      ImGui::Text("%s", Addr(dp + i).c_str());
+      ImGui::NextColumn();
+      for (int x = 0; x < 4; x++) {
+        if (i + x < buffer.size()) {
+          ImGui::Text("%02X", buffer[i + x]);
+        }
+        ImGui::NextColumn();
+      }
+    }
+    ImGui::Columns(1);
+  }
+}
+
+void GUI::DrawStackInspect() const {
+  if (ImGui::CollapsingHeader("Stack Inspect")) {
+    uint16_t sp = system_->cpu()->cpu_state.regs.sp.u16;
+    std::vector<uint8_t> buffer;
+    // Stuff bytes in the buffer descending from sp down 256 bytes.
+    for (int offset = 0; offset < 0x100; offset++) {
+      buffer.push_back(system_->ReadByte(sp - offset));
+    }
+
+    // Draw in ascending order.
+    ImGui::Columns(5);
+    for (size_t i = 0; i < buffer.size(); i += 4) {
+      ImGui::Text("%s", Addr(sp - i).c_str());
+      ImGui::NextColumn();
+      for (int x = 0; x < 4; x++) {
+        if (i + x < buffer.size()) {
+          ImGui::Text("%02X", buffer[i + x]);
+        }
+        ImGui::NextColumn();
+      }
+    }
+    ImGui::Columns(1);
+  }
+}
+
 void GUI::DrawVickySettings() const {
   ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Appearing);
   if (ImGui::CollapsingHeader("Vicky")) {
@@ -320,6 +371,9 @@ void GUI::DrawCPUStatus() const {
     ImGui::LabelText("Stack", "%s (%d)",
                      Addr(cpu->cpu_state.regs.sp.u16).c_str(),
                      cpu->cpu_state.regs.sp.u16);
+    ImGui::LabelText("Direct page", "%s (%d)",
+                     Addr(cpu->cpu_state.regs.d.u16).c_str(),
+                     cpu->cpu_state.regs.d.u16);
 
     ImGui::Columns(3);
     DebugInterface *debug_interface = system_->GetDebugInterface();

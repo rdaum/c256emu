@@ -37,4 +37,6 @@ public:
   GLFWwindow *window_ = nullptr;
   ImGuiIO *io_;
   void DrawVickySettings() const;
+void DrawStackInspect() const;
+void DrawDirectPageInspect() const;
 };
