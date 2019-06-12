@@ -5,11 +5,14 @@ This is a work in progress emulator for the [C256 Foenix](https://c256foenix.com
 It is written in C++ and renders to a window via SDL2. It's relatively fast, 
 and on my i5 workstation easily emulates the C256 at full 14mhz and full 60fps.
 
-It supports the following features at the moment. There are definitely bugs and missing pieces. There are definitely
-going to be mismatches with the hardware as I do not have a board to compare against yet. When the Rev C boards are
-released, I will test and fix accordingly.
+There are definitely bugs and missing pieces. There are definitely
+going to be mismatches with the hardware as I do not have a board to compare against yet. When the Rev C boards are released, I will test and fix accordingly.
 
-## Functionality
+Obligatory screenshot:
+
+![screenshot](screenshot.png?raw=true)
+
+## Current Functionality
 
 #### CPU
 
@@ -17,9 +20,19 @@ Uses achaulk's 65c816 emulator from [RetroCpu](https://github.com/achaulk)
 
 #### Debugger / Automation
 
+GUI Debugger/Inspector that can:
+
+  * Set breakpoints
+  * Inspect memory
+  * Disassemble
+  * Profile the CPU/FPS
+  * Show status of CPU
+  * Alter some parameters of video rendering
+  
 Embedded Lua interpretter that can do the following:
 
   * Set breakpoints
+  * Disassemble
   * Inspect CPU state
   * Read and modify memory
   * Has bugs, needs love. (stepping and resume after suspend currently broken)
