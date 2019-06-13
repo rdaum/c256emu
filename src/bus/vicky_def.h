@@ -4,7 +4,7 @@
 
 // Internal VICKY Registers and Internal Memory Locations (LUTs)
 constexpr uint32_t MASTER_CTRL_REG_L(0x000);
-constexpr uint32_t MASTER_CTRL_REG_H(0x002);
+constexpr uint32_t MASTER_CTRL_REG_H(0x001);
 
 // Control Bits Fields
 constexpr uint8_t Mstr_Ctrl_Text_Mode_En = 0x01;  // Enable the Text Mode

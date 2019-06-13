@@ -12,7 +12,15 @@ constexpr const char kAutomationLuaObj[] = "Automation";
 System *GetSystem(lua_State *L) {
   lua_getglobal(L, kAutomationLuaObj);
   Automation *automation = (Automation *)lua_touserdata(L, -1);
+  lua_pop(L, 1);
   return automation->system();
+}
+
+Automation *GetAutomation(lua_State *L) {
+  lua_getglobal(L, kAutomationLuaObj);
+  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  lua_pop(L, 1);
+  return automation;
 }
 
 void PushTable(lua_State *L, const std::string &label, bool val) {
@@ -117,8 +125,7 @@ std::vector<Automation::Breakpoint> Automation::GetBreakpoints() const {
 
 // static
 int Automation::LuaAddBreakpoint(lua_State *L) {
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  Automation *automation = GetAutomation(L);
   uint32_t addr = lua_tointeger(L, -3);
   size_t len;
   const char *function_cstr = lua_tolstring(L, -2, &len);
@@ -130,8 +137,7 @@ int Automation::LuaAddBreakpoint(lua_State *L) {
 
 // static
 int Automation::LuaClearBreakpoint(lua_State *L) {
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  Automation *automation = GetAutomation(L);
   uint32_t addr = lua_tointeger(L, -2);
   automation->ClearBreakpoint(addr);
 
@@ -140,8 +146,7 @@ int Automation::LuaClearBreakpoint(lua_State *L) {
 
 // static
 int Automation::LuaGetBreakpoints(lua_State *L) {
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  Automation *automation = GetAutomation(L);
   auto breakpoints = automation->GetBreakpoints();
 
   lua_createtable(L, breakpoints.size(), 0);
@@ -157,7 +162,6 @@ int Automation::LuaGetBreakpoints(lua_State *L) {
 // static
 int Automation::LuaPeek(lua_State *L) {
   System *sys = GetSystem(L);
-  lua_pop(L, 1);
   uint32_t addr = lua_tointeger(L, -1);
   auto v = sys->ReadByte(addr);
   lua_pushinteger(L, v);
@@ -167,7 +171,6 @@ int Automation::LuaPeek(lua_State *L) {
 // static
 int Automation::LuaPoke(lua_State *L) {
   System *sys = GetSystem(L);
-  lua_pop(L, 1);
   uint32_t addr = lua_tointeger(L, -2);
   uint32_t v = lua_tointeger(L, -1);
   sys->StoreByte(addr, v);
@@ -177,7 +180,6 @@ int Automation::LuaPoke(lua_State *L) {
 // static
 int Automation::LuaPeek16(lua_State *L) {
   System *sys = GetSystem(L);
-  lua_pop(L, 1);
   uint32_t addr = lua_tointeger(L, -1);
   auto v = sys->ReadTwoBytes(addr);
   lua_pushinteger(L, v);
@@ -187,7 +189,6 @@ int Automation::LuaPeek16(lua_State *L) {
 // static
 int Automation::LuaPoke16(lua_State *L) {
   System *sys = GetSystem(L);
-  lua_pop(L, 1);
   uint32_t addr = lua_tointeger(L, -2);
   uint32_t v = lua_tointeger(L, -1);
   sys->StoreByte(addr, v);
@@ -197,7 +198,6 @@ int Automation::LuaPoke16(lua_State *L) {
 // static
 int Automation::LuaPeekBuf(lua_State *L) {
   System *sys = GetSystem(L);
-  lua_pop(L, 1);
   uint32_t start_addr = lua_tointeger(L, -2);
   uint32_t buf_size = lua_tointeger(L, -1);
 
@@ -215,7 +215,6 @@ int Automation::LuaPeekBuf(lua_State *L) {
 // static
 int Automation::LuaLoadHex(lua_State *L) {
   System *sys = GetSystem(L);
-  lua_pop(L, 1);
   const std::string path = lua_tostring(L, -1);
   sys->LoadHex(path);
   return 0;
@@ -224,7 +223,6 @@ int Automation::LuaLoadHex(lua_State *L) {
 // static
 int Automation::LuaLoadBin(lua_State *L) {
   System *sys = GetSystem(L);
-  lua_pop(L, 1);
   const std::string path = lua_tostring(L, -2);
   uint32_t addr = lua_tointeger(L, -1);
   sys->LoadBin(path, addr);
@@ -235,25 +233,25 @@ int Automation::LuaLoadBin(lua_State *L) {
 // static
 int Automation::LuaSys(lua_State *L) {
   System *sys = GetSystem(L);
-  lua_pop(L, 1);
+  Automation *automation = GetAutomation(L);
+
   uint32_t addr = lua_tointeger(L, -1);
+
+  automation->debug_interface_->Pause();
   sys->Sys(addr);
+  automation->debug_interface_->Resume();
   return 0;
 }
 
 // static
 int Automation::LuaDisasm(lua_State *L) {
   System *sys = GetSystem(L);
-  lua_pop(L, 1);
-
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation *automation = (Automation *)lua_touserdata(L, -1);
-
+  Automation *automation = GetAutomation(L);
   WDC65C816 *cpu = sys->cpu();
   auto disassembler = cpu->GetDisassembler();
   cpuaddr_t addr;
-  if (lua_isnumber(L, 1)) {
-    addr = (cpuaddr_t)lua_tointeger(L, 1);
+  if (lua_isnumber(L, -1)) {
+    addr = (cpuaddr_t)lua_tointeger(L, -1);
   } else if (!automation->debug_interface_->paused()) {
     return luaL_error(
         L, "c256emu: cannot disassemble current address while not paused");
@@ -262,7 +260,7 @@ int Automation::LuaDisasm(lua_State *L) {
   }
   Disassembler::Config config;
   if (lua_isnumber(L, 2))
-    config.max_instruction_count = (uint32_t)lua_tointeger(L, 2);
+    config.max_instruction_count = (uint32_t)lua_tointeger(L, -2);
 
   auto list = disassembler->Disassemble(config, addr);
   lua_newtable(L);
@@ -275,8 +273,7 @@ int Automation::LuaDisasm(lua_State *L) {
 
 // static
 int Automation::LuaStopCpu(lua_State *L) {
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  Automation *automation = GetAutomation(L);
   automation->debug_interface_->Pause();
 
   return 0;
@@ -284,8 +281,7 @@ int Automation::LuaStopCpu(lua_State *L) {
 
 // static
 int Automation::LuaContCpu(lua_State *L) {
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  Automation *automation = GetAutomation(L);
   automation->debug_interface_->Resume();
 
   return 0;
@@ -293,9 +289,7 @@ int Automation::LuaContCpu(lua_State *L) {
 
 // static
 int Automation::LuaStep(lua_State *L) {
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation *automation = (Automation *)lua_touserdata(L, -1);
-
+  Automation *automation = GetAutomation(L);
   automation->debug_interface_->SingleStep(1);
 
   return 0;
@@ -303,8 +297,7 @@ int Automation::LuaStep(lua_State *L) {
 
 // static
 int Automation::LuaGetCpuState(lua_State *L) {
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation *automation = (Automation *)lua_touserdata(L, -1);
+  Automation *automation = GetAutomation(L);
   const auto &cpu_state = automation->cpu_->cpu_state;
 
   lua_createtable(L, 0, 5);
