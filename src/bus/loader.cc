@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <boost/filesystem.hpp>
 
 namespace {
 
@@ -117,14 +118,13 @@ void LoadFromIHex(const std::string &filename, SystemBus *system_bus) {
 }
 
 void LoadFromHex(const std::string &filename, SystemBus *system_bus) {
-  int ext_po = filename.find('.');
-  CHECK_NE(ext_po, -1);
-  if (filename.substr(ext_po) == ".hex")
+  boost::filesystem::path path(filename);
+  if (path.extension().string() == ".hex") {
     LoadFromIHex(filename, system_bus);
-  else if (filename.substr(ext_po) == ".s28") {
+  } else if (path.extension().string() == ".s28") {
     LoadFromS28(filename, system_bus);
   } else {
-    CHECK(false) << "Unknown file format: " << filename;
+    CHECK(false) << "Unknown file format: " << path.extension();
   }
 }
 

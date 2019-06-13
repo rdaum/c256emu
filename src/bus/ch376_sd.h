@@ -2,45 +2,25 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <dirent.h>
 #include <memory>
-#include <sys/stat.h>
-#include <sys/types.h>
-
 #include <deque>
 #include <vector>
+#include <boost/filesystem.hpp>
+
 #include <gtest/gtest.h>
 #include <glog/logging.h>
 
 class InterruptController;
 
-struct CH376_ReadLong {
-  explicit CH376_ReadLong(size_t num_bytes_needed)
+struct LongBuffer {
+  explicit LongBuffer(size_t num_bytes_needed)
       : num_bytes_needed_(num_bytes_needed){};
 
   void Write(uint8_t v);
-
   bool HasValue() const;
-
   uint32_t value() const;
-
   std::vector<uint8_t> values_;
   const size_t num_bytes_needed_;
-};
-
-struct CH376_FileInfo {
-  bool open = false;
-  std::string path;
-  bool enumerate_mode_ = false;
-  bool is_dir = false;
-  DIR *dir = nullptr;
-  struct dirent *dirent = nullptr;
-  struct stat statbuf;
-  FILE *f = nullptr;
-  std::unique_ptr<CH376_ReadLong> byte_read_request;
-  std::unique_ptr<CH376_ReadLong> byte_seek_request;
-
-  void Clear();
 };
 
 // Emulate the CH376 SD/USB storage controller.
@@ -50,6 +30,8 @@ public:
   CH376SD(InterruptController *int_controller,
           const std::string &root_directory)
       : int_controller_(int_controller), root_directory_(root_directory) {}
+
+  ~CH376SD();
 
   // SystemBusDevice implementation.
   void StoreByte(uint32_t addr, uint8_t v);
@@ -67,7 +49,21 @@ private:
   uint8_t int_status_;
 
   bool mounted_ = false;
-  std::string root_directory_;
+  boost::filesystem::path root_directory_;
 
+  struct CH376_FileInfo {
+    ~CH376_FileInfo();
+    bool open = false;
+    std::string path;
+    boost::filesystem::directory_entry entry;
+    bool enumerate_mode_ = false;
+    boost::filesystem::directory_iterator directory_iterator;
+    struct stat statbuf;
+    FILE *f = nullptr;
+    std::unique_ptr<LongBuffer> byte_read_request;
+    std::unique_ptr<LongBuffer> byte_seek_request;
+
+    void Clear();
+  };
   CH376_FileInfo current_file_;
 };

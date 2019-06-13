@@ -7,9 +7,12 @@
 #include "ch376_sd.h"
 
 namespace {
-constexpr uint32_t SDCARD_DATA = 0xE808; // (R/W) SDCARD (CH376S) Data PORT_A (A0 = 0)
-constexpr uint32_t SDCARD_CMD = 0xE809; // (R/W) SDCARD (CH376S) CMD/STATUS Port (A0 = 1)
-constexpr uint32_t SDCARD_STAT = 0xE810; // (R) SDCARD (Bit[0] = CD, Bit[1] = WP)
+constexpr uint32_t SDCARD_DATA =
+    0xE808; // (R/W) SDCARD (CH376S) Data PORT_A (A0 = 0)
+constexpr uint32_t SDCARD_CMD =
+    0xE809; // (R/W) SDCARD (CH376S) CMD/STATUS Port (A0 = 1)
+constexpr uint32_t SDCARD_STAT =
+    0xE810; // (R) SDCARD (Bit[0] = CD, Bit[1] = WP)
 
 enum SdCommands {
   GET_IC_VER = 0x01,
@@ -81,9 +84,11 @@ void Push32(uint32_t v, std::deque<uint8_t> *out) {
 }
 } // namespace
 
-void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
-  LOG(INFO) << "WRITE: " << addr << " 0x" << std::hex << (int)v;
+CH376SD::CH376_FileInfo::~CH376_FileInfo() {}
 
+CH376SD::~CH376SD() {}
+
+void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
   if (addr == SDCARD_CMD) {
     current_cmd_ = 0;
     switch (v) {
@@ -102,38 +107,32 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
       mounted_ = true;
       int_status_ = USB_INT_SUCCESS;
       int_controller_->RaiseCH376();
-      LOG(INFO) << "DISK_MOUNT";
       return;
     case SET_FILE_NAME:
       current_file_.Clear();
-      current_file_.path = root_directory_;
+      current_file_.path = root_directory_.string();
       current_cmd_ = SET_FILE_NAME;
       return;
     case FILE_OPEN: {
-      if (stat(current_file_.path.c_str(), &current_file_.statbuf) != 0) {
+
+      if (!boost::filesystem::exists(current_file_.entry)) {
         int_status_ = 0x42; // ERR_MISS_FILE
-        LOG(INFO) << "ERR_MISS_FILE";
         current_file_.open = false;
-      } else if (current_file_.statbuf.st_mode & S_IFDIR) {
-        current_file_.is_dir = true;
+      } else if (boost::filesystem::is_directory(current_file_.entry)) {
         int_status_ = 0x1d; // docs say ERR_OPEN_DIR but kernel expects
         // USB_INT_DISK_READ
-        current_file_.dir = opendir(current_file_.path.c_str());
-        while ((current_file_.dirent = readdir(current_file_.dir))) {
-          if (current_file_.dirent->d_name[0] == '.')
-            continue;
-          LOG(INFO) << current_file_.dirent->d_name;
-          break;
-        }
-        if (current_file_.dirent)
+        current_file_.directory_iterator =
+            boost::filesystem::directory_iterator(current_file_.entry);
+        auto end = boost::filesystem::directory_iterator();
+        if (current_file_.directory_iterator == end) {
+          int_status_ = 0x42; // ERR_MISS_FILE
+          current_file_.open = false;
+        } else
           current_file_.open = true;
-        CHECK(current_file_.dir);
       } else {
         current_file_.open = true;
-        current_file_.is_dir = false;
-        current_file_.f = fopen(current_file_.path.c_str(), "r");
+        current_file_.f = fopen(current_file_.entry.path().c_str(), "r");
         if (!current_file_.f) {
-          LOG(INFO) << "Unable to open file: " << current_file_.path.c_str();
           int_status_ = 0x42; // ERR_MISS_FILE
           current_file_.open = false;
           return;
@@ -148,29 +147,32 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
     case FILE_CLOSE: {
       current_file_.open = false;
       current_cmd_ = FILE_CLOSE;
-      if (current_file_.dir) {
-        closedir(current_file_.dir);
-      } else {
+      if (boost::filesystem::is_regular_file(current_file_.entry)) {
         CHECK(fclose(current_file_.f) == 0);
       }
-      LOG(INFO) << "FILE CLOSE:" << current_file_.path;
       return;
     }
-    case FILE_ENUM_GO:
-      LOG(INFO) << "FILE_ENUM_GO!";
+    case FILE_ENUM_GO: {
     repeat:
-      current_file_.dirent = readdir(current_file_.dir);
-      if (current_file_.dirent && current_file_.dirent->d_name[0] == '.')
-        goto repeat;
+      auto end = boost::filesystem::directory_iterator();
 
-      int_status_ = !current_file_.dirent ? 0x42 : USB_INT_DISK_READ;
+      if (current_file_.directory_iterator != end) {
+        auto path = current_file_.directory_iterator->path();
+        if (path.filename_is_dot() || path.filename_is_dot_dot()) {
+          current_file_.directory_iterator++;
+          goto repeat;
+        }
+      }
+      int_status_ =
+          current_file_.directory_iterator == end ? 0x42 : USB_INT_DISK_READ;
       int_controller_->RaiseCH376();
-
-      break;
+    } break;
     case RD_USB_DATA0:
       if (current_file_.open) {
-        if (current_file_.enumerate_mode_ && current_file_.is_dir &&
-            current_file_.dirent) {
+        if (current_file_.enumerate_mode_ &&
+            boost::filesystem::is_directory(current_file_.entry) &&
+            current_file_.directory_iterator !=
+                boost::filesystem::directory_iterator()) {
           PushDirectoryListing();
           return;
         } else {
@@ -184,7 +186,7 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
       break;
     case BYTE_READ:
       current_cmd_ = BYTE_READ;
-      current_file_.byte_read_request = std::make_unique<CH376_ReadLong>(2);
+      current_file_.byte_read_request = std::make_unique<LongBuffer>(2);
       break;
     case BYTE_RD_GO:
       if (ftell(current_file_.f) < current_file_.statbuf.st_size) {
@@ -197,10 +199,10 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
     case BYTE_LOCATE:
       // Seek.
       current_cmd_ = BYTE_LOCATE;
-      current_file_.byte_seek_request = std::make_unique<CH376_ReadLong>(4);
+      current_file_.byte_seek_request = std::make_unique<LongBuffer>(4);
       break;
     default:
-      LOG(INFO) << "UNHANDLED COMMAND: " << std::hex << (int)v;
+      LOG(ERROR) << "UNHANDLED CH376 COMMAND: " << std::hex << (int)v;
       break;
     }
     return;
@@ -214,7 +216,9 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
       return;
     case SET_FILE_NAME:
       if (v == 0) {
-        LOG(INFO) << "SET_FILE_NAME: " << current_file_.path;
+        current_file_.entry = boost::filesystem::directory_entry(
+            boost::filesystem::path(current_file_.path));
+        current_file_.path.clear();
         current_cmd_ = 0;
         return;
       }
@@ -262,24 +266,20 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
 }
 
 uint8_t CH376SD::ReadByte(uint32_t addr) {
-  LOG(INFO) << "READ: " << addr;
   if (addr == SDCARD_DATA) {
     CHECK(!out_data_.empty());
     uint8_t data = out_data_.front();
     out_data_.pop_front();
-    LOG(INFO) << "Return: 0x" << std::hex << (int)data << ", " << std::dec
-              << out_data_.size() << " remaining in buffer";
     return data;
   }
   if (addr == SDCARD_CMD) {
-    LOG(INFO) << "Return int status: " << int_status_;
     return int_status_;
   }
   return 0;
 }
 
 void CH376SD::PushDirectoryListing() {
-  LOG(INFO) << "RD_USB_DATA0 directory: " << current_file_.dirent->d_name;
+  auto entry = current_file_.entry;
 
   // Expect 32 bytes.
   out_data_.push_back(0x20);
@@ -287,9 +287,11 @@ void CH376SD::PushDirectoryListing() {
   // 8.3 filename, only support the first 11 characters, first dot
   // breaks to extension.
   size_t c_num = 0;
-  size_t d_namelen = strlen(current_file_.dirent->d_name);
+  auto working_file = *current_file_.directory_iterator;
+  auto name = working_file.path().filename().string();
+  size_t d_namelen = name.size();
   for (int i = 0; i < 8; i++) {
-    char c = current_file_.dirent->d_name[c_num++];
+    char c = name[c_num++];
     if (c == '.' || c_num > d_namelen) {
       while (i++ < 8)
         out_data_.push_back(0);
@@ -298,7 +300,7 @@ void CH376SD::PushDirectoryListing() {
     out_data_.push_back(c);
   }
   for (int i = 0; i < 3; i++) {
-    char c = current_file_.dirent->d_name[c_num++];
+    char c = name[c_num++];
     if (c == 0 || c_num > d_namelen) {
       while (i++ < 3)
         out_data_.push_back(0);
@@ -306,9 +308,7 @@ void CH376SD::PushDirectoryListing() {
       out_data_.push_back(c);
   }
 
-  struct stat f_stat;
-  stat(current_file_.dirent->d_name, &f_stat);
-  if (S_ISDIR(f_stat.st_mode))
+  if (boost::filesystem::is_directory(entry))
     out_data_.push_back(0x10);
   else
     out_data_.push_back(0);
@@ -322,16 +322,17 @@ void CH376SD::PushDirectoryListing() {
   for (int i = 0; i < 2; i++)
     out_data_.push_back(0);
   // File size in bytes, 32 bits.
-  size_t flen = f_stat.st_size;
+  size_t flen = boost::filesystem::is_directory(working_file.path())
+                    ? 0
+                    : boost::filesystem::file_size(working_file.path());
   Push32(flen, &out_data_);
 
   // No more data after this.
   out_data_.push_back(0);
+  current_file_.directory_iterator++;
 }
 
 void CH376SD::StreamFileContents() {
-  LOG(INFO) << "RD_USB_DATA0 file: " << current_file_.path;
-
   uint32_t total_read = 0;
 
   // We will only buffer up 255 bytes at a time, and force the client to ask for
@@ -346,8 +347,6 @@ void CH376SD::StreamFileContents() {
     size_t read_bytes = fread(byte_buffer, 1, 255, current_file_.f);
     out_data_.push_back(read_bytes);
     if (!read_bytes) {
-      LOG(INFO) << "EOF: " << total_read << " bytes of " << amount_to_retrieve
-                << " requested " << out_data_.size() << " in buffer";
       return;
     }
 
@@ -355,24 +354,18 @@ void CH376SD::StreamFileContents() {
               std::back_inserter(out_data_));
     total_read += read_bytes;
   } while (!feof(current_file_.f) && total_read < amount_to_retrieve);
-
-  LOG(INFO) << "READ: " << total_read << " bytes of " << amount_to_retrieve
-            << " requested " << out_data_.size() << " in buffer"
-            << " pos: " << ftell(current_file_.f) << " / "
-            << current_file_.statbuf.st_size;
-
   // If done, put 0.
   if (feof(current_file_.f))
     out_data_.push_back(0);
 }
 
-void CH376_ReadLong::Write(uint8_t v) { values_.push_back(v); }
+void LongBuffer::Write(uint8_t v) { values_.push_back(v); }
 
-bool CH376_ReadLong::HasValue() const {
+bool LongBuffer::HasValue() const {
   return values_.size() == num_bytes_needed_;
 }
 
-uint32_t CH376_ReadLong::value() const {
+uint32_t LongBuffer::value() const {
   CHECK(HasValue());
   CHECK_LT(values_.size(), 5u);
   uint32_t v = 0;
@@ -382,13 +375,10 @@ uint32_t CH376_ReadLong::value() const {
   return v;
 }
 
-void CH376_FileInfo::Clear() {
+void CH376SD::CH376_FileInfo::Clear() {
   open = false;
-  path = "";
   enumerate_mode_ = false;
-  is_dir = false;
-  dir = nullptr;
-  dirent = nullptr;
+  directory_iterator = boost::filesystem::directory_iterator();
   statbuf = {};
   f = nullptr;
   byte_read_request.reset();
