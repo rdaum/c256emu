@@ -24,7 +24,44 @@ bool ReadHex(std::istream &line_stream, uint8_t *h) {
 
 } // namespace
 
-void LoadFromHex(const std::string &filename, SystemBus *system_bus) {
+void LoadFromS28(const std::string &filename, SystemBus *system_bus) {
+  std::ifstream srec_stream;
+  srec_stream.open(filename);
+  while (!srec_stream.eof()) {
+    std::string line;
+    std::getline(srec_stream, line);
+    if (line.empty())
+      return;
+    CHECK_EQ(line[0], 'S');
+    char rec_type = line[1];
+
+    std::stringstream line_stream(line.substr(2));
+
+    // 24 bit data load
+    if (rec_type == '2') {
+      uint8_t byte_count;
+
+      CHECK(ReadHex(line_stream, &byte_count));
+      CHECK_EQ(byte_count * 2, (uint16_t)line.size() - 5);
+      uint8_t address[3];
+      CHECK(ReadHex(line_stream, &address[0]));
+      CHECK(ReadHex(line_stream, &address[1]));
+      CHECK(ReadHex(line_stream, &address[2]));
+      byte_count -= 4;
+      uint32_t addr = address[0] << 16 | address[1] << 8 | address[2];
+      while (byte_count--) {
+        uint8_t byte;
+        CHECK(ReadHex(line_stream, &byte));
+
+        system_bus->WriteByte(addr++, byte);
+      }
+      uint8_t checksum;
+      CHECK(ReadHex(line_stream, &checksum));
+    }
+  }
+}
+
+void LoadFromIHex(const std::string &filename, SystemBus *system_bus) {
   std::ifstream hex;
   hex.open(filename);
   int line_no = 0;
@@ -76,6 +113,18 @@ void LoadFromHex(const std::string &filename, SystemBus *system_bus) {
       CHECK(ReadHex(line_stream, &page_addr_hi));
       page_addr = (page_addr_hi << 16) | (page_addr_lo << 8);
     }
+  }
+}
+
+void LoadFromHex(const std::string &filename, SystemBus *system_bus) {
+  int ext_po = filename.find('.');
+  CHECK_NE(ext_po, -1);
+  if (filename.substr(ext_po) == ".hex")
+    LoadFromIHex(filename, system_bus);
+  else if (filename.substr(ext_po) == ".s28") {
+    LoadFromS28(filename, system_bus);
+  } else {
+    CHECK(false) << "Unknown file format: " << filename;
   }
 }
 
