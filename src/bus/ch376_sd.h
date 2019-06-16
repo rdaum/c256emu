@@ -5,10 +5,11 @@
 #include <memory>
 #include <deque>
 #include <vector>
-#include <boost/filesystem.hpp>
-
+#include <experimental/filesystem>
 #include <gtest/gtest.h>
 #include <glog/logging.h>
+
+namespace fs = std::experimental::filesystem;
 
 class InterruptController;
 
@@ -49,15 +50,15 @@ private:
   uint8_t int_status_;
 
   bool mounted_ = false;
-  boost::filesystem::path root_directory_;
+  fs::path root_directory_;
 
   struct CH376_FileInfo {
     ~CH376_FileInfo();
     bool open = false;
     std::string path;
-    boost::filesystem::directory_entry entry;
+	fs::directory_entry entry;
     bool enumerate_mode_ = false;
-    boost::filesystem::directory_iterator directory_iterator;
+	fs::directory_iterator directory_iterator;
     struct stat statbuf;
     FILE *f = nullptr;
     std::unique_ptr<LongBuffer> byte_read_request;

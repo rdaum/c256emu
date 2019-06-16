@@ -1,12 +1,11 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <linenoise.h>
 
 #include <SDL2/SDL.h>
 #include <iostream>
 #include <thread>
 
-#include "bus/automation.h"
+#include "automation/automation.h"
 #include "system.h"
 
 DEFINE_bool(interpreter, false, "enable Lua command read prompt loop");
@@ -44,25 +43,6 @@ int main(int argc, char *argv[]) {
     }
     system.Run();
   });
-
-  if (FLAGS_interpreter) {
-    linenoiseInstallWindowChangeHandler();
-
-    char *buf;
-    while ((buf = linenoise(">> ")) != nullptr) {
-      if (strlen(buf) > 0) {
-        linenoiseHistoryAdd(buf);
-      }
-
-      automation->Eval(buf);
-
-      // readline malloc's a new buffer every time.
-      free(buf);
-    }
-    linenoiseHistoryFree();
-    system.SetStop();
-  }
-
 
   run_thread.join();
 

@@ -115,15 +115,15 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
       return;
     case FILE_OPEN: {
 
-      if (!boost::filesystem::exists(current_file_.entry)) {
+      if (!fs::exists(current_file_.entry)) {
         int_status_ = 0x42; // ERR_MISS_FILE
         current_file_.open = false;
-      } else if (boost::filesystem::is_directory(current_file_.entry)) {
+      } else if (fs::is_directory(current_file_.entry)) {
         int_status_ = 0x1d; // docs say ERR_OPEN_DIR but kernel expects
         // USB_INT_DISK_READ
         current_file_.directory_iterator =
-            boost::filesystem::directory_iterator(current_file_.entry);
-        auto end = boost::filesystem::directory_iterator();
+            fs::directory_iterator(current_file_.entry);
+        auto end = fs::directory_iterator();
         if (current_file_.directory_iterator == end) {
           int_status_ = 0x42; // ERR_MISS_FILE
           current_file_.open = false;
@@ -131,7 +131,7 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
           current_file_.open = true;
       } else {
         current_file_.open = true;
-        current_file_.f = fopen(current_file_.entry.path().c_str(), "r");
+        current_file_.f = fopen(current_file_.entry.path().string().c_str(), "r");
         if (!current_file_.f) {
           int_status_ = 0x42; // ERR_MISS_FILE
           current_file_.open = false;
@@ -147,18 +147,18 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
     case FILE_CLOSE: {
       current_file_.open = false;
       current_cmd_ = FILE_CLOSE;
-      if (boost::filesystem::is_regular_file(current_file_.entry)) {
+      if (fs::is_regular_file(current_file_.entry)) {
         CHECK(fclose(current_file_.f) == 0);
       }
       return;
     }
     case FILE_ENUM_GO: {
     repeat:
-      auto end = boost::filesystem::directory_iterator();
+      auto end = fs::directory_iterator();
 
       if (current_file_.directory_iterator != end) {
         auto path = current_file_.directory_iterator->path();
-        if (path.filename_is_dot() || path.filename_is_dot_dot()) {
+        if (path.string()[0] == '.') {
           current_file_.directory_iterator++;
           goto repeat;
         }
@@ -170,9 +170,9 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
     case RD_USB_DATA0:
       if (current_file_.open) {
         if (current_file_.enumerate_mode_ &&
-            boost::filesystem::is_directory(current_file_.entry) &&
+            fs::is_directory(current_file_.entry) &&
             current_file_.directory_iterator !=
-                boost::filesystem::directory_iterator()) {
+                fs::directory_iterator()) {
           PushDirectoryListing();
           return;
         } else {
@@ -216,8 +216,8 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
       return;
     case SET_FILE_NAME:
       if (v == 0) {
-        current_file_.entry = boost::filesystem::directory_entry(
-            boost::filesystem::path(current_file_.path));
+        current_file_.entry = fs::directory_entry(
+            fs::path(current_file_.path));
         current_file_.path.clear();
         current_cmd_ = 0;
         return;
@@ -308,7 +308,7 @@ void CH376SD::PushDirectoryListing() {
       out_data_.push_back(c);
   }
 
-  if (boost::filesystem::is_directory(entry))
+  if (fs::is_directory(entry))
     out_data_.push_back(0x10);
   else
     out_data_.push_back(0);
@@ -322,9 +322,9 @@ void CH376SD::PushDirectoryListing() {
   for (int i = 0; i < 2; i++)
     out_data_.push_back(0);
   // File size in bytes, 32 bits.
-  size_t flen = boost::filesystem::is_directory(working_file.path())
+  size_t flen = fs::is_directory(working_file.path())
                     ? 0
-                    : boost::filesystem::file_size(working_file.path());
+                    : fs::file_size(working_file.path());
   Push32(flen, &out_data_);
 
   // No more data after this.
@@ -343,7 +343,7 @@ void CH376SD::StreamFileContents() {
 
   do {
     // We do blocks of no more than 255 bytes;
-    char byte_buffer[std::min<size_t>(255, amount_to_retrieve)];
+    char byte_buffer[255];
     size_t read_bytes = fread(byte_buffer, 1, 255, current_file_.f);
     out_data_.push_back(read_bytes);
     if (!read_bytes) {
@@ -378,7 +378,7 @@ uint32_t LongBuffer::value() const {
 void CH376SD::CH376_FileInfo::Clear() {
   open = false;
   enumerate_mode_ = false;
-  directory_iterator = boost::filesystem::directory_iterator();
+  directory_iterator = fs::directory_iterator();
   statbuf = {};
   f = nullptr;
   byte_read_request.reset();

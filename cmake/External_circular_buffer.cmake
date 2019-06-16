@@ -16,6 +16,3 @@ set(CIRCULAR_BUFFER_INCLUDE_DIRS ${source_dir}/include)
 # To make it work, we just create the directory now during config.
 file(MAKE_DIRECTORY ${CIRCULAR_BUFFER_INCLUDE_DIRS})
 
-ExternalProject_Get_Property(circular_buffer binary_dir)
-set(CIRCULAR_BUFFER_LIBRARY_PATH ${binary_dir}/lib/${CMAKE_FIND_LIBRARY_PREFIXES}circular_buffer.a)
-set(CIRCULAR_BUFFER_LIBRARY circular_buffer)

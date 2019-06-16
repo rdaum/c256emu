@@ -1,12 +1,17 @@
 include(ExternalProject)
 ExternalProject_Add(
         retrocpu
-        GIT_REPOSITORY https://github.com/achaulk/retro_cpu.git
-        UPDATE_COMMAND ""
-        INSTALL_COMMAND ""
+        GIT_REPOSITORY https://github.com/rdaum/retro_cpu.git
+        GIT_TAG patch-1
         LOG_DOWNLOAD ON
         LOG_CONFIGURE ON
-        LOG_BUILD ON)
+        LOG_BUILD ON
+        LOG_INSTALL ON
+        UPDATE_COMMAND ""
+        INSTALL_COMMAND ""
+        CMAKE_ARGS
+            -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+    )
 
 ExternalProject_Get_Property(retrocpu source_dir)
 set(RETROCPU_INCLUDE_DIRS ${source_dir}/)
@@ -17,15 +22,31 @@ set(RETROCPU_INCLUDE_DIRS ${source_dir}/)
 file(MAKE_DIRECTORY ${RETROCPU_INCLUDE_DIRS})
 
 ExternalProject_Get_Property(retrocpu binary_dir)
-set(RETROCPU_LIBRARY_PATH
-        ${binary_dir}/${CMAKE_FIND_LIBRARY_PREFIXES}retro_cpu_core.a
-        ${binary_dir}/${CMAKE_FIND_LIBRARY_PREFIXES}retro_cpu_65816.a
-        ${binary_dir}/${CMAKE_FIND_LIBRARY_PREFIXES}retro_host_linux.a
-        )
-set(RETROCPU_LIBRARY RETROCPU)
-add_library(${RETROCPU_LIBRARY} UNKNOWN IMPORTED)
-set_target_properties(${RETROCPU_LIBRARY} PROPERTIES
-        "IMPORTED_LOCATION" "${RETROCPU_LIBRARY_PATH}"
+
+message(STATUS "Retro CPU binary_dir = ${binary_dir} output directory: ${CMAKE_CURRENT_BINARY_DIR}")
+
+set(RETRO_CPU_CORE_LIBRARY_PATH ${binary_dir}/${CMAKE_FIND_LIBRARY_PREFIXES}retro_cpu_core${CMAKE_FIND_LIBRARY_SUFFIXES})
+add_library(retro_cpu_core UNKNOWN IMPORTED)
+set_target_properties(retro_cpu_core PROPERTIES
+        "IMPORTED_LOCATION" "${RETRO_CPU_CORE_LIBRARY_PATH}"
         "IMPORTED_LINK_INTERFACE_LIBRARIES" "${CMAKE_THREAD_LIBS_INIT}"
         "INTERFACE_INCLUDE_DIRECTORIES" "${RETROCPU_INCLUDE_DIRS}")
-add_dependencies(${RETROCPU_LIBRARY} retrocpu)
+add_dependencies(retro_cpu_core retrocpu)
+
+set(RETRO_CPU_65816_LIBRARY_PATH ${binary_dir}/${CMAKE_FIND_LIBRARY_PREFIXES}retro_cpu_65816${CMAKE_FIND_LIBRARY_SUFFIXES})
+add_library(retro_cpu_65816 UNKNOWN IMPORTED)
+set_target_properties(retro_cpu_65816 PROPERTIES
+        "IMPORTED_LOCATION" "${RETRO_CPU_65816_LIBRARY_PATH}"
+        "IMPORTED_LINK_INTERFACE_LIBRARIES" "${CMAKE_THREAD_LIBS_INIT}"
+        "INTERFACE_INCLUDE_DIRECTORIES" "${RETROCPU_INCLUDE_DIRS}")
+add_dependencies(retro_cpu_65816 retrocpu)
+
+
+set(RETRO_HOST_LIBRARY_PATH ${binary_dir}/${CMAKE_FIND_LIBRARY_PREFIXES}retro_host${CMAKE_FIND_LIBRARY_SUFFIXES})
+add_library(retro_host UNKNOWN IMPORTED)
+set_target_properties(retro_host PROPERTIES
+        "IMPORTED_LOCATION" "${RETRO_HOST_LIBRARY_PATH}"
+        "IMPORTED_LINK_INTERFACE_LIBRARIES" "${CMAKE_THREAD_LIBS_INIT}"
+        "INTERFACE_INCLUDE_DIRECTORIES" "${RETROCPU_INCLUDE_DIRS}")
+add_dependencies(retro_host retrocpu)
+

@@ -8,6 +8,7 @@
 #include <optional>
 #include <vector>
 
+#include "automation/lua_describe.h"
 #include "bus/int_controller.h"
 #include "cpu/65816/cpu_65c816.h"
 #include "debug_interface.h"
@@ -20,12 +21,12 @@ class System;
 // clear breakpoints, etc. Will be memory addressable as well, so that
 // automation actions can be triggered from the running program.
 class Automation {
- public:
+public:
   Automation(WDC65C816 *cpu, System *sys, DebugInterface *debug_interface);
   ~Automation();
 
   bool LoadScript(const std::string &path);
-  bool Eval(const std::string &expression);
+  std::string Eval(const std::string &expression);
 
   void AddBreakpoint(uint32_t address, const std::string &function_name);
   void ClearBreakpoint(uint32_t address);
@@ -38,7 +39,7 @@ class Automation {
 
   System *system() { return system_; }
 
- private:
+private:
   static int LuaStopCpu(lua_State *L);
   static int LuaContCpu(lua_State *L);
   static int LuaAddBreakpoint(lua_State *L);
@@ -67,4 +68,6 @@ class Automation {
   ::lua_State *lua_state_;
 
   std::vector<Breakpoint> breakpoints_;
+
+  LuaDescribe describe_;
 };

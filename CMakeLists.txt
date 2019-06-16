@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.9)
 
 # Enable Hunter package management.
 include("cmake/HunterGate.cmake")
@@ -10,12 +10,6 @@ huntergate(
 project(c256emu)
 
 set(CMAKE_CXX_STANDARD 17)
-
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
-# External dependencies
-find_package(PkgConfig)
 
 hunter_add_package(SDL2)
 find_package(SDL2 CONFIG REQUIRED)
@@ -38,13 +32,11 @@ find_package(imgui CONFIG REQUIRED)
 hunter_add_package(glfw)
 find_package(glfw3 CONFIG REQUIRED)
 
-# Todo: replace with std::filesytem when that grows up and becomes mature.
-hunter_add_package(Boost COMPONENTS filesystem)
-find_package(Boost CONFIG REQUIRED filesystem)
+# Add our local cmake dir.
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-# Configure liblinenoise-ng as a downloadable library.
-include(cmake/External_LinenoiseNG.cmake)
-
+# Configure circular_buffer a downloadable library.
 # Configure circular_buffer a downloadable library.
 include(cmake/External_circular_buffer.cmake)
 
@@ -53,7 +45,8 @@ include(cmake/External_RetroCpu.cmake)
 
 # The c256 bus devices
 set(BUS_SOURCES
-        src/bus/automation.cc
+        src/automation/automation.cc
+        src/automation/lua_describe.cc
         src/bus/ch376_sd.cc
         src/bus/int_controller.cc
         src/bus/keyboard.cc
@@ -63,7 +56,8 @@ set(BUS_SOURCES
         src/bus/vicky.cc
         src/bus/c256_system_bus.cc)
 set(BUS_HEADERS
-        src/bus/automation.h
+        src/automation/automation.h
+        src/automation/lua_describe.h
         src/bus/ch376_sd.h
         src/bus/int_controller.h
         src/bus/keyboard.h
@@ -81,38 +75,43 @@ target_include_directories(bus PUBLIC ${SDL2_INCLUDE_DIRS}
         ${GLOG_ROOT}/include
         ${CIRCULAR_BUFFER_INCLUDE_DIRS}
         ${RETROCPU_INCLUDE_DIRS}
-        ${ADPLUG_INCLUDE_DIRS}
         ./src)
-target_compile_options(bus PUBLIC ${SDL2_CFLAGS_OTHER} ${glog_CFLAGS_OTHER}
-        -Werror -Wall -Wextra -Wno-unused-parameter)
+target_compile_options(bus PUBLIC ${SDL2_CFLAGS_OTHER} ${glog_CFLAGS_OTHER})
 
 # Main executable
-add_executable(c256emu src/main.cc src/system.cc src/gui/gui.cc
+add_executable(c256emu
+        src/main.cc
+        src/system.cc
+        src/gui/gui.cc
+        src/gui/automation_console.cc src/gui/automation_console.h
         src/gui/imgui_impl_glfw.cpp src/gui/imgui_impl_glfw.h
         src/gui/imgui_impl_opengl2.cpp src/gui/imgui_impl_opengl2.h)
-add_dependencies(c256emu bus gflags)
+add_dependencies(c256emu bus gflags retrocpu circular_buffer)
 target_include_directories(c256emu PUBLIC
         ${CIRCULAR_BUFFER_INCLUDE_DIRS}
-        ${LINENOISENG_INCLUDE_DIR}
         ${RETROCPU_INCLUDE_DIRS}
         ./src)
+
+if (WIN32)
+    set(PLATFORM_LIBRARIES})
+else ()
+    set(PLATFORM_LIBRARIES pthread rt GL)
+endif ()
+
 target_link_libraries(c256emu
         bus
-        pthread rt
+        ${PLATFORM_LIBRARIES}
         glog::glog
         gflags
         SDL2::SDL2main
         SDL2::SDL2
         glfw
         imgui::imgui
-        Lua::lua_lib
-        GL
-        Boost::filesystem
-        ${RETROCPU_LIBRARY_PATH}
-        ${CIRCULAR_BUFFER_LIBRARIES}
-        ${ADPLUG_LIBRARY}
-        ${LINENOISENG_LIBRARY})
-target_compile_options(c256emu PUBLIC -Werror -Wall -Wextra)
+        ${RETRO_CPU_CORE_LIBRARY_PATH}
+        ${RETRO_CPU_65816_LIBRARY_PATH}
+        ${RETRO_HOST_LIBRARY_PATH}
+        Lua::lua_lib)
+
 
 # Unit tests.
 include(GoogleTest)
@@ -124,10 +123,10 @@ target_include_directories(c256_tests PUBLIC
 target_link_libraries(c256_tests bus
         glog::glog gflags GTest::main
         ${GTEST_MAIN_LIBRARY}
-        ${RETROCPU_LIBRARY_PATH}
+        ${RETRO_CPU_CORE_LIBRARY_PATH}
+        ${RETRO_CPU_65816_LIBRARY_PATH}
         )
 target_compile_options(c256_tests PUBLIC
-        ${GLOG_CFLAGS_OTHER}
-        ${GFLAGS_CFLAGS_OTHER} -Werror -Wall -Wextra)
+        ${GLOG_CFLAGS_OTHER})
 
 gtest_add_tests(TARGET c256_tests)

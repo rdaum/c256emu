@@ -3,14 +3,16 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
-#include <boost/filesystem.hpp>
+#include <experimental/filesystem>
+
+namespace fs = std::experimental::filesystem;
 
 namespace {
 
-unsigned char hstouc(std::string const &in) {
+uint8_t hstouc(std::string const &in) {
   static const std::string v{"0123456789ABCDEF"};
 
-  return v.find(toupper(in[0])) * 16 + v.find(toupper(in[1]));
+  return (uint8_t)v.find(toupper(in[0])) * 16 + v.find(toupper(in[1]));
 }
 
 bool ReadHex(std::istream &line_stream, uint8_t *h) {
@@ -22,6 +24,39 @@ bool ReadHex(std::istream &line_stream, uint8_t *h) {
   *h = hstouc(byte_count_str);
   return true;
 }
+
+    std::istream& safeGetline(std::istream& is, std::string& t)
+    {
+        t.clear();
+
+        // The characters in the stream are read one-by-one using a std::streambuf.
+        // That is faster than reading them one-by-one using the std::istream.
+        // Code that uses streambuf this way must be guarded by a sentry object.
+        // The sentry object performs various tasks,
+        // such as thread synchronization and updating the stream state.
+
+        std::istream::sentry se(is, true);
+        std::streambuf* sb = is.rdbuf();
+
+        for(;;) {
+            int c = sb->sbumpc();
+            switch (c) {
+                case '\n':
+                    return is;
+                case '\r':
+                    if(sb->sgetc() == '\n')
+                        sb->sbumpc();
+                    return is;
+                case std::streambuf::traits_type::eof():
+                    // Also handle the case when the last line has no line ending
+                    if(t.empty())
+                        is.setstate(std::ios::eofbit);
+                    return is;
+                default:
+                    t += (char)c;
+            }
+        }
+    }
 
 } // namespace
 
@@ -63,14 +98,15 @@ void LoadFromS28(const std::string &filename, SystemBus *system_bus) {
 }
 
 void LoadFromIHex(const std::string &filename, SystemBus *system_bus) {
-  std::ifstream hex;
-  hex.open(filename);
+  std::ifstream hex(filename);
+  CHECK(hex);
   int line_no = 0;
   uint32_t page_addr = 0;
+  LOG(INFO) << "Loading: " << filename;
   while (!hex.eof()) {
     // Read record type.
     std::string line;
-    std::getline(hex, line);
+    safeGetline(hex, line);
     if (line.empty())
       break;
     line_no++;
@@ -113,12 +149,13 @@ void LoadFromIHex(const std::string &filename, SystemBus *system_bus) {
       CHECK(ReadHex(line_stream, &page_addr_lo));
       CHECK(ReadHex(line_stream, &page_addr_hi));
       page_addr = (page_addr_hi << 16) | (page_addr_lo << 8);
+      LOG(INFO) <<" Page: " << page_addr;
     }
   }
 }
 
 void LoadFromHex(const std::string &filename, SystemBus *system_bus) {
-  boost::filesystem::path path(filename);
+  fs::path path(filename);
   if (path.extension().string() == ".hex") {
     LoadFromIHex(filename, system_bus);
   } else if (path.extension().string() == ".s28") {

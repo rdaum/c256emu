@@ -1,4 +1,4 @@
-#include "bus/automation.h"
+#include "automation.h"
 
 #include <algorithm>
 
@@ -53,7 +53,8 @@ const ::luaL_Reg Automation::c256emu_methods[] = {
 
 Automation::Automation(WDC65C816 *cpu, System *sys,
                        DebugInterface *debug_interface)
-    : cpu_(cpu), system_(sys), debug_interface_(debug_interface) {
+    : cpu_(cpu), system_(sys), debug_interface_(debug_interface),
+      describe_(80) {
   lua_state_ = luaL_newstate();
   luaL_openlibs(lua_state_);
   lua_pushlightuserdata(lua_state_, this);
@@ -81,15 +82,14 @@ bool Automation::LoadScript(const std::string &path) {
   return true;
 }
 
-bool Automation::Eval(const std::string &expression) {
+std::string Automation::Eval(const std::string &expression) {
   std::lock_guard<std::recursive_mutex> lua_lock(lua_mutex_);
 
   auto result = luaL_dostring(lua_state_, expression.c_str());
   if (result != 0) {
-    LOG(ERROR) << "Eval failure: " << lua_tostring(lua_state_, -1);
-    return false;
+    return describe_.luap_describe(lua_state_, -1);
   }
-  return true;
+  return "";
 }
 
 void Automation::AddBreakpoint(uint32_t address,

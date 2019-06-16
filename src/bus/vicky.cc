@@ -404,7 +404,7 @@ void Vicky::RenderLine() {
     SDL_UpdateTexture(vicky_texture_, nullptr, frame_buffer_,
                       kVickyBitmapWidth * sizeof(uint32_t));
     SDL_GL_MakeCurrent(window_, gl_context_);
-    SDL_GL_SwapWindow(window_);
+
     int w, h;
     SDL_GetWindowSize(window_, &w, &h);
     SDL_Rect scaled_rect{0, 0, w, h};
@@ -559,13 +559,13 @@ uint32_t Vicky::ApplyGamma(uint32_t colour_val) {
   if (!gamma_override_ && !(mode_ & Mstr_Ctrl_GAMMA_En))
     return colour_val;
 
-  BGRAColour colour{.v = colour_val};
-  BGRAColour corrected{.bgra = {
-                           gamma_.b[colour.bgra[0]],
-                           gamma_.g[colour.bgra[1]],
-                           gamma_.r[colour.bgra[2]],
-                           colour.bgra[0],
-                       }};
+  BGRAColour colour;
+  colour.v = colour_val;
+  BGRAColour corrected;
+  corrected.bgra[0] = gamma_.b[colour.bgra[0]];
+  corrected.bgra[1] = gamma_.g[colour.bgra[1]];
+  corrected.bgra[2] = gamma_.r[colour.bgra[2]];
+  corrected.bgra[3] = colour.bgra[0];
 
   return corrected.v;
 }

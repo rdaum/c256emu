@@ -1,11 +1,14 @@
 #include "gui/gui.h"
 
+#include <array>
+
 #include <imgui.h>
 
 #include <circular_buffer.hpp>
 #include <glog/logging.h>
 
 #include "bus/vicky.h"
+#include "gui/automation_console.h"
 #include "gui/imgui_impl_glfw.h"
 #include "gui/imgui_impl_opengl2.h"
 #include "system.h"
@@ -46,7 +49,7 @@ void GUI::Start() {
       glfwSetErrorCallback(glfw_error_callback);
       CHECK(glfwInit());
 
-      window_ = glfwCreateWindow(640, 800, "c256emu", nullptr, nullptr);
+      window_ = glfwCreateWindow(800, 800, "c256emu", nullptr, nullptr);
       CHECK(window_);
 
       glfwMakeContextCurrent(window_);
@@ -116,8 +119,12 @@ void GUI::Render() {
     DrawDirectPageInspect();
     DrawDisassembler();
   }
-  ImGui::End();
 
+  static AutomationConsole console(system_->automation());
+  static bool console_open;
+  console.Draw("Automation", &console_open);
+
+  ImGui::End();
   ImGui::EndFrame();
   ImGui::Render();
 

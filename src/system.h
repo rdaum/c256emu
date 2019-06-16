@@ -5,7 +5,7 @@
 #include <mutex>
 #include <thread>
 
-#include "bus/automation.h"
+#include "automation/automation.h"
 #include "cpu/65816/cpu_65c816.h"
 #include "debug_interface.h"
 
