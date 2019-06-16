@@ -69,7 +69,8 @@ void AutomationConsole::ClearLog() {
   items_.clear();
   scroll_to_bottom_ = true;
 }
-void AutomationConsole::AddLog(const char *fmt, ...) IM_FMTARGS(2) {
+
+void AutomationConsole::AddLog(const char *fmt, ...) {
   // FIXME-OPT
   char buf[1024];
   va_list args;
