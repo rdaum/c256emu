@@ -101,23 +101,10 @@ void AutomationConsole::Draw(const char *title, bool *p_open) {
   }
 
   ImGui::TextWrapped(
-      "This example implements a console with basic coloring, completion and "
-      "history. A more elaborate implementation may want to store entries "
-      "along with extra data such as timestamp, emitter, etc.");
-  ImGui::TextWrapped(
       "Enter 'HELP' for help, press TAB to use text completion.");
 
   // TODO: display items starting from the bottom
 
-  if (ImGui::SmallButton("Add Dummy Text")) {
-    AddLog("%d some text", items_.Size);
-    AddLog("some more text");
-    AddLog("display very important message here!");
-  }
-  ImGui::SameLine();
-  if (ImGui::SmallButton("Add Dummy Error")) {
-    AddLog("[error] something went wrong");
-  }
   ImGui::SameLine();
   if (ImGui::SmallButton("Clear")) {
     ClearLog();
@@ -236,6 +223,7 @@ void AutomationConsole::Draw(const char *title, bool *p_open) {
 
   ImGui::End();
 }
+
 void AutomationConsole::ExecCommand(const char *command_line) {
   AddLog("# %s\n", command_line);
 
@@ -268,6 +256,7 @@ void AutomationConsole::ExecCommand(const char *command_line) {
   // On commad input, we scroll to bottom even if AutoScroll==false
   scroll_to_bottom_ = true;
 }
+
 // static
 int AutomationConsole::TextEditCallbackStub(
     ImGuiInputTextCallbackData
@@ -277,6 +266,7 @@ int AutomationConsole::TextEditCallbackStub(
   AutomationConsole *console = (AutomationConsole *)data->UserData;
   return console->TextEditCallback(data);
 }
+
 int AutomationConsole::TextEditCallback(ImGuiInputTextCallbackData *data) {
   // AddLog("cursor: %d, selection: %d-%d", data->CursorPos,
   // data->SelectionStart, data->SelectionEnd);

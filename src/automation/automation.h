@@ -57,6 +57,8 @@ private:
   static int LuaSys(lua_State *L);
   static int LuaDisasm(lua_State *L);
 
+  std::string ExecuteLua(int *status);
+
   static const ::luaL_Reg c256emu_methods[];
 
   std::recursive_mutex lua_mutex_;
@@ -70,4 +72,7 @@ private:
   std::vector<Breakpoint> breakpoints_;
 
   LuaDescribe describe_;
+  std::string buffer_;
+
+  bool incomplete = false;
 };

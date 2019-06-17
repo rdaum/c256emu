@@ -1,19 +1,22 @@
 #pragma once
 
+#include <sstream>
+
 #include <lua.hpp>
 
 class LuaDescribe {
 public:
   explicit LuaDescribe(int line_width) : line_width_(line_width) {}
 
-  char *luap_describe(lua_State *L, int index);
+  std::string luap_describe(lua_State *L, int index);
 
 private:
   void describe(lua_State *L, int index);
-  void check_fit(int size);
   void break_line();
-  void dump_string(const char *s, int n);
+  void dump_string(const std::string &s);
+  void dump_character(const char c);
+  void dump_literal(const std::string &s);
 
-  char *dump_;
-  int length_, offset_, indent_, column_, line_width_, ancestors_;
+  std::stringstream dump_;
+  int indent_, column_, line_width_, ancestors_;
 };

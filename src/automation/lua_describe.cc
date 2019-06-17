@@ -29,14 +29,7 @@
 
 /*
  * All this code borrowed / forked from https://github.com/dpapavas/luaprompt
- * TODO: refactor to use std::string/stringstream instead of c strings
  */
-#define dump_literal(s)                                                        \
-  (check_fit(sizeof(s) - 1), strcpy(dump_ + offset_, s),                       \
-   offset_ += sizeof(s) - 1, column_ += width(s))
-
-#define dump_character(c)                                                      \
-  (check_fit(1), dump_[offset_] = c, offset_ += 1, column_ += 1)
 
 #define absolute(L, i) (i < 0 ? lua_gettop(L) + i + 1 : i)
 
@@ -64,13 +57,14 @@ static int width(const char *s) {
   return n;
 }
 
-void LuaDescribe::check_fit(int size) {
-  /* Check if a chunk fits in the buffer and expand as necessary. */
+void LuaDescribe::dump_literal(const std::string &s) {
+  dump_ << s;
+  column_ += width(s.c_str());
+}
 
-  if (offset_ + size + 1 > length_) {
-    length_ = offset_ + size + 1;
-    dump_ = (char *)realloc(dump_, length_ * sizeof(char));
-  }
+void LuaDescribe::dump_character(const char c) {
+  dump_ << c;
+  column_ += 1;
 }
 
 static int is_identifier(const char *s, int n) {
@@ -91,42 +85,34 @@ static int is_identifier(const char *s, int n) {
 void LuaDescribe::break_line() {
   int i;
 
-  check_fit(indent_ + 1);
-
   /* Add a line break. */
 
-  dump_[offset_] = '\n';
+  dump_ << '\n';
 
   /* And indent to the current level. */
 
   for (i = 1; i <= indent_; i += 1) {
-    dump_[offset_ + i] = ' ';
+    dump_ << ' ';
   }
 
-  offset_ += indent_ + 1;
   column_ = indent_;
 }
 
-void LuaDescribe::dump_string(const char *s, int n) {
+void LuaDescribe::dump_string(const std::string &s) {
   int l;
 
   /* Break the line if the current chunk doesn't fit but it would
    * fit if we started on a fresh line at the current indent. */
 
-  l = width(s);
+  l = width(s.c_str());
 
   if (column_ + l > line_width_ && indent_ + l <= line_width_) {
     break_line();
   }
 
-  check_fit(n);
-
   /* Copy the string to the buffer. */
+  dump_ << s;
 
-  memcpy(dump_ + offset_, s, n);
-  dump_[offset_ + n] = '\0';
-
-  offset_ += n;
   column_ += l;
 }
 
@@ -144,7 +130,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
     s = (char *)lua_tolstring(L, -1, &n);
     lua_pop(L, 1);
 
-    dump_string(s, n);
+    dump_string(s);
   } else if (type == LUA_TNUMBER) {
     /* Copy the value to avoid mutating it. */
 
@@ -152,7 +138,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
     s = (char *)lua_tolstring(L, -1, &n);
     lua_pop(L, 1);
 
-    dump_string(s, n);
+    dump_string(s);
   } else if (type == LUA_TSTRING) {
     int i, started, score, level, uselevel = 0;
 
@@ -205,7 +191,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
       }
       dump_literal("[\n");
 
-      dump_string(s, n);
+      dump_string(s);
 
       dump_character(']');
       for (i = 0; i < uselevel; i += 1) {
@@ -239,36 +225,36 @@ void LuaDescribe::describe(lua_State *L, int index) {
         } else if (isprint(s[i])) {
           dump_character(s[i]);
         } else {
-          char t[5];
+          char *t = new char[5];
           size_t n;
 
-          n = sprintf(t, "\\%03u", ((unsigned char *)s)[i]);
-          dump_string(t, n);
+          asprintf(&t, "\\%03u", ((unsigned char *)s)[i]);
+          dump_string(t);
         }
       }
 
       dump_literal("\"");
     }
   } else if (type == LUA_TNIL) {
-    n = sprintf(s, "nil");
-    dump_string(s, n);
+    asprintf(&s, "nil");
+    dump_string(s);
     free(s);
   } else if (type == LUA_TBOOLEAN) {
-    n = sprintf(s, "%s", lua_toboolean(L, index) ? "true" : "false");
-    dump_string(s, n);
+    asprintf(&s, "%s", lua_toboolean(L, index) ? "true" : "false");
+    dump_string(s);
     free(s);
   } else if (type == LUA_TFUNCTION) {
-    n = sprintf(s, "<%sfunction:%s %p>", lua_topointer(L, index));
-    dump_string(s, n);
+    asprintf(&s, "<function:%p>", lua_topointer(L, index));
+    dump_string(s);
     free(s);
   } else if (type == LUA_TUSERDATA) {
-    n = sprintf(s, "<%suserdata:%s %p>", lua_topointer(L, index));
+    asprintf(&s, "<userdata:%p>", lua_topointer(L, index));
 
-    dump_string(s, n);
+    dump_string(s);
     free(s);
   } else if (type == LUA_TTHREAD) {
-    n = sprintf(s, "<%sthread:%s %p>", lua_topointer(L, index));
-    dump_string(s, n);
+    asprintf(&s, "<thread:%p>", lua_topointer(L, index));
+    dump_string(s);
     free(s);
   } else if (type == LUA_TTABLE) {
     int i, l, n, oldindent, multiline, nobreak;
@@ -277,10 +263,8 @@ void LuaDescribe::describe(lua_State *L, int index) {
 
     if (indent_ > 8 * line_width_ / 10) {
       char *s;
-      size_t n;
-
-      n = sprintf(s, "{ %s...%s }");
-      dump_string(s, n);
+      asprintf(&s, "{ ... }");
+      dump_string(s);
       free(s);
 
       return;
@@ -294,16 +278,12 @@ void LuaDescribe::describe(lua_State *L, int index) {
 
     for (i = 0; i < n; i += 1) {
       lua_rawgeti(L, -1, n - i);
-#if LUA_VERSION_NUM == 501
-      if (lua_equal(L, -1, -3)) {
-#else
       if (lua_compare(L, -1, -3, LUA_OPEQ)) {
-#endif
         char *s;
         size_t n;
 
-        n = sprintf(s, "{ [%d]... }", -(i + 1));
-        dump_string(s, n);
+        asprintf(&s, "{ [%d]... }", -(i + 1));
+        dump_string(s);
         free(s);
         lua_pop(L, 2);
 
@@ -385,7 +365,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
           s = (char *)lua_tolstring(L, -2, &n);
 
           if (is_identifier(s, n)) {
-            dump_string(s, n);
+            dump_string(s);
           } else {
             dump_literal("[");
             describe(L, -2);
@@ -425,11 +405,11 @@ void LuaDescribe::describe(lua_State *L, int index) {
   }
 }
 
-char *LuaDescribe::luap_describe(lua_State *L, int index) {
+std::string LuaDescribe::luap_describe(lua_State *L, int index) {
   index = absolute(L, index);
-  offset_ = 0;
   indent_ = 0;
   column_ = 0;
+  dump_ = std::stringstream();
 
   /* Create a table to hold the ancestors for checking for cycles
    * when printing table hierarchies. */
@@ -441,5 +421,5 @@ char *LuaDescribe::luap_describe(lua_State *L, int index) {
 
   luaL_unref(L, LUA_REGISTRYINDEX, ancestors_);
 
-  return dump_;
+  return dump_.str();
 }
