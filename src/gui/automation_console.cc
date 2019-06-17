@@ -50,12 +50,33 @@ AutomationConsole::AutomationConsole(Automation *automation) : automation_(autom
   ClearLog();
   memset(input_buf_, 0, sizeof(input_buf_));
   history_pos_ = -1;
-  commands_.push_back("HELP");
-  commands_.push_back("HISTORY");
-  commands_.push_back("CLEAR");
+  commands_.push_back("and");
+  commands_.push_back("break");
+  commands_.push_back("c256emu.");
+  commands_.push_back("clear");
+  commands_.push_back("do");
+  commands_.push_back("else");
+  commands_.push_back("elseif");
+  commands_.push_back("end");
+  commands_.push_back("end");
+  commands_.push_back("false");
+  commands_.push_back("for");
+  commands_.push_back("function");
+  commands_.push_back("help");
+  commands_.push_back("history");
+  commands_.push_back("if");
+  commands_.push_back("in");
+  commands_.push_back("local");
+  commands_.push_back("nil");
+  commands_.push_back("or");
+  commands_.push_back("repeat");
+  commands_.push_back("return");
+  commands_.push_back("then");
+  commands_.push_back("true");
+  commands_.push_back("until");
+  commands_.push_back("while");
   auto_scroll_ = true;
   scroll_to_bottom_ = true;
-  AddLog("Welcome to Dear ImGui!");
 }
 
 AutomationConsole::~AutomationConsole() {
@@ -250,7 +271,10 @@ void AutomationConsole::ExecCommand(const char *command_line) {
     for (int i = first > 0 ? first : 0; i < history_.Size; i++)
       AddLog("%3d: %s\n", i, history_[i]);
   } else {
-    AddLog(automation_->Eval(command_line).c_str());
+    auto result = automation_->Eval(command_line);
+    if (!result.empty()) {
+      AddLog(result.c_str());
+    }
   }
 
   // On commad input, we scroll to bottom even if AutoScroll==false

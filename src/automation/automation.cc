@@ -176,14 +176,6 @@ bool Automation::LoadScript(const std::string &path) {
 std::string Automation::ExecuteLua(int *status) {
   int i, h_0, h;
 
-#ifdef SAVE_RESULTS
-  /* Get the results table, and stash it behind the to-be-executed
-   * chunk. */
-
-  lua_rawgeti(M, LUA_REGISTRYINDEX, results);
-  lua_insert(M, -2);
-#endif
-
   std::string result;
   h_0 = lua_gettop(lua_state_);
   result = luap_call(lua_state_, 0, status);
@@ -212,11 +204,7 @@ std::string Automation::Eval(const std::string &expression) {
 
   /* Try to execute the line with a return prepended first.  If
    * this works we can show returned values. */
-
-  std::string result;
-
-  int status;
-  if (incomplete) {
+  if (incomplete_) {
     buffer_.append(expression);
   } else {
     buffer_ = expression;
@@ -224,49 +212,49 @@ std::string Automation::Eval(const std::string &expression) {
 
   std::string l = "return " + buffer_;
   if (luaL_loadbuffer(lua_state_, l.c_str(), l.size(), "lua") == LUA_OK) {
-    result = ExecuteLua(&status);
-
-    incomplete = false;
-    buffer_.clear();
-  } else {
-    lua_pop(lua_state_, 1);
-
-    /* Try to execute the line as-is. */
-    int status =
-        luaL_loadbuffer(lua_state_, buffer_.c_str(), buffer_.size(), "lua");
-
-    incomplete = false;
-    if (status == LUA_ERRSYNTAX) {
-      const char *message;
-      const int k = sizeof(EOF_MARKER) / sizeof(char) - 1;
-      size_t n;
-
-      message = lua_tolstring(lua_state_, -1, &n);
-
-      /* If the error message mentions an unexpected eof
-       * then consider this a multi-line statement and wait
-       * for more input.  If not then just print the error
-       * message.*/
-      if ((int)n > k && !strncmp(message + n - k, EOF_MARKER, k)) {
-        incomplete = true;
-        buffer_.append(expression);
-      } else {
-        result = lua_tostring(lua_state_, -1);
-        buffer_.clear();
-      }
-
-      lua_pop(lua_state_, 1);
-    } else if (status == LUA_ERRMEM) {
-      result = lua_tostring(lua_state_, -1);
-    } else {
-      /* Try to execute the loaded chunk. */
-
-      result = ExecuteLua(&status);
-      incomplete = false;
-      buffer_.clear();
-    }
+    incomplete_ = false;
+    int status;
+    std::string result = ExecuteLua(&status);
+    if (status == LUA_OK)
+      return result;
   }
-  return result;
+
+  lua_pop(lua_state_, 1);
+
+  /* Try to execute the line as-is. */
+  int status =
+      luaL_loadbuffer(lua_state_, buffer_.c_str(), buffer_.size(), "lua");
+
+  incomplete_ = false;
+  if (status == LUA_ERRSYNTAX) {
+    const int k = sizeof(EOF_MARKER) / sizeof(char) - 1;
+    size_t n;
+    const char *message = lua_tolstring(lua_state_, -1, &n);
+
+    /* If the error message mentions an unexpected eof
+     * then consider this a multi-line statement and wait
+     * for more input.  If not then just print the error
+     * message.*/
+    if ((int)n > k && !strncmp(message + n - k, EOF_MARKER, k)) {
+      lua_pop(lua_state_, 1);
+
+      incomplete_ = true;
+      return "";
+    }
+
+    lua_pop(lua_state_, 1);
+    incomplete_ = false;
+    return lua_tostring(lua_state_, -1);
+  }
+
+  if (status == LUA_ERRMEM) {
+    incomplete_ = false;
+    return lua_tostring(lua_state_, -1);
+  }
+
+  /* Try to execute the loaded chunk. */
+  incomplete_ = false;
+  return ExecuteLua(&status);
 }
 
 void Automation::AddBreakpoint(uint32_t address,

@@ -74,5 +74,5 @@ private:
   LuaDescribe describe_;
   std::string buffer_;
 
-  bool incomplete = false;
+  bool incomplete_ = false;
 };
