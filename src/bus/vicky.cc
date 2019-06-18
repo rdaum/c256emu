@@ -80,7 +80,7 @@ Vicky::Vicky(System *system, InterruptController *int_controller)
   memset(video_ram_, 0, sizeof(video_ram_));
   memset(tile_sets_, 0, sizeof(tile_sets_));
   memset(sprites_, 0, sizeof(sprites_));
-
+  memset(tile_mem_, 0, sizeof(tile_mem_));
   registers_ = {
       {kBorderColour, &border_colour_.v, 3},
       {kCursorX, &cursor_x_, 2},
@@ -110,6 +110,7 @@ void Vicky::InitPages(Page *vicky_page_start) {
   map(kTextColorMemoryBegin, text_colour_mem_, kTextColorMemorySize);
   map(kFontBankMemoryBegin, font_bank_, kFontTotalMemorySize);
   map(kGrphLutBegin, (uint8_t *)lut_, kGrphLutTotalSize);
+  map(kTileMapsBegin, (uint8_t *)tile_mem_, kTileMapTotalSize);
 }
 
 void Vicky::Start() {
@@ -223,14 +224,6 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
     return;
   }
 
-  if (addr >= kTileMapsBegin && addr <= kTileMapsEnd) {
-    uint16_t tile_offset = offset - kTileMapsBegin;
-    uint8_t tile_num = tile_offset / kTileMapSize;
-    uint8_t map_offset = tile_offset % kTileMapSize;
-    tile_sets_[tile_num].tile_map.mem[map_offset] = v;
-    return;
-  }
-
   if (addr >= kSpriteRegistersBegin && addr <= kSpriteRegistersEnd + 8) {
     uint16_t sprite_offset = offset - kSpriteRegistersBegin;
     uint16_t sprite_num = sprite_offset / kNumSpriteRegisters;
@@ -303,7 +296,6 @@ void Vicky::RenderLine() {
     if (time_since_flash > std::chrono::milliseconds(flash_interval_ms)) {
       cursor_state_ = !cursor_state_;
       last_cursor_flash_ = std::chrono::steady_clock::now();
-      LOG(INFO) << "blink " << cursor_state_;
     }
   }
 
@@ -449,7 +441,8 @@ bool Vicky::RenderTileMap(uint16_t raster_x, uint8_t layer,
     uint8_t screen_tile_col = adjusted_x / kTileSize;
     uint8_t screen_tile_sub_col = adjusted_x % kTileSize;
 
-    uint8_t tile_num = tile_set.tile_map.map[screen_tile_row][screen_tile_col];
+    TileMem *tile_mem = &tile_mem_[layer];
+    uint8_t tile_num = tile_mem->map[screen_tile_row][screen_tile_col];
     uint8_t *tile_sheet_bitmap = &video_ram_[tile_set.start_addr];
 
     uint8_t tile_sheet_column =

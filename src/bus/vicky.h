@@ -151,12 +151,14 @@ private:
 
     uint8_t offset_x;
     uint8_t offset_y;
-    union {
-      uint8_t map[32][64];
-      uint8_t mem[2048];
-    } tile_map;
   };
   TileSet tile_sets_[kNumLayers];
+
+  union TileMem {
+    uint8_t map[32][64];
+    uint8_t mem[2048];
+  };
+  TileMem tile_mem_[8];
 
   struct Sprite {
     bool tile_striding = false;
