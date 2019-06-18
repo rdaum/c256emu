@@ -110,7 +110,7 @@ void Vicky::InitPages(Page *vicky_page_start) {
   map(kTextColorMemoryBegin, text_colour_mem_, kTextColorMemorySize);
   map(kFontBankMemoryBegin, font_bank_, kFontTotalMemorySize);
   map(kGrphLutBegin, (uint8_t *)lut_, kGrphLutTotalSize);
-  map(kTileMapsBegin, (uint8_t *)tile_mem_, kTileMapTotalSize);
+  map(kTileMapsBegin, (uint8_t *)tile_mem_, sizeof(tile_mem_));
 }
 
 void Vicky::Start() {

@@ -158,7 +158,7 @@ private:
     uint8_t map[32][64];
     uint8_t mem[2048];
   };
-  TileMem tile_mem_[8];
+  TileMem tile_mem_[4];
 
   struct Sprite {
     bool tile_striding = false;
@@ -180,5 +180,5 @@ private:
   uint32_t frame_buffer_[kRasterSize];
 
   // Which is uploaded to this texture each frame.
-  SDL_Texture* vicky_texture_{};
+  SDL_Texture* vicky_texture_ = nullptr;
 };

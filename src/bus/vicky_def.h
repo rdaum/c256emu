@@ -145,7 +145,7 @@ constexpr uint32_t GAMMA_R_LUT_PTR(0x4200);
 constexpr uint32_t kTileMapsBegin(0x5000);
 constexpr uint32_t kTileMapsEnd(0x6ffff);
 constexpr uint32_t kTileMapSize(0x800);
-constexpr uint32_t kTileMapTotalSize(0x4000);
+constexpr uint32_t kTileMapTotalSize(0x2000);
 
 constexpr uint32_t kFontBankMemoryBegin(0x8000);   // start of font banks
 constexpr uint32_t kFontBankMemorySize(0x800);     // size of each bank
