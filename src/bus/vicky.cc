@@ -219,7 +219,8 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
       tile_sets_[tile_num].offset_x = (v & 0x0f);
       tile_sets_[tile_num].offset_y = (v >> 4);
     } else {
-      LOG(ERROR) << "Unsupported tile reg: " << register_num;
+      LOG(ERROR) << "Unsupported tile reg: " << std::hex << (int)register_num
+                 << " @ " << std::hex << addr;
     }
     return;
   }
@@ -432,8 +433,10 @@ bool Vicky::RenderTileMap(uint16_t raster_x, uint8_t layer,
 
     // Try to take account of the horizontal and vertical scroll.
     // TODO: this is untested.
-    if (tile_set.scroll_x_enable) adjusted_x -= tile_set.offset_x;
-    if (tile_set.scroll_y_enable) adjusted_x -= tile_set.offset_y;
+    if (tile_set.scroll_x_enable)
+      adjusted_x -= tile_set.offset_x;
+    if (tile_set.scroll_y_enable)
+      adjusted_x -= tile_set.offset_y;
 
     uint8_t screen_tile_row = adjusted_y / kTileSize;
     uint8_t screen_tile_sub_row = adjusted_y % kTileSize;
@@ -498,7 +501,8 @@ bool Vicky::RenderCharacterGenerator(uint16_t raster_x, uint32_t *row_pixel) {
   if (border_enabled_) {
     bitmap_x -= kBorderWidth;
     bitmap_y -= kBorderHeight;
-    if (bitmap_x < 0 || bitmap_y < 0) return false;
+    if (bitmap_x < 0 || bitmap_y < 0)
+      return false;
   }
 
   uint16_t row = bitmap_y / 8;
@@ -566,4 +570,3 @@ void Vicky::set_scaling_quality(Vicky::ScalingQuality scaling_quality) {
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,
               ScalingQualityStr(scaling_quality).c_str());
 }
-
