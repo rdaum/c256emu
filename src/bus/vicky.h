@@ -88,6 +88,16 @@ private:
     uint32_t v;
     uint8_t bgra[4]{0, 0, 0, 0};
   };
+
+  struct Reg {
+    uint32_t reg_addr;
+    void *reg_ptr;
+    uint8_t byte_width;
+  };
+
+  std::vector<Reg> registers_;
+
+  // All register values and memory blocks.
   BGRAColour lut_[8][256];
   BGRAColour background_bgr_;
 
@@ -106,9 +116,9 @@ private:
   uint32_t fg_colour_mem_[16]{};
   uint32_t bg_colour_mem_[16]{};
 
-  uint8_t cursor_colour_{};
-  uint8_t cursor_char_{};
-  uint8_t cursor_reg_{};
+  uint8_t cursor_colour_ = 0;
+  uint8_t cursor_char_ = 0;
+  uint8_t cursor_reg_ = 0;
   uint16_t cursor_x_ = 0;
   uint16_t cursor_y_ = 0;
 
@@ -118,8 +128,8 @@ private:
   uint8_t mouse_cursor_1_[256]{};
 
   // Set by SDL
-  int mouse_pos_x_{};
-  int mouse_pos_y_{};
+  uint16_t mouse_pos_x_ = 0;
+  uint16_t mouse_pos_y_ = 0;
 
   bool cursor_state_ = false;
   std::chrono::time_point<std::chrono::steady_clock> last_cursor_flash_;
@@ -127,6 +137,7 @@ private:
   bool bitmap_enabled_ = false;
   uint8_t bitmap_lut_ = 0;
   uint32_t bitmap_addr_offset_ = 0;
+\
   uint8_t video_ram_[0x400000]{};
 
   struct TileSet {
@@ -135,8 +146,11 @@ private:
     bool tiled_sheet = false;  // true if a 256x256 sheet of 16x16 tiles
                                // otherwise a sequential row of 16x16 tiles
     uint32_t start_addr = 0;
-    uint16_t stride_x;
-    uint16_t stride_y;
+    bool scroll_x_enable = false;
+    bool scroll_y_enable = false;
+
+    uint8_t offset_x;
+    uint8_t offset_y;
     union {
       uint8_t map[32][64];
       uint8_t mem[2048];
@@ -161,7 +175,7 @@ private:
   uint16_t raster_y_ = 0;
 
   // Our physical frame buffer
-  uint32_t frame_buffer_[kRasterSize]{};
+  uint32_t frame_buffer_[kRasterSize];
 
   // Which is uploaded to this texture each frame.
   SDL_Texture* vicky_texture_{};
