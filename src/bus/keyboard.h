@@ -18,7 +18,7 @@ class Keyboard {
   Keyboard(System* system, InterruptController* int_controller);
   ~Keyboard() = default;
 
-  void ProcessEvent(const SDL_Event &event);
+  void ProcessEvent(const SDL_Event& event);
 
   void StoreByte(uint32_t addr, uint8_t v);
   uint8_t ReadByte(uint32_t addr);
@@ -27,13 +27,14 @@ class Keyboard {
   void PollKeyboard();
   void PushKey(const Keybinding& key, bool release);
 
-  System *sys_;
+  System* sys_;
   InterruptController* int_controller_;
 
   struct RepeatKeyInfo {
     Keybinding key = kNoKey;
     uint16_t repeats = 0;
-    std::chrono::time_point<std::chrono::steady_clock, std::chrono::milliseconds>
+    std::chrono::time_point<std::chrono::steady_clock,
+                            std::chrono::milliseconds>
         last_key_output_time;
   };
   RepeatKeyInfo repeat_key_;

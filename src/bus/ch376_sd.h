@@ -1,13 +1,13 @@
 #pragma once
 
+#include <glog/logging.h>
+#include <gtest/gtest.h>
 #include <cstdio>
 #include <cstdlib>
-#include <memory>
 #include <deque>
-#include <vector>
 #include <experimental/filesystem>
-#include <gtest/gtest.h>
-#include <glog/logging.h>
+#include <memory>
+#include <vector>
 
 namespace fs = std::experimental::filesystem;
 
@@ -27,9 +27,9 @@ struct LongBuffer {
 // Emulate the CH376 SD/USB storage controller.
 // Incomplete.
 class CH376SD {
-public:
-  CH376SD(InterruptController *int_controller,
-          const std::string &root_directory)
+ public:
+  CH376SD(InterruptController* int_controller,
+          const std::string& root_directory)
       : int_controller_(int_controller), root_directory_(root_directory) {}
 
   ~CH376SD();
@@ -38,13 +38,13 @@ public:
   void StoreByte(uint32_t addr, uint8_t v);
   uint8_t ReadByte(uint32_t addr);
 
-private:
+ private:
   void PushDirectoryListing();
   void StreamFileContents();
 
-  InterruptController *int_controller_;
+  InterruptController* int_controller_;
 
-  uint8_t current_cmd_ = 0; // If command takes parameter.
+  uint8_t current_cmd_ = 0;  // If command takes parameter.
   std::deque<uint8_t> out_data_;
 
   uint8_t int_status_;
@@ -56,11 +56,11 @@ private:
     ~CH376_FileInfo();
     bool open = false;
     std::string path;
-	fs::directory_entry entry;
+    fs::directory_entry entry;
     bool enumerate_mode_ = false;
-	fs::directory_iterator directory_iterator;
+    fs::directory_iterator directory_iterator;
     struct stat statbuf;
-    FILE *f = nullptr;
+    FILE* f = nullptr;
     std::unique_ptr<LongBuffer> byte_read_request;
     std::unique_ptr<LongBuffer> byte_seek_request;
 

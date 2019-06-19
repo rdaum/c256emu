@@ -24,8 +24,8 @@ class System {
   System();
   ~System();
 
-  void LoadHex(const std::string &kernel_hex_file);
-  void LoadBin(const std::string &kernel_bin_file, uint32_t addr);
+  void LoadHex(const std::string& kernel_hex_file);
+  void LoadBin(const std::string& kernel_bin_file, uint32_t addr);
   void Initialize();
 
   // Launch the loop thread and run the CPU.
@@ -42,13 +42,13 @@ class System {
   // Jump to address.
   void Sys(uint32_t address);
 
-  WDC65C816 *cpu() { return &cpu_; }
-  DebugInterface *GetDebugInterface();
+  WDC65C816* cpu() { return &cpu_; }
+  DebugInterface* GetDebugInterface();
   ProfileInfo profile_info() const { return profile_info_; }
-  Automation *automation();
-  Vicky *vicky() const;
+  Automation* automation();
+  Vicky* vicky() const;
 
-protected:
+ protected:
   friend class InterruptController;
 
   void RaiseIRQ();

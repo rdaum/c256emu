@@ -14,7 +14,7 @@ DEFINE_string(kernel_bin, "", "Location of kernel .bin file");
 DEFINE_string(script, "", "Lua script to run on start (automation only)");
 DEFINE_string(program_hex, "", "Program HEX file to load (optional)");
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, false);
@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
   if (!FLAGS_program_hex.empty())
     system.LoadHex(FLAGS_program_hex);
 
-  Automation *automation = system.automation();
+  Automation* automation = system.automation();
   std::thread run_thread([&system, automation]() {
     system.Initialize();
 

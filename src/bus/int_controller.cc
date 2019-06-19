@@ -21,9 +21,9 @@ constexpr uint32_t kIntMaskReg0 = 0x014C;
 constexpr uint32_t kIntMaskReg1 = 0x014D;
 constexpr uint32_t kIntMaskReg2 = 0x014E;
 
-} // namespace
+}  // namespace
 
-InterruptController::InterruptController(System *sys) : sys_(sys) {
+InterruptController::InterruptController(System* sys) : sys_(sys) {
   pending_reg0_.val = 0;
   pending_reg1_.val = 0;
   pending_reg2_.val = 0;
@@ -75,6 +75,11 @@ void InterruptController::LowerCH376() {
   if (!pending_reg1_.ints.Pending()) {
     sys_->ClearIRQ();
   }
+}
+
+void InterruptController::RaiseVDMATransferComplete() {
+  pending_reg2_.ints.gavin_dma = true;
+  sys_->RaiseIRQ();
 }
 
 void InterruptController::StoreByte(uint32_t addr, uint8_t v) {

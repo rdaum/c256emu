@@ -8,11 +8,11 @@
 
 namespace {
 constexpr uint32_t SDCARD_DATA =
-    0xE808; // (R/W) SDCARD (CH376S) Data PORT_A (A0 = 0)
+    0xE808;  // (R/W) SDCARD (CH376S) Data PORT_A (A0 = 0)
 constexpr uint32_t SDCARD_CMD =
-    0xE809; // (R/W) SDCARD (CH376S) CMD/STATUS Port (A0 = 1)
+    0xE809;  // (R/W) SDCARD (CH376S) CMD/STATUS Port (A0 = 1)
 constexpr uint32_t SDCARD_STAT =
-    0xE810; // (R) SDCARD (Bit[0] = CD, Bit[1] = WP)
+    0xE810;  // (R) SDCARD (Bit[0] = CD, Bit[1] = WP)
 
 enum SdCommands {
   GET_IC_VER = 0x01,
@@ -72,7 +72,7 @@ enum InterruptState {
   USB_INT_DISK_ERR = 0x1f,
 };
 
-void Push32(uint32_t v, std::deque<uint8_t> *out) {
+void Push32(uint32_t v, std::deque<uint8_t>* out) {
   uint8_t highest_byte = v >> 24;
   uint8_t next_byte = (v & 0x00ff0000) >> 16;
   uint8_t nextest_byte = (v & 0x0000ff00) >> 8;
@@ -82,7 +82,7 @@ void Push32(uint32_t v, std::deque<uint8_t> *out) {
   out->push_back(nextest_byte);
   out->push_back(lowest_byte);
 }
-} // namespace
+}  // namespace
 
 CH376SD::CH376_FileInfo::~CH376_FileInfo() {}
 
@@ -92,175 +92,174 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
   if (addr == SDCARD_CMD) {
     current_cmd_ = 0;
     switch (v) {
-    case CHECK_EXIST:
-      out_data_.push_back(CMD_RET_SUCCESS);
-      return;
-    case SET_USB_MODE:
-      current_cmd_ = v;
-      return;
-    case GET_STATUS:
-      int_controller_->LowerCH376();
-      out_data_.push_back(int_status_);
-      int_status_ = 0;
-      return;
-    case DISK_MOUNT:
-      mounted_ = true;
-      int_status_ = USB_INT_SUCCESS;
-      int_controller_->RaiseCH376();
-      return;
-    case SET_FILE_NAME:
-      current_file_.Clear();
-      current_file_.path = root_directory_.string();
-      current_cmd_ = SET_FILE_NAME;
-      return;
-    case FILE_OPEN: {
-
-      if (!fs::exists(current_file_.entry)) {
-        int_status_ = 0x42; // ERR_MISS_FILE
-        current_file_.open = false;
-      } else if (fs::is_directory(current_file_.entry)) {
-        int_status_ = 0x1d; // docs say ERR_OPEN_DIR but kernel expects
-        // USB_INT_DISK_READ
-        current_file_.directory_iterator =
-            fs::directory_iterator(current_file_.entry);
-        auto end = fs::directory_iterator();
-        if (current_file_.directory_iterator == end) {
-          int_status_ = 0x42; // ERR_MISS_FILE
+      case CHECK_EXIST:
+        out_data_.push_back(CMD_RET_SUCCESS);
+        return;
+      case SET_USB_MODE:
+        current_cmd_ = v;
+        return;
+      case GET_STATUS:
+        int_controller_->LowerCH376();
+        out_data_.push_back(int_status_);
+        int_status_ = 0;
+        return;
+      case DISK_MOUNT:
+        mounted_ = true;
+        int_status_ = USB_INT_SUCCESS;
+        int_controller_->RaiseCH376();
+        return;
+      case SET_FILE_NAME:
+        current_file_.Clear();
+        current_file_.path = root_directory_.string();
+        current_cmd_ = SET_FILE_NAME;
+        return;
+      case FILE_OPEN: {
+        if (!fs::exists(current_file_.entry)) {
+          int_status_ = 0x42;  // ERR_MISS_FILE
           current_file_.open = false;
-        } else
+        } else if (fs::is_directory(current_file_.entry)) {
+          int_status_ = 0x1d;  // docs say ERR_OPEN_DIR but kernel expects
+          // USB_INT_DISK_READ
+          current_file_.directory_iterator =
+              fs::directory_iterator(current_file_.entry);
+          auto end = fs::directory_iterator();
+          if (current_file_.directory_iterator == end) {
+            int_status_ = 0x42;  // ERR_MISS_FILE
+            current_file_.open = false;
+          } else
+            current_file_.open = true;
+        } else {
           current_file_.open = true;
-      } else {
-        current_file_.open = true;
-        current_file_.f = fopen(current_file_.entry.path().string().c_str(), "r");
-        if (!current_file_.f) {
-          int_status_ = 0x42; // ERR_MISS_FILE
-          current_file_.open = false;
+          current_file_.f =
+              fopen(current_file_.entry.path().string().c_str(), "r");
+          if (!current_file_.f) {
+            int_status_ = 0x42;  // ERR_MISS_FILE
+            current_file_.open = false;
+            return;
+          }
+          int_status_ = USB_INT_SUCCESS;
           return;
         }
-        int_status_ = USB_INT_SUCCESS;
+        current_file_.byte_seek_request.reset();
+        int_controller_->RaiseCH376();
         return;
       }
-      current_file_.byte_seek_request.reset();
-      int_controller_->RaiseCH376();
-      return;
-    }
-    case FILE_CLOSE: {
-      current_file_.open = false;
-      current_cmd_ = FILE_CLOSE;
-      if (fs::is_regular_file(current_file_.entry)) {
-        CHECK(fclose(current_file_.f) == 0);
+      case FILE_CLOSE: {
+        current_file_.open = false;
+        current_cmd_ = FILE_CLOSE;
+        if (fs::is_regular_file(current_file_.entry)) {
+          CHECK(fclose(current_file_.f) == 0);
+        }
+        return;
       }
-      return;
-    }
-    case FILE_ENUM_GO: {
-    repeat:
-      auto end = fs::directory_iterator();
+      case FILE_ENUM_GO: {
+      repeat:
+        auto end = fs::directory_iterator();
 
-      if (current_file_.directory_iterator != end) {
-        auto path = current_file_.directory_iterator->path();
-        if (path.string()[0] == '.') {
-          current_file_.directory_iterator++;
-          goto repeat;
+        if (current_file_.directory_iterator != end) {
+          auto path = current_file_.directory_iterator->path();
+          if (path.string()[0] == '.') {
+            current_file_.directory_iterator++;
+            goto repeat;
+          }
         }
-      }
-      int_status_ =
-          current_file_.directory_iterator == end ? 0x42 : USB_INT_DISK_READ;
-      int_controller_->RaiseCH376();
-    } break;
-    case RD_USB_DATA0:
-      if (current_file_.open) {
-        if (current_file_.enumerate_mode_ &&
-            fs::is_directory(current_file_.entry) &&
-            current_file_.directory_iterator !=
-                fs::directory_iterator()) {
-          PushDirectoryListing();
-          return;
+        int_status_ =
+            current_file_.directory_iterator == end ? 0x42 : USB_INT_DISK_READ;
+        int_controller_->RaiseCH376();
+      } break;
+      case RD_USB_DATA0:
+        if (current_file_.open) {
+          if (current_file_.enumerate_mode_ &&
+              fs::is_directory(current_file_.entry) &&
+              current_file_.directory_iterator != fs::directory_iterator()) {
+            PushDirectoryListing();
+            return;
+          } else {
+            StreamFileContents();
+            return;
+          }
+        }
+        break;
+      case GET_FILE_SIZE:
+        current_cmd_ = GET_FILE_SIZE;
+        break;
+      case BYTE_READ:
+        current_cmd_ = BYTE_READ;
+        current_file_.byte_read_request = std::make_unique<LongBuffer>(2);
+        break;
+      case BYTE_RD_GO:
+        if (ftell(current_file_.f) < current_file_.statbuf.st_size) {
+          int_status_ = USB_INT_DISK_READ;
         } else {
-          StreamFileContents();
-          return;
+          int_status_ = USB_INT_SUCCESS;  // done reading
         }
-      }
-      break;
-    case GET_FILE_SIZE:
-      current_cmd_ = GET_FILE_SIZE;
-      break;
-    case BYTE_READ:
-      current_cmd_ = BYTE_READ;
-      current_file_.byte_read_request = std::make_unique<LongBuffer>(2);
-      break;
-    case BYTE_RD_GO:
-      if (ftell(current_file_.f) < current_file_.statbuf.st_size) {
-        int_status_ = USB_INT_DISK_READ;
-      } else {
-        int_status_ = USB_INT_SUCCESS; // done reading
-      }
-      int_controller_->RaiseCH376();
-      break;
-    case BYTE_LOCATE:
-      // Seek.
-      current_cmd_ = BYTE_LOCATE;
-      current_file_.byte_seek_request = std::make_unique<LongBuffer>(4);
-      break;
-    default:
-      LOG(ERROR) << "UNHANDLED CH376 COMMAND: " << std::hex << (int)v;
-      break;
+        int_controller_->RaiseCH376();
+        break;
+      case BYTE_LOCATE:
+        // Seek.
+        current_cmd_ = BYTE_LOCATE;
+        current_file_.byte_seek_request = std::make_unique<LongBuffer>(4);
+        break;
+      default:
+        LOG(ERROR) << "UNHANDLED CH376 COMMAND: " << std::hex << (int)v;
+        break;
     }
     return;
   };
   if (addr == SDCARD_DATA) {
     switch (current_cmd_) {
-    case SET_USB_MODE:
-      CHECK_EQ(v, 0x03) << "SET_USB_MODE for invalid mode (" << v << ")";
-      out_data_.push_back(CMD_RET_SUCCESS);
-      out_data_.push_back(0); // byte 2;
-      return;
-    case SET_FILE_NAME:
-      if (v == 0) {
-        current_file_.entry = fs::directory_entry(
-            fs::path(current_file_.path));
-        current_file_.path.clear();
-        current_cmd_ = 0;
+      case SET_USB_MODE:
+        CHECK_EQ(v, 0x03) << "SET_USB_MODE for invalid mode (" << v << ")";
+        out_data_.push_back(CMD_RET_SUCCESS);
+        out_data_.push_back(0);  // byte 2;
         return;
-      }
-      if (v == '*') {
-        current_file_.enumerate_mode_ = true;
-        return;
-      }
-      current_file_.path.push_back(v);
-      break;
-    case FILE_CLOSE:
-      // v? "Update or not" ?
-      int_status_ = USB_INT_SUCCESS;
-      int_controller_->RaiseCH376();
-      break;
-    case GET_FILE_SIZE:
-      Push32(current_file_.statbuf.st_size, &out_data_);
-      break;
-    case BYTE_READ:
-      current_file_.byte_read_request->Write(v);
-      if (current_file_.byte_read_request->HasValue()) {
-        uint32_t bytes = current_file_.byte_read_request->value();
-        if (ftell(current_file_.f) + bytes > current_file_.statbuf.st_size) {
-          int_status_ = USB_INT_SUCCESS; // done reading
-        } else {
-          int_status_ = USB_INT_DISK_READ;
+      case SET_FILE_NAME:
+        if (v == 0) {
+          current_file_.entry =
+              fs::directory_entry(fs::path(current_file_.path));
+          current_file_.path.clear();
+          current_cmd_ = 0;
+          return;
         }
-        int_controller_->RaiseCH376();
-      }
-      break;
-    case BYTE_LOCATE:
-      current_file_.byte_seek_request->Write(v);
-      if (current_file_.byte_seek_request->HasValue()) {
-        uint32_t seek_val = current_file_.byte_seek_request->value();
-        // Seek end of file?
-        if (seek_val == 0xffffffff ||
-            seek_val >= current_file_.statbuf.st_size) {
-          seek_val = current_file_.statbuf.st_size;
+        if (v == '*') {
+          current_file_.enumerate_mode_ = true;
+          return;
         }
-        fseek(current_file_.f, seek_val, SEEK_SET);
+        current_file_.path.push_back(v);
+        break;
+      case FILE_CLOSE:
+        // v? "Update or not" ?
         int_status_ = USB_INT_SUCCESS;
         int_controller_->RaiseCH376();
-      }
+        break;
+      case GET_FILE_SIZE:
+        Push32(current_file_.statbuf.st_size, &out_data_);
+        break;
+      case BYTE_READ:
+        current_file_.byte_read_request->Write(v);
+        if (current_file_.byte_read_request->HasValue()) {
+          uint32_t bytes = current_file_.byte_read_request->value();
+          if (ftell(current_file_.f) + bytes > current_file_.statbuf.st_size) {
+            int_status_ = USB_INT_SUCCESS;  // done reading
+          } else {
+            int_status_ = USB_INT_DISK_READ;
+          }
+          int_controller_->RaiseCH376();
+        }
+        break;
+      case BYTE_LOCATE:
+        current_file_.byte_seek_request->Write(v);
+        if (current_file_.byte_seek_request->HasValue()) {
+          uint32_t seek_val = current_file_.byte_seek_request->value();
+          // Seek end of file?
+          if (seek_val == 0xffffffff ||
+              seek_val >= current_file_.statbuf.st_size) {
+            seek_val = current_file_.statbuf.st_size;
+          }
+          fseek(current_file_.f, seek_val, SEEK_SET);
+          int_status_ = USB_INT_SUCCESS;
+          int_controller_->RaiseCH376();
+        }
     }
   }
 }
@@ -359,7 +358,9 @@ void CH376SD::StreamFileContents() {
     out_data_.push_back(0);
 }
 
-void LongBuffer::Write(uint8_t v) { values_.push_back(v); }
+void LongBuffer::Write(uint8_t v) {
+  values_.push_back(v);
+}
 
 bool LongBuffer::HasValue() const {
   return values_.size() == num_bytes_needed_;

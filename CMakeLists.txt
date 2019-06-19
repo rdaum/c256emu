@@ -54,7 +54,10 @@ set(BUS_SOURCES
         src/bus/math_copro.cc
         src/bus/rtc.cc
         src/bus/vicky.cc
-        src/bus/c256_system_bus.cc)
+        src/bus/vdma.cc
+        src/bus/c256_system_bus.cc
+        src/bus/register_utils.cc
+        )
 set(BUS_HEADERS
         src/automation/automation.h
         src/automation/lua_describe.h
@@ -67,7 +70,9 @@ set(BUS_HEADERS
         src/bus/sdl_to_atset_keymap.h
         src/bus/vicky_def.h
         src/bus/vicky.h
+        src/bus/vdma.h
         src/bus/c256_system_bus.h
+        src/bus/register_utils.h
         )
 add_library(bus ${BUS_SOURCES} ${BUS_HEADERS})
 add_dependencies(bus circular_buffer retrocpu)

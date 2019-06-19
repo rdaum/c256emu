@@ -1,23 +1,33 @@
 #include "bus/math_copro.h"
 
-#include <functional>
 #include <glog/logging.h>
+#include <functional>
 namespace {
-template <typename T, typename R> R Multiply(T a, T b) { return a * b; }
-template <typename T, typename R> R Divide(T a, T b) {
+template <typename T, typename R>
+R Multiply(T a, T b) {
+  return a * b;
+}
+template <typename T, typename R>
+R Divide(T a, T b) {
   if (b == 0)
     return 0;
   return a / b;
 }
-template <typename T, typename R> R Remainder(T a, T b) {
+template <typename T, typename R>
+R Remainder(T a, T b) {
   if (b == 0)
     return 0;
   return a % b;
 }
-template <typename T, typename R> R Add(T a, T b) { return a + b; }
+template <typename T, typename R>
+R Add(T a, T b) {
+  return a + b;
+}
 
-bool Set16(uint32_t addr, uint32_t start_addr,
-           MathCoprocessor::IVal *d, uint8_t v) {
+bool Set16(uint32_t addr,
+           uint32_t start_addr,
+           MathCoprocessor::IVal* d,
+           uint8_t v) {
   uint16_t o = addr - start_addr;
   if (o > 1)
     return false;
@@ -25,8 +35,7 @@ bool Set16(uint32_t addr, uint32_t start_addr,
   return true;
 }
 
-bool Set32(uint32_t addr, uint32_t start_addr, int32_t *d,
-           uint8_t v) {
+bool Set32(uint32_t addr, uint32_t start_addr, int32_t* d, uint8_t v) {
   uint16_t o = addr - start_addr;
   if (o > 3)
     return false;
@@ -49,8 +58,10 @@ bool Set32(uint32_t addr, uint32_t start_addr, int32_t *d,
   return false;
 }
 
-bool Get32(uint32_t addr, uint32_t start_addr,
-           const MathCoprocessor::LongVal &r, uint8_t *result) {
+bool Get32(uint32_t addr,
+           uint32_t start_addr,
+           const MathCoprocessor::LongVal& r,
+           uint8_t* result) {
   uint16_t o = addr - start_addr;
   if (o > 3)
     return false;
@@ -58,8 +69,10 @@ bool Get32(uint32_t addr, uint32_t start_addr,
   return true;
 }
 
-bool Get16(uint32_t addr, uint32_t start_addr,
-           const MathCoprocessor::WordVal &r, uint8_t *result) {
+bool Get16(uint32_t addr,
+           uint32_t start_addr,
+           const MathCoprocessor::WordVal& r,
+           uint8_t* result) {
   uint16_t o = addr - start_addr;
   if (o > 2)
     return false;
@@ -83,11 +96,15 @@ MathCoprocessor::DivRegisters ZeroDiv() {
   o.remainder.uint_16 = 0;
   return o;
 }
-} // namespace
+}  // namespace
 
 MathCoprocessor::MathCoprocessor()
-    : m0_(ZeroMul()), m1_(ZeroMul()), d0_(ZeroDiv()), d1_(ZeroDiv()),
-      adder32_a_(0), adder32_b_(0) {
+    : m0_(ZeroMul()),
+      m1_(ZeroMul()),
+      d0_(ZeroDiv()),
+      d1_(ZeroDiv()),
+      adder32_a_(0),
+      adder32_b_(0) {
   adder32_r_.uint_32 = 0;
 }
 

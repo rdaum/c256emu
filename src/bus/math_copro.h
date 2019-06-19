@@ -24,7 +24,6 @@ constexpr uint32_t ADDER32_OPERAND_A = 0x120;
 constexpr uint32_t ADDER32_OPERAND_B = 0x124;
 constexpr uint32_t ADDER32_RESULT = 0x128;
 
-
 class MathCoprocessor {
  public:
   MathCoprocessor();
@@ -41,7 +40,7 @@ class MathCoprocessor {
   union LongVal {
     uint8_t bytes[4];
     uint32_t uint_32;
-    int32_t  int_32;
+    int32_t int_32;
   };
   union WordVal {
     uint8_t bytes[2];
@@ -59,8 +58,8 @@ class MathCoprocessor {
     WordVal result;
     WordVal remainder;
   };
- private:
 
+ private:
   MulRegisters m0_;
   MulRegisters m1_;
   DivRegisters d0_;

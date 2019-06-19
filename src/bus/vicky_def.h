@@ -22,7 +22,6 @@ constexpr uint32_t kBorderCtrlReg(0x0004);
 constexpr uint8_t Border_Ctrl_Enable = 0x0;
 constexpr uint32_t kBorderColour(0x0005);
 
-
 constexpr uint32_t kBackgroundColour(0x0008);
 
 constexpr uint32_t kCursorCtrlReg(0x0010);
@@ -49,7 +48,8 @@ constexpr uint8_t TILE_LUT1 = 0x04;
 constexpr uint8_t TILE_LUT2 = 0x08;
 constexpr uint8_t TILE_Scroll_X_Enable = 0x10;
 constexpr uint8_t TILE_Scroll_Y_Enable = 0x20;
-constexpr uint8_t TILESHEET_256x256_En = 0x80; // 0 -> Sequential, 1-> 256x256 Tile Sheet Striding
+constexpr uint8_t TILESHEET_256x256_En =
+    0x80;  // 0 -> Sequential, 1-> 256x256 Tile Sheet Striding
 //
 constexpr uint32_t kTileRegistersBegin(0x0100);
 constexpr uint32_t kTileRegistersEnd(0x011F);
@@ -115,12 +115,10 @@ constexpr uint32_t kMousePtrGrap1End(0x06FF);  //  Pointer 1
 constexpr uint32_t kMousePtrCtrlReg(
     0x0700);  //  Bit[0] Enable, Bit[1] = 0  (0 = Pointer0, 1 = Pointer1)
 
-constexpr uint32_t kMousePtrX(
-    0x0702);  //  X Position (0 - 639) (Can only read
-              //  now) Writing will have no effect
-constexpr uint32_t kMousePtrY(
-    0x0704);  //  Y Position (0 - 479) (Can only read
-              //  now) Writing will have no effect
+constexpr uint32_t kMousePtrX(0x0702);  //  X Position (0 - 639) (Can only read
+                                        //  now) Writing will have no effect
+constexpr uint32_t kMousePtrY(0x0704);  //  Y Position (0 - 479) (Can only read
+                                        //  now) Writing will have no effect
 
 constexpr uint32_t MOUSE_PTR_Y_POS_H(0x0705);
 constexpr uint32_t MOUSE_PTR_BYTE0(
@@ -134,9 +132,9 @@ constexpr uint32_t MOUSE_PTR_BYTE2(
 constexpr uint32_t kTextFgColourLUT(0x1F40);
 constexpr uint32_t kTextBgColourLUT(0x1F80);
 
-constexpr uint32_t kGrphLutBegin(0x2000);     // start of all 8 LUTs
-constexpr uint32_t kGrphLutSize(0x0400);      // the size of each LUT
-constexpr uint32_t kGrphLutTotalSize(0x4000); // the total size of all 8 LUTs
+constexpr uint32_t kGrphLutBegin(0x2000);      // start of all 8 LUTs
+constexpr uint32_t kGrphLutSize(0x0400);       // the size of each LUT
+constexpr uint32_t kGrphLutTotalSize(0x4000);  // the total size of all 8 LUTs
 
 constexpr uint32_t GAMMA_B_LUT_PTR(0x4000);
 constexpr uint32_t GAMMA_G_LUT_PTR(0x4100);
@@ -147,9 +145,9 @@ constexpr uint32_t kTileMapsEnd(0x6ffff);
 constexpr uint32_t kTileMapSize(0x800);
 constexpr uint32_t kTileMapTotalSize(0x2000);
 
-constexpr uint32_t kFontBankMemoryBegin(0x8000);   // start of font banks
-constexpr uint32_t kFontBankMemorySize(0x800);     // size of each bank
-constexpr uint32_t kFontTotalMemorySize(0x1000);   // size of both combined
+constexpr uint32_t kFontBankMemoryBegin(0x8000);  // start of font banks
+constexpr uint32_t kFontBankMemorySize(0x800);    // size of each bank
+constexpr uint32_t kFontTotalMemorySize(0x1000);  // size of both combined
 
 constexpr uint32_t kTextMemoryBegin(0xA000);
 constexpr uint32_t kTextMemorySize(0x2000);

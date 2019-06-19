@@ -7,7 +7,6 @@ ExternalProject_Add(
         LOG_CONFIGURE ON
         LOG_BUILD ON
         LOG_INSTALL ON
-        UPDATE_COMMAND ""
         INSTALL_COMMAND ""
         CMAKE_ARGS
             -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}

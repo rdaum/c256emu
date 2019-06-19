@@ -6,6 +6,7 @@
 #include "bus/int_controller.h"
 #include "bus/keyboard.h"
 #include "bus/loader.h"
+#include "bus/vdma.h"
 #include "bus/vicky.h"
 #include "gui/gui.h"
 
@@ -24,28 +25,28 @@ constexpr int kRasterLinesPerSecond = kVickyBitmapHeight * kVickyTargetFps;
 
 DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
 
-} // namespace
+}  // namespace
 
 System::System()
     : system_bus_(std::make_unique<C256SystemBus>(this)),
-      gui_(std::make_unique<GUI>(this)), cpu_(system_bus_.get()),
+      gui_(std::make_unique<GUI>(this)),
+      cpu_(system_bus_.get()),
       debug_(&cpu_, &events_, system_bus_.get(), true),
       automation_(&cpu_, this, &debug_) {}
 
 System::~System() = default;
 
-void System::LoadHex(const std::string &kernel_hex_file) {
+void System::LoadHex(const std::string& kernel_hex_file) {
   // GAVIN copies up to 512k flash mem to kernel mem.
   LoadFromHex(kernel_hex_file, system_bus_.get());
 }
 
-void System::LoadBin(const std::string &kernel_bin_file, uint32_t addr) {
+void System::LoadBin(const std::string& kernel_bin_file, uint32_t addr) {
   // GAVIN copies up to 512k flash mem to kernel mem.
   LoadFromBin(kernel_bin_file, addr, system_bus_.get());
 }
 
 void System::Initialize() {
-
   // Copy Bank 18 to Bank 0
   LOG(INFO) << "Copying flash bank 18 to bank 0...";
   for (int i = 0; i < 1 << 16; i++) {
@@ -73,7 +74,9 @@ void System::Sys(uint32_t address) {
   cpu_.cpu_state.code_segment_base = address & 0xFF0000;
 }
 
-DebugInterface *System::GetDebugInterface() { return &debug_; }
+DebugInterface* System::GetDebugInterface() {
+  return &debug_;
+}
 
 void System::DrawNextLine() {
   system_bus_->vicky()->RenderLine();
@@ -93,6 +96,7 @@ void System::DrawNextLine() {
         }
         system_bus_->keyboard()->ProcessEvent(event);
       }
+      system_bus_->vdma()->OnFrameStart();
     }
 
     current_frame_++;
@@ -127,9 +131,9 @@ void System::DrawNextLine() {
 
 void System::ScheduleNextScanline() {
   total_scanlines_++;
-  events_.ScheduleNoLock((kTargetClockRate * total_scanlines_) /
-                             kRasterLinesPerSecond,
-                         std::bind(&System::DrawNextLine, this));
+  events_.ScheduleNoLock(
+      (kTargetClockRate * total_scanlines_) / kRasterLinesPerSecond,
+      std::bind(&System::DrawNextLine, this));
 }
 
 void System::Run() {
@@ -146,22 +150,34 @@ void System::Run() {
   cpu_.Emulate(&events_);
 }
 
-uint16_t System::ReadTwoBytes(uint32_t addr) { return cpu_.PeekU16(addr); }
+uint16_t System::ReadTwoBytes(uint32_t addr) {
+  return cpu_.PeekU16(addr);
+}
 
-uint16_t System::ReadByte(uint32_t addr) { return system_bus_->ReadByte(addr); }
+uint16_t System::ReadByte(uint32_t addr) {
+  return system_bus_->ReadByte(addr);
+}
 
 void System::StoreByte(uint32_t addr, uint8_t val) {
   system_bus_->WriteByte(addr, val);
 }
 
-void System::RaiseIRQ() { cpu_.cpu_state.SetInterruptSource(1); }
+void System::RaiseIRQ() {
+  cpu_.cpu_state.SetInterruptSource(1);
+}
 
-void System::ClearIRQ() { cpu_.cpu_state.ClearInterruptSource(1); }
+void System::ClearIRQ() {
+  cpu_.cpu_state.ClearInterruptSource(1);
+}
 
-void System::SetStop() { cpu_.cpu_state.cycle_stop = 0; }
+void System::SetStop() {
+  cpu_.cpu_state.cycle_stop = 0;
+}
 
-Automation *System::automation() {
+Automation* System::automation() {
   return &automation_;
 }
 
-Vicky *System::vicky() const { return system_bus_->vicky(); }
+Vicky* System::vicky() const {
+  return system_bus_->vicky();
+}

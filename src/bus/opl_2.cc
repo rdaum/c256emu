@@ -1,12 +1,8 @@
 #include "bus/opl_2.h"
 
-
-OPL2::OPL2() :
-opl_left_(std::make_unique<CEmuopl>(44100, true, false)),
-opl_right_(std::make_unique<CEmuopl>(44100, true, false))
-{
-
-}
+OPL2::OPL2()
+    : opl_left_(std::make_unique<CEmuopl>(44100, true, false)),
+      opl_right_(std::make_unique<CEmuopl>(44100, true, false)) {}
 
 void OPL2::StoreByte(uint32_t addr, uint8_t v) {
   if (addr >= kOplLeftBase && addr <= kOplLeftTop) {

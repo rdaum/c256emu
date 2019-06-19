@@ -9,6 +9,7 @@
 #include <mutex>
 #include <thread>
 
+#include "bus/register_utils.h"
 #include "cpu.h"
 
 class System;
@@ -28,7 +29,7 @@ constexpr uint8_t kNumLayers = 4;
 // Text mode only for now.
 class Vicky {
  public:
-  Vicky(System *system, InterruptController *int_controller);
+  Vicky(System* system, InterruptController* int_controller);
 
   ~Vicky();
 
@@ -41,13 +42,13 @@ class Vicky {
   void StoreByte(uint32_t addr, uint8_t v);
   uint8_t ReadByte(uint32_t addr);
 
-  void InitPages(Page *vicky_page_start);
+  void InitPages(Page* vicky_page_start);
 
   inline bool is_vertical_end() { return raster_y_ == 479; }
   inline int current_scanline() { return raster_y_; }
   inline int max_scanline() { return kVickyBitmapHeight; }
 
-  uint8_t *vram() { return video_ram_; }
+  uint8_t* vram() { return video_ram_; }
 
   unsigned int window_id() const;
 
@@ -61,18 +62,20 @@ class Vicky {
   void set_gamma_override(bool override) { gamma_override_ = override; }
   bool gamma_override() const { return gamma_override_; }
 
-private:
-  bool RenderBitmap(uint16_t raster_x, uint32_t *pixel);
-  bool RenderCharacterGenerator(uint16_t raster_x, uint32_t *pixel);
-  bool RenderMouseCursor(uint16_t raster_x, uint32_t *pixel);
-  bool RenderTileMap(uint16_t raster_x, uint8_t layer, uint32_t *pixel);
-  bool RenderSprites(uint16_t raster_x, uint8_t layer, uint32_t sprite_mask,
-                     uint32_t *pixel);
+ private:
+  bool RenderBitmap(uint16_t raster_x, uint32_t* pixel);
+  bool RenderCharacterGenerator(uint16_t raster_x, uint32_t* pixel);
+  bool RenderMouseCursor(uint16_t raster_x, uint32_t* pixel);
+  bool RenderTileMap(uint16_t raster_x, uint8_t layer, uint32_t* pixel);
+  bool RenderSprites(uint16_t raster_x,
+                     uint8_t layer,
+                     uint32_t sprite_mask,
+                     uint32_t* pixel);
 
   uint32_t ApplyGamma(uint32_t colour_val);
 
-  System *sys_;
-  InterruptController *int_controller_;
+  System* sys_;
+  InterruptController* int_controller_;
 
   float scale_ = 1.0;
   ScalingQuality scaling_quality_ = ScalingQuality::NEAREST;
@@ -80,19 +83,13 @@ private:
   // Enable gamma correction even if the video mode doesn't say so.
   bool gamma_override_ = true;
 
-  SDL_Window *window_;
-  SDL_Renderer *renderer_;
+  SDL_Window* window_;
+  SDL_Renderer* renderer_;
   SDL_GLContext gl_context_;
 
   union BGRAColour {
     uint32_t v;
     uint8_t bgra[4]{0, 0, 0, 0};
-  };
-
-  struct Reg {
-    uint32_t reg_addr;
-    void *reg_ptr;
-    uint8_t byte_width;
   };
 
   std::vector<Reg> registers_;
@@ -137,7 +134,7 @@ private:
   bool bitmap_enabled_ = false;
   uint8_t bitmap_lut_ = 0;
   uint32_t bitmap_addr_offset_ = 0;
-\
+
   uint8_t video_ram_[0x400000]{};
 
   struct TileSet {
