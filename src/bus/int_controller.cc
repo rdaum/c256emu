@@ -37,11 +37,6 @@ InterruptController::InterruptController(System *sys) : sys_(sys) {
   mask_reg1_.val = 0;
   mask_reg2_.val = 0;
 
-  pending_reg0_.ints.UNUSED = false;
-  polarity_reg0_.ints.UNUSED = false;
-  edge_reg0_.ints.UNUSED = false;
-  mask_reg0_.ints.UNUSED = false;
-
   pending_reg2_.ints.UNUSED0 = false;
   pending_reg2_.ints.UNUSED1 = false;
   polarity_reg2_.ints.UNUSED0 = false;
@@ -53,17 +48,13 @@ InterruptController::InterruptController(System *sys) : sys_(sys) {
 }
 
 void InterruptController::RaiseFrameStart() {
-  if (!pending_reg0_.ints.vicky0) {
-    pending_reg0_.ints.vicky0 = true;
-    sys_->RaiseIRQ();
-  }
+  pending_reg0_.ints.vicky0 = true;
+  sys_->RaiseIRQ();
 }
 
 void InterruptController::RaiseKeyboard() {
-  if (!pending_reg1_.ints.kbd) {
-    pending_reg1_.ints.kbd = true;
-    sys_->RaiseIRQ();
-  }
+  pending_reg1_.ints.kbd = true;
+  sys_->RaiseIRQ();
 }
 
 void InterruptController::LowerKeyboard() {
@@ -74,11 +65,9 @@ void InterruptController::LowerKeyboard() {
 }
 
 void InterruptController::RaiseCH376() {
-  if (!pending_reg1_.ints.ch376) {
-    pending_reg1_.ints.ch376 = true;
-    //    sys_->RaiseIRQ(); // For some reason this causes issues, and seems
-    //    unnecessary.
-  }
+  pending_reg1_.ints.ch376 = true;
+  //    sys_->RaiseIRQ(); // For some reason this causes issues, and seems
+  //    unnecessary.
 }
 
 void InterruptController::LowerCH376() {

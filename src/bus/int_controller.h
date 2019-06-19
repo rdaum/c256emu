@@ -23,17 +23,17 @@ public:
 private:
   union InterruptSet1 {
     struct {
-      bool UNUSED : 1; // Always 1
       bool vicky0 : 1; // Start of frame
       bool vicky1 : 1; // Line Interrupt
       bool timer_0 : 1;
       bool timer_1 : 1;
       bool timer_2 : 1;
       bool rtc : 1;
-      bool lpc : 1;
+      bool fdc : 1;
+      bool mouse : 1;
 
       bool Pending() const {
-        return vicky0 || vicky1 || timer_0 || timer_1 || timer_2 || rtc || lpc;
+        return vicky0 || vicky1 || timer_0 || timer_1 || timer_2 || rtc || fdc;
       }
     } ints;
     uint8_t val;
