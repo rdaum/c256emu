@@ -153,6 +153,36 @@ uint8_t Vicky::ReadByte(uint32_t addr) {
   }
 
   // TODO: read more complex registers (tiles, sprites, bitmasked things, etc.)
+  if (addr >= kTileRegistersBegin && addr <= kTileRegistersEnd) {
+    uint8_t v = 0;
+    uint16_t tile_offset = addr - kTileRegistersBegin;
+    uint8_t tile_num = tile_offset / kNumTileRegisters;
+    uint8_t register_num = tile_offset % kNumTileRegisters;
+    TileSet &tile_set = tile_sets_[tile_num];
+    if (register_num == 0) {
+      if (tile_set.enabled)
+        v |= TILE_Enable;
+      v |= tile_set.lut << 1;
+      if (tile_set.tiled_sheet)
+        v |= TILESHEET_256x256_En;
+      if (tile_set.scroll_x_enable)
+        v |= TILE_Scroll_X_Enable;
+      if (tile_set.scroll_y_enable)
+        v |= TILE_Scroll_Y_Enable;
+    } else if (register_num == 1) {
+      v = tile_set.start_addr & 0x000000ff;
+    } else if (register_num == 2) {
+      v = (tile_set.start_addr & 0x0000ff00) >> 8;
+    } else if (register_num == 3) {
+      v = (tile_set.start_addr & 0x00ff0000) >> 16;
+    } else if (register_num == 4) {
+      v = (tile_set.offset_x) | (tile_set.offset_y << 4);
+    } else {
+      LOG(ERROR) << "Unsupported tile reg: " << std::hex << (int)register_num
+                 << " @ " << std::hex << addr;
+    }
+    return v;
+  }
 
   LOG(INFO) << "Read from unhandled vicky reg: " << std::hex << addr;
   return 0;
@@ -200,24 +230,22 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
     uint16_t tile_offset = offset - kTileRegistersBegin;
     uint8_t tile_num = tile_offset / kNumTileRegisters;
     uint8_t register_num = tile_offset % kNumTileRegisters;
+    TileSet &tile_set = tile_sets_[tile_num];
     if (register_num == 0) {
-      tile_sets_[tile_num].enabled = v & TILE_Enable;
-      tile_sets_[tile_num].lut = (v & 0b00001110) >> 1;
-      tile_sets_[tile_num].tiled_sheet = (v & TILESHEET_256x256_En);
-      tile_sets_[tile_num].scroll_x_enable = (v & TILE_Scroll_X_Enable);
-      tile_sets_[tile_num].scroll_y_enable = (v & TILE_Scroll_Y_Enable);
+      tile_set.enabled = v & TILE_Enable;
+      tile_set.lut = (v & 0b00001110) >> 1;
+      tile_set.tiled_sheet = (v & TILESHEET_256x256_En);
+      tile_set.scroll_x_enable = (v & TILE_Scroll_X_Enable);
+      tile_set.scroll_y_enable = (v & TILE_Scroll_Y_Enable);
     } else if (register_num == 1) {
-      tile_sets_[tile_num].start_addr =
-          (tile_sets_[tile_num].start_addr & 0x00ffff00) | v;
+      tile_set.start_addr = (tile_set.start_addr & 0x00ffff00) | v;
     } else if (register_num == 2) {
-      tile_sets_[tile_num].start_addr =
-          (tile_sets_[tile_num].start_addr & 0x00ff00ff) | (v << 8);
+      tile_set.start_addr = (tile_set.start_addr & 0x00ff00ff) | (v << 8);
     } else if (register_num == 3) {
-      tile_sets_[tile_num].start_addr =
-          (tile_sets_[tile_num].start_addr & 0x0000ffff) | (v << 16);
+      tile_set.start_addr = (tile_set.start_addr & 0x0000ffff) | (v << 16);
     } else if (register_num == 4) {
-      tile_sets_[tile_num].offset_x = (v & 0x0f);
-      tile_sets_[tile_num].offset_y = (v >> 4);
+      tile_set.offset_x = (v & 0x0f);
+      tile_set.offset_y = (v >> 4);
     } else {
       LOG(ERROR) << "Unsupported tile reg: " << std::hex << (int)register_num
                  << " @ " << std::hex << addr;
@@ -433,10 +461,15 @@ bool Vicky::RenderTileMap(uint16_t raster_x, uint8_t layer,
 
     // Try to take account of the horizontal and vertical scroll.
     // TODO: this is untested.
-    if (tile_set.scroll_x_enable)
+    if (tile_set.scroll_x_enable) {
       adjusted_x -= tile_set.offset_x;
-    if (tile_set.scroll_y_enable)
-      adjusted_x -= tile_set.offset_y;
+    }
+    if (tile_set.scroll_y_enable) {
+      adjusted_y -= tile_set.offset_y;
+    }
+
+    if (adjusted_x > kVickyBitmapWidth || adjusted_y > kVickyBitmapHeight)
+      return false;
 
     uint8_t screen_tile_row = adjusted_y / kTileSize;
     uint8_t screen_tile_sub_row = adjusted_y % kTileSize;
