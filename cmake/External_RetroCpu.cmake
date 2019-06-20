@@ -1,8 +1,7 @@
 include(ExternalProject)
 ExternalProject_Add(
         retrocpu
-        GIT_REPOSITORY https://github.com/rdaum/retro_cpu.git
-        GIT_TAG patch-1
+        GIT_REPOSITORY https://github.com/achaulk/retro_cpu.git
         LOG_DOWNLOAD ON
         LOG_CONFIGURE ON
         LOG_BUILD ON

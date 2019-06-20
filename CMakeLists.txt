@@ -100,7 +100,7 @@ target_include_directories(c256emu PUBLIC
 if (WIN32)
     set(PLATFORM_LIBRARIES})
 else ()
-    set(PLATFORM_LIBRARIES pthread rt GL -lstdc++fs )
+    set(PLATFORM_LIBRARIES pthread rt GL -lstdc++fs)
 endif ()
 
 target_link_libraries(c256emu
