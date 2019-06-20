@@ -6,6 +6,7 @@
 #include <thread>
 
 #include "automation/automation.h"
+#include "bus/loader.h"
 #include "system.h"
 
 DEFINE_bool(interpreter, false, "enable Lua command read prompt loop");
@@ -24,15 +25,16 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "Good morning.";
 
   System system;
+
   if (!FLAGS_kernel_hex.empty())
-    system.LoadHex(FLAGS_kernel_hex);
+    system.loader()->LoadFromHex(FLAGS_kernel_hex);
   else if (!FLAGS_kernel_bin.empty())
-    system.LoadBin(FLAGS_kernel_bin, 0x180000);
+    system.loader()->LoadFromBin(FLAGS_kernel_bin, 0x180000);
   else
     LOG(FATAL) << "No kernel";
 
   if (!FLAGS_program_hex.empty())
-    system.LoadHex(FLAGS_program_hex);
+    system.loader()->LoadFromHex(FLAGS_program_hex);
 
   Automation* automation = system.automation();
   std::thread run_thread([&system, automation]() {

@@ -6,6 +6,7 @@
 #include <thread>
 
 #include "automation/automation.h"
+#include "bus/loader.h"
 #include "cpu/65816/cpu_65c816.h"
 #include "debug_interface.h"
 
@@ -24,8 +25,6 @@ class System {
   System();
   ~System();
 
-  void LoadHex(const std::string& kernel_hex_file);
-  void LoadBin(const std::string& kernel_bin_file, uint32_t addr);
   void Initialize();
 
   // Launch the loop thread and run the CPU.
@@ -47,6 +46,8 @@ class System {
   ProfileInfo profile_info() const { return profile_info_; }
   Automation* automation();
   Vicky* vicky() const;
+
+  Loader* loader() { return &loader_; }
 
  protected:
   friend class InterruptController;
@@ -70,6 +71,8 @@ class System {
   std::chrono::time_point<std::chrono::high_resolution_clock> next_frame_clock;
 
   std::unique_ptr<C256SystemBus> system_bus_;
+  Loader loader_;
+
   std::unique_ptr<GUI> gui_;
 
   WDC65C816 cpu_;

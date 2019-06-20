@@ -33,8 +33,8 @@
 
 #define absolute(L, i) (i < 0 ? lua_gettop(L) + i + 1 : i)
 
-static int width(const char *s) {
-  const char *c;
+static int width(const char* s) {
+  const char* c;
   int n, discard = 0;
 
   /* Calculate the printed width of the chunk s ignoring escape
@@ -57,7 +57,7 @@ static int width(const char *s) {
   return n;
 }
 
-void LuaDescribe::dump_literal(const std::string &s) {
+void LuaDescribe::dump_literal(const std::string& s) {
   dump_ << s;
   column_ += width(s.c_str());
 }
@@ -67,7 +67,7 @@ void LuaDescribe::dump_character(const char c) {
   column_ += 1;
 }
 
-static int is_identifier(const char *s, int n) {
+static int is_identifier(const char* s, int n) {
   int i;
 
   /* Check whether a string can be used as a key without quotes and
@@ -98,7 +98,7 @@ void LuaDescribe::break_line() {
   column_ = indent_;
 }
 
-void LuaDescribe::dump_string(const std::string &s) {
+void LuaDescribe::dump_string(const std::string& s) {
   int l;
 
   /* Break the line if the current chunk doesn't fit but it would
@@ -116,8 +116,8 @@ void LuaDescribe::dump_string(const std::string &s) {
   column_ += l;
 }
 
-void LuaDescribe::describe(lua_State *L, int index) {
-  char *s;
+void LuaDescribe::describe(lua_State* L, int index) {
+  char* s;
   size_t n;
   int type;
 
@@ -127,7 +127,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
   if (luaL_getmetafield(L, index, "__tostring")) {
     lua_pushvalue(L, index);
     lua_pcall(L, 1, 1, 0);
-    s = (char *)lua_tolstring(L, -1, &n);
+    s = (char*)lua_tolstring(L, -1, &n);
     lua_pop(L, 1);
 
     dump_string(s);
@@ -135,14 +135,14 @@ void LuaDescribe::describe(lua_State *L, int index) {
     /* Copy the value to avoid mutating it. */
 
     lua_pushvalue(L, index);
-    s = (char *)lua_tolstring(L, -1, &n);
+    s = (char*)lua_tolstring(L, -1, &n);
     lua_pop(L, 1);
 
     dump_string(s);
   } else if (type == LUA_TSTRING) {
     int i, started, score, level, uselevel = 0;
 
-    s = (char *)lua_tolstring(L, index, &n);
+    s = (char*)lua_tolstring(L, index, &n);
 
     /* Scan the string to decide how to print it. */
 
@@ -225,10 +225,10 @@ void LuaDescribe::describe(lua_State *L, int index) {
         } else if (isprint(s[i])) {
           dump_character(s[i]);
         } else {
-          char *t = new char[5];
+          char* t = new char[5];
           size_t n;
 
-          asprintf(&t, "\\%03u", ((unsigned char *)s)[i]);
+          asprintf(&t, "\\%03u", ((unsigned char*)s)[i]);
           dump_string(t);
         }
       }
@@ -262,7 +262,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
     /* Check if table is too deeply nested. */
 
     if (indent_ > 8 * line_width_ / 10) {
-      char *s;
+      char* s;
       asprintf(&s, "{ ... }");
       dump_string(s);
       free(s);
@@ -279,7 +279,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
     for (i = 0; i < n; i += 1) {
       lua_rawgeti(L, -1, n - i);
       if (lua_compare(L, -1, -3, LUA_OPEQ)) {
-        char *s;
+        char* s;
         size_t n;
 
         asprintf(&s, "{ [%d]... }", -(i + 1));
@@ -350,7 +350,6 @@ void LuaDescribe::describe(lua_State *L, int index) {
       if (lua_type(L, -2) != LUA_TNUMBER ||
           lua_tonumber(L, -2) != lua_tointeger(L, -2) ||
           lua_tointeger(L, -2) < 1 || lua_tointeger(L, -2) > l) {
-
         /* Keep each key-value pair on a separate line. */
 
         break_line();
@@ -359,10 +358,10 @@ void LuaDescribe::describe(lua_State *L, int index) {
         /* Dump the key and value. */
 
         if (lua_type(L, -2) == LUA_TSTRING) {
-          char *s;
+          char* s;
           size_t n;
 
-          s = (char *)lua_tolstring(L, -2, &n);
+          s = (char*)lua_tolstring(L, -2, &n);
 
           if (is_identifier(s, n)) {
             dump_string(s);
@@ -405,7 +404,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
   }
 }
 
-std::string LuaDescribe::luap_describe(lua_State *L, int index) {
+std::string LuaDescribe::luap_describe(lua_State* L, int index) {
   index = absolute(L, index);
   indent_ = 0;
   column_ = 0;

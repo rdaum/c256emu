@@ -30,22 +30,13 @@ DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
 
 System::System()
     : system_bus_(std::make_unique<C256SystemBus>(this)),
+      loader_(system_bus_.get()),
       gui_(std::make_unique<GUI>(this)),
       cpu_(system_bus_.get()),
       debug_(&cpu_, &events_, system_bus_.get(), true),
       automation_(&cpu_, this, &debug_) {}
 
 System::~System() = default;
-
-void System::LoadHex(const std::string& kernel_hex_file) {
-  // GAVIN copies up to 512k flash mem to kernel mem.
-  LoadFromHex(kernel_hex_file, system_bus_.get());
-}
-
-void System::LoadBin(const std::string& kernel_bin_file, uint32_t addr) {
-  // GAVIN copies up to 512k flash mem to kernel mem.
-  LoadFromBin(kernel_bin_file, addr, system_bus_.get());
-}
 
 void System::Initialize() {
   // Copy Bank 18 to Bank 0

@@ -21,14 +21,14 @@ class System;
 // clear breakpoints, etc. Will be memory addressable as well, so that
 // automation actions can be triggered from the running program.
 class Automation {
-public:
-  Automation(WDC65C816 *cpu, System *sys, DebugInterface *debug_interface);
+ public:
+  Automation(WDC65C816* cpu, System* sys, DebugInterface* debug_interface);
   ~Automation();
 
-  bool LoadScript(const std::string &path);
-  std::string Eval(const std::string &expression);
+  bool LoadScript(const std::string& path);
+  std::string Eval(const std::string& expression);
 
-  void AddBreakpoint(uint32_t address, const std::string &function_name);
+  void AddBreakpoint(uint32_t address, const std::string& function_name);
   void ClearBreakpoint(uint32_t address);
 
   struct Breakpoint {
@@ -37,37 +37,38 @@ public:
   };
   std::vector<Breakpoint> GetBreakpoints() const;
 
-  System *system() { return system_; }
+  System* system() { return system_; }
 
-private:
-  static int LuaStopCpu(lua_State *L);
-  static int LuaContCpu(lua_State *L);
-  static int LuaAddBreakpoint(lua_State *L);
-  static int LuaClearBreakpoint(lua_State *L);
-  static int LuaGetBreakpoints(lua_State *L);
-  static int LuaGetCpuState(lua_State *L);
-  static int LuaStep(lua_State *L);
-  static int LuaPeek(lua_State *L);
-  static int LuaPoke(lua_State *L);
-  static int LuaPeek16(lua_State *L);
-  static int LuaPoke16(lua_State *L);
-  static int LuaPeekBuf(lua_State *L);
-  static int LuaLoadHex(lua_State *L);
-  static int LuaLoadBin(lua_State *L);
-  static int LuaSys(lua_State *L);
-  static int LuaDisasm(lua_State *L);
+ private:
+  static int LuaStopCpu(lua_State* L);
+  static int LuaContCpu(lua_State* L);
+  static int LuaAddBreakpoint(lua_State* L);
+  static int LuaClearBreakpoint(lua_State* L);
+  static int LuaGetBreakpoints(lua_State* L);
+  static int LuaGetCpuState(lua_State* L);
+  static int LuaStep(lua_State* L);
+  static int LuaPeek(lua_State* L);
+  static int LuaPoke(lua_State* L);
+  static int LuaPeek16(lua_State* L);
+  static int LuaPoke16(lua_State* L);
+  static int LuaPeekBuf(lua_State* L);
+  static int LuaLoadHex(lua_State* L);
+  static int LuaLoadBin(lua_State* L);
+  static int LuaLoadO65(lua_State* L);
+  static int LuaSys(lua_State* L);
+  static int LuaDisasm(lua_State* L);
 
-  std::string ExecuteLua(int *status);
+  std::string ExecuteLua(int* status);
 
   static const ::luaL_Reg c256emu_methods[];
 
   std::recursive_mutex lua_mutex_;
 
-  WDC65C816 *cpu_;
-  System *system_;
-  DebugInterface *debug_interface_;
+  WDC65C816* cpu_;
+  System* system_;
+  DebugInterface* debug_interface_;
 
-  ::lua_State *lua_state_;
+  ::lua_State* lua_state_;
 
   std::vector<Breakpoint> breakpoints_;
 
