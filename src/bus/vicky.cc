@@ -172,7 +172,9 @@ uint8_t Vicky::ReadByte(uint32_t addr) {
     } else if (register_num == 3) {
       v = (tile_set.start_addr & 0x00ff0000) >> 16;
     } else if (register_num == 4) {
-      v = (tile_set.offset_x) | (tile_set.offset_y << 4);
+      v = (tile_set.offset_x);
+    } else if (register_num == 5) {
+      v  = (tile_set.offset_y);
     } else {
       LOG(ERROR) << "Unsupported tile reg: " << std::hex << (int)register_num
                  << " @ " << std::hex << addr;
@@ -235,8 +237,9 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
     } else if (register_num == 3) {
       tile_set.start_addr = (tile_set.start_addr & 0x0000ffff) | (v << 16);
     } else if (register_num == 4) {
-      tile_set.offset_x = (v & 0x0f);
-      tile_set.offset_y = (v >> 4);
+      tile_set.offset_x = v;
+    } else if (register_num == 5) {
+      tile_set.offset_y = v;
     } else {
       LOG(ERROR) << "Unsupported tile reg: " << std::hex << (int)register_num
                  << " @ " << std::hex << addr;
@@ -456,10 +459,10 @@ bool Vicky::RenderTileMap(uint16_t raster_x,
     // Try to take account of the horizontal and vertical scroll.
     // TODO: this is untested.
     if (tile_set.scroll_x_enable) {
-      adjusted_x -= tile_set.offset_x;
+      adjusted_x -= (tile_set.offset_x & 0x0f);
     }
     if (tile_set.scroll_y_enable) {
-      adjusted_y -= tile_set.offset_y;
+      adjusted_y -= (tile_set.offset_y & 0x0f);
     }
 
     if (adjusted_x > kVickyBitmapWidth || adjusted_y > kVickyBitmapHeight)
