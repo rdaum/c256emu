@@ -1,6 +1,7 @@
+#include "bus/math_copro.h"
+
 #include <gtest/gtest.h>
 
-#include "bus/math_copro.h"
 #include "cpu.h"
 
 class MathCoprocessorTest : public ::testing::Test {

@@ -8,7 +8,7 @@ class InterruptController;
 
 class VDMA {
  public:
-  VDMA(uint8_t* vram, InterruptController *int_controller);
+  VDMA(uint8_t* vram, InterruptController* int_controller);
 
   void OnFrameStart();
   void StoreByte(uint32_t addr, uint8_t v);
@@ -19,8 +19,8 @@ class VDMA {
   std::vector<Reg> read_only_registers_;
 
   uint8_t* vram_;
-  InterruptController *int_controller_;
-  
+  InterruptController* int_controller_;
+
   union {
     uint8_t v;
     struct {

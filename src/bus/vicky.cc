@@ -174,7 +174,7 @@ uint8_t Vicky::ReadByte(uint32_t addr) {
     } else if (register_num == 4) {
       v = (tile_set.offset_x);
     } else if (register_num == 5) {
-      v  = (tile_set.offset_y);
+      v = (tile_set.offset_y);
     } else {
       LOG(ERROR) << "Unsupported tile reg: " << std::hex << (int)register_num
                  << " @ " << std::hex << addr;
@@ -291,6 +291,11 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
 }
 
 void Vicky::RenderLine() {
+  if (vblank_cnt_ < kVickyVBlankLines) {
+    vblank_cnt_++;
+    return;
+  }
+
   //  if (mode_ & Mstr_Ctrl_Disable_Vid)
   //    return;
 
@@ -404,6 +409,7 @@ void Vicky::RenderLine() {
     SDL_Rect scaled_rect{0, 0, w, h};
     SDL_RenderCopy(renderer_, vicky_texture_, nullptr, &scaled_rect);
     SDL_RenderPresent(renderer_);
+    vblank_cnt_ = 0;
     raster_y_ = 0;
   }
 }

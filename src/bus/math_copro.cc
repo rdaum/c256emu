@@ -1,6 +1,7 @@
 #include "bus/math_copro.h"
 
 #include <glog/logging.h>
+
 #include <functional>
 namespace {
 template <typename T, typename R>

@@ -48,7 +48,7 @@ void FillBlt(uint8_t* dst,
 }
 }  // namespace
 
-VDMA::VDMA(uint8_t* vram, InterruptController *int_controller)
+VDMA::VDMA(uint8_t* vram, InterruptController* int_controller)
     : registers_({
           {kVdmaControlReg, &ctrl_reg_.v, 1},
           {kVdmaSrcAddy, &src_addr_, 3},
@@ -57,7 +57,8 @@ VDMA::VDMA(uint8_t* vram, InterruptController *int_controller)
           {kVdmaSrcStride, &src_stride_, 2},
           {kVdmaDstStride, &dst_stride_, 2},
       }),
-      vram_(vram), int_controller_(int_controller) {}
+      vram_(vram),
+      int_controller_(int_controller) {}
 
 void VDMA::OnFrameStart() {
   if (!ctrl_reg_.reg.enable)
@@ -80,7 +81,6 @@ void VDMA::OnFrameStart() {
   if (ctrl_reg_.reg.int_enable) {
     int_controller_->RaiseVDMATransferComplete();
   }
-
 }
 
 void VDMA::StoreByte(uint32_t addr, uint8_t v) {

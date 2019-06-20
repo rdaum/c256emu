@@ -2,6 +2,7 @@
 
 #include <adplug/emuopl.h>
 #include <glog/logging.h>
+
 #include <memory>
 
 constexpr uint32_t kOplLeftBase = 0xe500;

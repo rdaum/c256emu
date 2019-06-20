@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glog/logging.h>
+
 #include <string>
 
 #include "cpu.h"

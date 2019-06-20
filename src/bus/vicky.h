@@ -20,6 +20,7 @@ constexpr uint8_t kBorderHeight = 16;
 
 constexpr uint16_t kVickyBitmapWidth = 640;
 constexpr uint16_t kVickyBitmapHeight = 480;
+constexpr uint16_t kVickyVBlankLines = 45;
 
 constexpr uint32_t kRasterSize = kVickyBitmapWidth * kVickyBitmapHeight;
 
@@ -171,6 +172,7 @@ class Vicky {
   bool border_enabled_{};
   BGRAColour border_colour_;
 
+  uint8_t vblank_cnt_ = 0;
   uint16_t raster_y_ = 0;
 
   // Our physical frame buffer

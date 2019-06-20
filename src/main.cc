@@ -1,7 +1,7 @@
+#include <SDL2/SDL.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
-#include <SDL2/SDL.h>
 #include <iostream>
 #include <thread>
 

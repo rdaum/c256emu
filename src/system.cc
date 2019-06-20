@@ -21,7 +21,8 @@ constexpr auto kVickyFrameDelayDurationNs =
     std::chrono::duration_cast<std::chrono::nanoseconds>(
         kVickyFrameDelayDuration);
 constexpr uint64_t kTargetClockRate = 14318000;
-constexpr int kRasterLinesPerSecond = kVickyBitmapHeight * kVickyTargetFps;
+constexpr int kRasterLinesPerSecond =
+    (kVickyBitmapHeight + kVickyVBlankLines) * kVickyTargetFps;
 
 DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
 
