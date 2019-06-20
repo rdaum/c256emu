@@ -348,7 +348,7 @@ void GUI::DrawBreakpoints() const {
       ImGui::NextColumn();
       if (ImGui::Button("OK")) {
         breakpoints.push_back(addr);
-        system_->cpu()->AddBreakpoint(addr, [](EmulatedCpu *) {});
+        debug_interface->SetBreakpoint(addr, [](EmulatedCpu *) {});
         adding_breakpoint = false;
       }
       ImGui::NextColumn();
