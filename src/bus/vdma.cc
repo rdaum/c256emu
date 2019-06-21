@@ -57,8 +57,15 @@ VDMA::VDMA(uint8_t* vram, InterruptController* int_controller)
           {kVdmaSrcStride, &src_stride_, 2},
           {kVdmaDstStride, &dst_stride_, 2},
       }),
-      vram_(vram),
-      int_controller_(int_controller) {}
+      vram_(vram), int_controller_(int_controller) {
+  memset(&ctrl_reg_, 0, sizeof(ctrl_reg_));
+  memset(&status_reg_, 0, sizeof(status_reg_));
+  memset(&write_byte_, 0, sizeof(write_byte_));
+  memset(&src_addr_, 0, sizeof(src_addr_));
+  memset(&dst_addr_, 0, sizeof(dst_addr_));
+  memset(&dst_stride_, 0, sizeof(dst_stride_));
+  memset(&src_stride_, 0, sizeof(src_stride_));
+}
 
 void VDMA::OnFrameStart() {
   if (!ctrl_reg_.reg.enable)
