@@ -323,7 +323,7 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
         LOG(INFO) << "WORD relocated: " << std::hex << *word << " to "
                   << *word + reloc_address;
         *word += adjust;
-      } else if (type == 0xa0) {
+      } else if (type == 0xa0) { // SEG
         uint8_t* seg_byte = &t_seg[reloc_offset - 1];
         uint8_t b1 = in_file.get();
         uint8_t b2 = in_file.get(); // TODO what do these mean?  docs suck.
@@ -331,11 +331,18 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
         LOG(INFO) << "SEG relocated: " << std::hex << (int)*seg_byte << " to "
                   << (int)rewrite;
         *seg_byte = rewrite;
+      } else if (type == 0xc0) { // SEGADDR
+        uint8_t* seg_addr = &t_seg[reloc_offset - 1];
+        uint32_t value;
+        memcpy(&value, seg_addr, 3);
+        LOG(INFO) << "SEGADDR relocated: " << std::hex << value << " to " << value + adjust;
+        value += adjust;
+        memcpy(seg_addr, &value, 3);
       } else {
-        CHECK(false);
+        CHECK(false) << "Unhandled reloc type: " << std::hex << (int)type;
       }
     } else {
-      CHECK(false);
+      CHECK(false) << "Unhandled segment type: " << std::hex << (int)segment;
     }
     // TODO more rewrites for other segment types, etc.
   };
