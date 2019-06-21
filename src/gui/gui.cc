@@ -374,7 +374,9 @@ void GUI::DrawCPUStatus() const {
     ImGui::LabelText("Index width", "%s", cpu->mode_long_xy ? "16" : "8");
     ImGui::LabelText("A", "%06x (%d)", cpu->a(), cpu->a());
     ImGui::LabelText("X", "%06x (%d)", cpu->x(), cpu->x());
-    ImGui::LabelText("Y", "%06x (%d)", cpu->y(), cpu->x());
+    ImGui::LabelText("Y", "%06x (%d)", cpu->y(), cpu->y());
+    ImGui::LabelText("DBR", "%06x (%d)", cpu->cpu_state.code_segment_base,
+                     cpu->cpu_state.code_segment_base);
     ImGui::LabelText("Stack", "%s (%d)",
                      Addr(cpu->cpu_state.regs.sp.u16).c_str(),
                      cpu->cpu_state.regs.sp.u16);
