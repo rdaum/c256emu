@@ -326,14 +326,18 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
       } else if (type == 0xa0) {
         uint8_t* seg_byte = &t_seg[reloc_offset - 1];
         uint8_t b1 = in_file.get();
-        uint8_t b2 = in_file.get();
+        uint8_t b2 = in_file.get(); // TODO what do these mean?  docs suck.
         uint8_t rewrite = ((*seg_byte << 16) + adjust) >> 16;
         LOG(INFO) << "SEG relocated: " << std::hex << (int)*seg_byte << " to "
                   << (int)rewrite;
         *seg_byte = rewrite;
+      } else {
+        CHECK(false);
       }
-      // TODO more rewrites for other segment types, etc.
+    } else {
+      CHECK(false);
     }
+    // TODO more rewrites for other segment types, etc.
   };
 
   // Now load the segments into memory.
@@ -344,4 +348,7 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
   for (int i = 0; i < dlen; i++, offset++) {
     system_bus_->WriteByte(reloc_address + offset, d_seg[i]);
   }
+
+  // Look for exported global symbols.
+
 }
