@@ -6,16 +6,16 @@
 
 namespace {
 
-constexpr uint32_t kVdmaControlReg = 0xaf0400;
+constexpr uint32_t kVdmaControlReg = 0x400;
 
 constexpr uint32_t kVdmaByte2Write =
-    0xaf0401;  // same address as below; one for read, one for write
-constexpr uint32_t kVmdaStatusReg = 0xaf0401;
-constexpr uint32_t kVdmaSrcAddy = 0xaf0402;
-constexpr uint32_t kVdmaDstAddr = 0xaf0405;
-constexpr uint32_t kVdmaTransferSize = 0xaf0408;
-constexpr uint32_t kVdmaSrcStride = 0xaf040c;
-constexpr uint32_t kVdmaDstStride = 0xaf040e;
+    0x401; // same address as below; one for read, one for write
+constexpr uint32_t kVmdaStatusReg = 0x401;
+constexpr uint32_t kVdmaSrcAddy = 0x402;
+constexpr uint32_t kVdmaDstAddr = 0x405;
+constexpr uint32_t kVdmaTransferSize = 0x408;
+constexpr uint32_t kVdmaSrcStride = 0x40c;
+constexpr uint32_t kVdmaDstStride = 0x40e;
 
 void BitBlt(uint8_t* src,
             uint8_t* dst,

@@ -29,7 +29,7 @@ class VDMA {
       bool trf_fill : 1;      // transfer or fill
       bool int_enable : 1;    // generate interrupt on completion
       bool start_trf : 1;     // begin?  clear when ready to start again
-      uint8_t unused : 4;
+      uint8_t unused : 3;
     } reg;
   } ctrl_reg_;
 

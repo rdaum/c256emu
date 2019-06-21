@@ -88,11 +88,11 @@ void System::DrawNextLine() {
         }
         system_bus_->keyboard()->ProcessEvent(event);
       }
-      system_bus_->vdma()->OnFrameStart();
     }
 
     current_frame_++;
     system_bus_->int_controller()->RaiseFrameStart();
+    system_bus_->vdma()->OnFrameStart();
 
     if (!FLAGS_turbo) {
       auto sleep_time = next_frame_clock - frame_clock;
