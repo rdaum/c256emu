@@ -1,14 +1,15 @@
 include(ExternalProject)
 ExternalProject_Add(
         retrocpu
-        GIT_REPOSITORY https://github.com/achaulk/retro_cpu.git
+        GIT_REPOSITORY https://github.com/rdaum/retro_cpu.git
+        GIT_TAG patch-2
         LOG_DOWNLOAD ON
         LOG_CONFIGURE ON
         LOG_BUILD ON
         LOG_INSTALL ON
         INSTALL_COMMAND ""
         CMAKE_ARGS
-            -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+        -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     )
 
 
