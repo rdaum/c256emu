@@ -1,18 +1,18 @@
-        ; ZP+ZPStruct::Param1Addr points to LUT startaddr to populate
-        ; ZP+ZPStruct::Param2Addr used as tmp
-	; ZP+ZPStruct::RC,ZP+ZPStruct::GC,ZP+ZPStruct::BC color to use
+        ; Param1Addr points to LUT startaddr to populate
+        ; Param2Addr used as tmp
+	; RC,GC,BC color to use
 
 .proc set_lut_colors
 	acc8i16
-	; set ZP+ZPStruct::Param2Addr to point to LUT + 4
-        lda ZP+ZPStruct::Param1Addr
+	; set Param2Addr to point to LUT + 4
+        lda Param1Addr
 	clc
 	adc #4
-        sta ZP+ZPStruct::Param2Addr
-        lda ZP+ZPStruct::Param1Addr + 1
-        sta ZP+ZPStruct::Param2Addr
-        lda ZP+ZPStruct::Param2Addr + 2
-        sta ZP+ZPStruct::Param2Addr
+        sta Param2Addr
+        lda Param1Addr + 1
+        sta Param2Addr
+        lda Param2Addr + 2
+        sta Param2Addr
 
         ; set first 30 colors in LUT to red
         ; index 0 is always transparent
@@ -20,16 +20,16 @@
         ldy #0
 
 first_color:
-        lda ZP+ZPStruct::GC
-        sta [ZP+ZPStruct::Param1Addr],y
+        lda GC
+        sta [Param1Addr],y
         iny
 
-        lda ZP+ZPStruct::BC
-        sta [ZP+ZPStruct::Param1Addr],y
+        lda BC
+        sta [Param1Addr],y
         iny
 
-        lda ZP+ZPStruct::RC
-        sta [ZP+ZPStruct::Param1Addr],y
+        lda RC
+        sta [Param1Addr],y
         iny
         iny
 
@@ -40,15 +40,15 @@ first_color:
         ldx #30
 second_color:
         lda #127
-        sta [ZP+ZPStruct::Param1Addr],y
+        sta [Param1Addr],y
         iny
 
         lda #127
-        sta [ZP+ZPStruct::Param1Addr],y
+        sta [Param1Addr],y
         iny
 
         lda #127
-        sta [ZP+ZPStruct::Param1Addr],y
+        sta [Param1Addr],y
         iny
         iny
 

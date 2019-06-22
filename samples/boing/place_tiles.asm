@@ -9,7 +9,7 @@
 
 	; translate X,Y params to a tile map start index
 	; Y / 16
-	lda ZP+ZPStruct::Param2Word
+	lda Param2Word
 	lsr
 	lsr
 	lsr
@@ -17,7 +17,7 @@
 	tay
 
 	; X / 16
-	lda ZP+ZPStruct::Param1Word
+	lda Param1Word
 	lsr
 	lsr
 	lsr
@@ -29,10 +29,10 @@
 	sta f:$000100
 	lda #64
 	sta f:$000102
-	stx ZP+ZPStruct::Param1Word
+	stx Param1Word
 	lda f:$000104
 	clc
-	adc ZP+ZPStruct::Param1Word
+	adc Param1Word
 	tay
 
         acc8i16
@@ -43,7 +43,7 @@
 next_row:
 	ldx #16
 row_loop:
-	sta [ZP+ZPStruct::Param1Addr],y
+	sta [Param1Addr],y
 	inc
 	iny
 	dex

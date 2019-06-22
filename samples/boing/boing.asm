@@ -5,7 +5,65 @@
 .rodata
 ball_tile_set:  .incbin "tiles.bin"
 
+.zeropage
+
+Ball0_x: .res 2	; x position
+Ball1_x: .res 2	; x position
+Ball2_x: .res 2	; x position
+Ball3_x: .res 2	; x position
+
+Ball0_y: .res 2	; y position
+Ball1_y: .res 2	; y position
+Ball2_y: .res 2	; y position
+Ball3_y: .res 2	; y position
+
+Ball0_ay: .res 2	; y acceleration
+Ball1_ay: .res 2	; y acceleration
+Ball2_ay: .res 2	; y acceleration
+Ball3_ay: .res 2	; y acceleration
+
+Ball0_dx: .res 2	; x delta
+Ball1_dx: .res 2	; x delta
+Ball2_dx: .res 2	; x delta
+Ball3_dx: .res 2	; x delta
+
+Ball0_dy: .res 2	; y delta
+Ball1_dy: .res 2	; y delta
+Ball2_dy: .res 2	; y delta
+Ball3_dy: .res 2	; y delta
+
+Ball0_sx: .res 2	; x delta sign
+Ball1_sx: .res 2	; x delta sign
+Ball2_sx: .res 2	; x delta sign
+Ball3_sx: .res 2	; x delta sign
+
+Ball0_sy: .res 2	; y delta sign
+Ball1_sy: .res 2	; y delta sign
+Ball2_sy: .res 2	; y delta sign
+Ball3_sy: .res 2	; y delta sign
+
+Param1Addr: .res 3
+Param2Addr: .res 3
+Param1Word: .res 2
+Param2Word: .res 2
+
+Lut0CycleLo: .res 3
+Lut1CycleLo: .res 3
+Lut2CycleLo: .res 3
+Lut3CycleLo: .res 3
+
+Lut0CycleHi: .res 3
+Lut1CycleHi: .res 3
+Lut2CycleHi: .res 3
+Lut3CycleHi: .res 3
+
+RC: .res 1	; tmp storage for color values
+GC: .res 1	; tmp storage for color values
+BC: .res 1	; tmp storage for color values
+Tmp: .res 1
+
 .code
+
 INT_PENDING_REG0 = $000140
 FNX0_INT00_SOF = $01
 BORDER_CTRL_REG = $af0004
@@ -39,65 +97,6 @@ LUT_3 = $af2c
 	y_offset .byte		; y offset
 .endstruct
 
-; Struct for our zero page vars
-ZP = $00
-.struct ZPStruct
-        Ball0_x .word	; x position
-        Ball1_x .word	; x position
-        Ball2_x .word	; x position
-        Ball3_x .word	; x position
-
-        Ball0_y .word	; y position
-        Ball1_y .word	; y position
-        Ball2_y .word	; y position
-        Ball3_y .word	; y position
-
-	Ball0_ay .word	; y acceleration
-	Ball1_ay .word	; y acceleration
-	Ball2_ay .word	; y acceleration
-	Ball3_ay .word	; y acceleration
-
-	Ball0_dx .word	; x delta
-	Ball1_dx .word	; x delta
-	Ball2_dx .word	; x delta
-	Ball3_dx .word	; x delta
-
-	Ball0_dy .word	; y delta
-	Ball1_dy .word	; y delta
-	Ball2_dy .word	; y delta
-	Ball3_dy .word	; y delta
-
-	Ball0_sx .word	; x delta sign
-	Ball1_sx .word	; x delta sign
-	Ball2_sx .word	; x delta sign
-	Ball3_sx .word	; x delta sign
-
-	Ball0_sy .word	; y delta sign
-	Ball1_sy .word	; y delta sign
-	Ball2_sy .word	; y delta sign
-	Ball3_sy .word	; y delta sign
-
-	Param1Addr .faraddr
-	Param2Addr .faraddr
-	Param1Word .word
-	Param2Word .word
-
-	Lut0CycleLo .faraddr
-	Lut1CycleLo .faraddr
-	Lut2CycleLo .faraddr
-	Lut3CycleLo .faraddr
-
-	Lut0CycleHi .faraddr
-	Lut1CycleHi .faraddr
-	Lut2CycleHi .faraddr
-	Lut3CycleHi .faraddr
-
-        RC .byte	; tmp storage for color values
-        GC .byte	; tmp storage for color values
-        BC .byte	; tmp storage for color values
-        Tmp .byte
-.endstruct
-
 begin:
 	jmp init
 
@@ -109,7 +108,7 @@ begin:
 init:
 	; set zero page to $fe00
 	acc16i16
-	lda #$fe00
+	lda #Ball0_x
 	tcd
 
 	; stop IRQ handling

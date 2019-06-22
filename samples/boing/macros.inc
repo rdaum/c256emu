@@ -30,23 +30,23 @@
 .macro SetLUTAddress LUTRegAddr, LUTHiField, LUTLoField
         acc16i16
         ldx #LUTRegAddr
-        stz ZP+ZPStruct::LUTLoField
-        stx ZP+ZPStruct::LUTLoField + 1
+        stz LUTLoField
+        stx LUTLoField + 1
         acc8i16
-        lda ZP+ZPStruct::LUTLoField
+        lda LUTLoField
         clc
         adc #4
-        sta ZP+ZPStruct::LUTHiField
-        lda ZP+ZPStruct::LUTLoField + 1
-        sta ZP+ZPStruct::LUTHiField + 1
-        lda ZP+ZPStruct::LUTLoField + 2
-        sta ZP+ZPStruct::LUTHiField + 2
+        sta LUTHiField
+        lda LUTLoField + 1
+        sta LUTHiField + 1
+        lda LUTLoField + 2
+        sta LUTHiField + 2
 .endmacro
 
 .macro SetTileXScroll BallField, TileReg
         ; set tile x scroll offset, this is lower 4 bits of X
         acc16i16
-        lda ZP+ZPStruct::BallField
+        lda BallField
         and #$0f
         acc8i16
         sta TileReg+Tile::x_offset
@@ -55,7 +55,7 @@
 .macro SetTileYScroll BallField, TileReg
         ; set tile y scroll offset, this is lower 4 bits of Y
         acc16i16
-        lda ZP+ZPStruct::BallField
+        lda BallField
         and #$0f
         acc8i16
         sta TileReg+Tile::y_offset
@@ -66,12 +66,12 @@
         ; draw the ball(s)
         acc16i16
         lda #TileMapAddr
-        stz ZP+ZPStruct::Param1Addr
-        sta ZP+ZPStruct::Param1Addr+1
-        lda ZP+ZPStruct::BallXField
-        sta ZP+ZPStruct::Param1Word
-        lda ZP+ZPStruct::BallYField
-        sta ZP+ZPStruct::Param2Word
+        stz Param1Addr
+        sta Param1Addr+1
+        lda BallXField
+        sta Param1Word
+        lda BallYField
+        sta Param2Word
         jsr clear_tile_map
 .endmacro
 
@@ -79,12 +79,12 @@
         ; draw the ball(s)
         acc16i16
         lda #TileMapAddr
-        stz ZP+ZPStruct::Param1Addr
-        sta ZP+ZPStruct::Param1Addr+1
-        lda ZP+ZPStruct::BallXField
-        sta ZP+ZPStruct::Param1Word
-        lda ZP+ZPStruct::BallYField
-        sta ZP+ZPStruct::Param2Word
+        stz Param1Addr
+        sta Param1Addr+1
+        lda BallXField
+        sta Param1Word
+        lda BallYField
+        sta Param2Word
         jsr place_tile_map
 .endmacro
 
@@ -95,31 +95,31 @@
 	; save color at index 1 which is about
 	; to be clobbered
 	ldy #0
-	lda [ZP+ZPStruct::LUTHiAddr],y
-	sta ZP+ZPStruct::RC
+	lda [LUTHiAddr],y
+	sta RC
 	iny
-	lda [ZP+ZPStruct::LUTHiAddr],y
-	sta ZP+ZPStruct::GC
+	lda [LUTHiAddr],y
+	sta GC
 	iny
-	lda [ZP+ZPStruct::LUTHiAddr],y
-	sta ZP+ZPStruct::BC
+	lda [LUTHiAddr],y
+	sta BC
 
 	; move colors 2-59 down to 1-58
 	lda #239 ; 1 less than 60*4
-	ldx ZP+ZPStruct::LUTHiAddr
-	ldy ZP+ZPStruct::LUTLoAddr
+	ldx LUTHiAddr
+	ldy LUTLoAddr
 	mvn #$af,#$af
 
 	; put saved color 1 into pos 59
 	ldy #240 ; 60 * 4
-	lda ZP+ZPStruct::RC
-	sta [ZP+ZPStruct::LUTLoAddr],y
+	lda RC
+	sta [LUTLoAddr],y
 	iny
-	lda ZP+ZPStruct::GC
-	sta [ZP+ZPStruct::LUTLoAddr],y
+	lda GC
+	sta [LUTLoAddr],y
 	iny
-	lda ZP+ZPStruct::BC
-	sta [ZP+ZPStruct::LUTLoAddr],y
+	lda BC
+	sta [LUTLoAddr],y
 .endmacro
 
 .macro BallPhysics BallNum
@@ -140,34 +140,34 @@
         ; Param1Addr = lut addr
         acc16i16
         ldx #LutAddr
-        stz ZP+ZPStruct::Param1Addr
-        stx ZP+ZPStruct::Param1Addr+1
+        stz Param1Addr
+        stx Param1Addr+1
         acc8i16
         lda #R
-        sta ZP+ZPStruct::RC
+        sta RC
         lda #G
-        sta ZP+ZPStruct::GC
+        sta GC
         lda #B
-        sta ZP+ZPStruct::BC
+        sta BC
         jsr set_lut_colors
 .endmacro
 
 .macro SetBallParameters BallNum, XPos, YPos, XVelocity, YVelocity, YAccel
         ldx #BallNum*2
         ldy #XPos
-        sty ZP+ZPStruct::Ball0_x,x
+        sty Ball0_x,x
         ldy #YPos
-        sty ZP+ZPStruct::Ball0_y,x
+        sty Ball0_y,x
 
         ; Ball accel ay 
         ldy #YAccel
-        sty ZP+ZPStruct::Ball0_ay,x
+        sty Ball0_ay,x
 
         ; Ball dir dx,dy
         ldy #XVelocity
-        sty ZP+ZPStruct::Ball0_dx,x
+        sty Ball0_dx,x
         ldy #YVelocity
-        sty ZP+ZPStruct::Ball0_dy,x
+        sty Ball0_dy,x
 .endmacro
 
 .macro EnableTiles TileRegBase, LutNum
