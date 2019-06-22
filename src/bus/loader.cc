@@ -232,6 +232,42 @@ struct HeaderOption {
   std::string option_bytes;
 };
 
+void Reloc(uint32_t reloc_address,
+           std::ifstream& in_file,
+           uint32_t tbase,
+           std::vector<uint8_t>* seg,
+           uint32_t reloc_offset,
+           uint8_t type) {
+  int adjust = reloc_address - tbase;
+  if (type == 0x80) {
+    uint16_t* word =
+        reinterpret_cast<uint16_t*>(&seg->data()[reloc_offset - 1]);
+    LOG(INFO) << "WORD relocated: " << std::hex << *word << " to "
+              << *word + reloc_address;
+    *word += adjust;
+  } else if (type == 0xa0) {  // SEG
+    uint8_t* seg_byte = &seg->data()[reloc_offset - 1];
+    uint8_t b1 = in_file.get();
+    uint8_t b2 = in_file.get();
+    //    uint16_t location = (b1<<8) | b2;  // not sure what we can do with
+    //    this, most SEG references are just the bank?
+    uint8_t rewrite = ((*seg_byte << 16) + adjust) >> 16;
+    LOG(INFO) << "SEG relocated: " << std::hex << (int)*seg_byte << " to "
+              << (int)rewrite;
+    *seg_byte = rewrite;
+  } else if (type == 0xc0) {  // SEGADDR
+    uint8_t* seg_addr = &seg->data()[reloc_offset - 1];
+    uint32_t value;
+    memcpy(&value, seg_addr, 3);
+    LOG(INFO) << "SEGADDR relocated: " << std::hex << value << " to "
+              << value + adjust;
+    value += adjust;
+    memcpy(seg_addr, &value, 3);
+  } else {
+    CHECK(false) << "Unhandled reloc type: " << std::hex << (int)type;
+  }
+}
+
 void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
   LOG(INFO) << "Relocating relative to " << std::hex << reloc_address;
   std::ifstream in_file(filename);
@@ -317,30 +353,9 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
               << " relative_offset:" << (int)offset << " type: " << (int)type
               << " segment: " << (int)segment;
     if (segment == 2) {
-      int adjust = reloc_address - tbase;
-      if (type == 0x80) {
-        uint16_t* word = reinterpret_cast<uint16_t*>(&t_seg[reloc_offset - 1]);
-        LOG(INFO) << "WORD relocated: " << std::hex << *word << " to "
-                  << *word + reloc_address;
-        *word += adjust;
-      } else if (type == 0xa0) { // SEG
-        uint8_t* seg_byte = &t_seg[reloc_offset - 1];
-        uint8_t b1 = in_file.get();
-        uint8_t b2 = in_file.get(); // TODO what do these mean?  docs suck.
-        uint8_t rewrite = ((*seg_byte << 16) + adjust) >> 16;
-        LOG(INFO) << "SEG relocated: " << std::hex << (int)*seg_byte << " to "
-                  << (int)rewrite;
-        *seg_byte = rewrite;
-      } else if (type == 0xc0) { // SEGADDR
-        uint8_t* seg_addr = &t_seg[reloc_offset - 1];
-        uint32_t value;
-        memcpy(&value, seg_addr, 3);
-        LOG(INFO) << "SEGADDR relocated: " << std::hex << value << " to " << value + adjust;
-        value += adjust;
-        memcpy(seg_addr, &value, 3);
-      } else {
-        CHECK(false) << "Unhandled reloc type: " << std::hex << (int)type;
-      }
+      Reloc(reloc_address, in_file, tbase, &t_seg, reloc_offset, type);
+    } else if (segment == 3) {
+      Reloc(reloc_address, in_file, tbase, &d_seg, reloc_offset, type);
     } else {
       CHECK(false) << "Unhandled segment type: " << std::hex << (int)segment;
     }
@@ -357,5 +372,4 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
   }
 
   // Look for exported global symbols.
-
 }
