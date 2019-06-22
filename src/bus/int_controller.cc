@@ -65,9 +65,11 @@ void InterruptController::LowerKeyboard() {
 }
 
 void InterruptController::RaiseCH376() {
-  pending_reg1_.ints.ch376 = true;
-  //    sys_->RaiseIRQ(); // For some reason this causes issues, and seems
-  //    unnecessary.
+  if (!pending_reg1_.ints.ch376) {
+    pending_reg1_.ints.ch376 = true;
+    //    sys_->RaiseIRQ(); // For some reason this causes issues, and seems
+    //    unnecessary.
+  }
 }
 
 void InterruptController::LowerCH376() {
@@ -78,8 +80,10 @@ void InterruptController::LowerCH376() {
 }
 
 void InterruptController::RaiseVDMATransferComplete() {
-  pending_reg2_.ints.gavin_dma = true;
-  sys_->RaiseIRQ();
+  if (!pending_reg2_.ints.Pending()) {
+    pending_reg2_.ints.gavin_dma = true;
+    sys_->RaiseIRQ();
+  }
 }
 
 void InterruptController::StoreByte(uint32_t addr, uint8_t v) {
