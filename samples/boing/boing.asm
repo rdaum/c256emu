@@ -1,8 +1,9 @@
 .p816
+.feature c_comments
 .include "macros.inc"
-
-.segment "TILESET"
-ball_tile_set:  .incbin "tiles.bin", $0, $ffff
+	
+.rodata
+ball_tile_set:  .incbin "tiles.bin"
 
 .code
 INT_PENDING_REG0 = $000140
@@ -104,7 +105,7 @@ begin:
 	.include "clear_tiles.asm"
 	.include "set_lut.asm"
 	.include "ball.asm"
-
+	
 init:
 	; set zero page to $fe00
 	acc16i16
@@ -114,7 +115,17 @@ init:
 	; stop IRQ handling
 	sei
 
+	;; copy the tile set data into $b0;
+	;; can't just use one MVP as this spans across the bank into the next
 	acc8i16
+	ldx #0
+copy_tile_loop:	
+	lda f:ball_tile_set,x
+	sta $b00000,x
+	inx
+	cpx #$ffff
+	bne copy_tile_loop
+	acc16i16
 
 	; populate $020000 with 16 zeroes
 	ldx #16
