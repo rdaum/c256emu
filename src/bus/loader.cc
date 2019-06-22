@@ -232,18 +232,15 @@ struct HeaderOption {
   std::string option_bytes;
 };
 
-void Reloc(uint32_t reloc_address,
-           std::ifstream& in_file,
-           uint32_t tbase,
+void Reloc(uint32_t adjust, std::ifstream& in_file,
            std::vector<uint8_t>* seg,
            uint32_t reloc_offset,
            uint8_t type) {
-  int adjust = reloc_address - tbase;
-  if (type == 0x80) {
+  if (type == 0x80) { // WORD
     uint16_t* word =
         reinterpret_cast<uint16_t*>(&seg->data()[reloc_offset - 1]);
     LOG(INFO) << "WORD relocated: " << std::hex << *word << " to "
-              << *word + reloc_address;
+              << *word + adjust;
     *word += adjust;
   } else if (type == 0xa0) {  // SEG
     uint8_t* seg_byte = &seg->data()[reloc_offset - 1];
@@ -263,6 +260,12 @@ void Reloc(uint32_t reloc_address,
               << value + adjust;
     value += adjust;
     memcpy(seg_addr, &value, 3);
+  } else if (type == 0x20) { // LOW
+    uint8_t *lo_addr = &seg->data()[reloc_offset - 1];
+
+    LOG(INFO) << "LO relocated: " << std::hex << (int)*lo_addr << " to "
+              << (int)*lo_addr + adjust;
+    *lo_addr += adjust;
   } else {
     CHECK(false) << "Unhandled reloc type: " << std::hex << (int)type;
   }
@@ -316,9 +319,14 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
   uint32_t dlen = header.mode.m.size ? o65_offsets.long_mode.dlen
                                      : o65_offsets.word_mode.dlen;
   LOG(INFO) << "DBASE: " << std::hex << dbase << " DLEN: " << dlen;
+
   std::vector<uint8_t> d_seg(dlen);
   in_file.read(reinterpret_cast<char*>(d_seg.data()), dlen);
   CHECK(!in_file.eof());
+
+  uint32_t zpbase = header.mode.m.size ? o65_offsets.long_mode.zbase
+                                       : o65_offsets.word_mode.zbase;
+  LOG(INFO) << "ZPBASE: " << std::hex << zpbase;
 
   // Obtain the external (undefined) references list. This is meaningless for us
   // tho.
@@ -353,11 +361,13 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
               << " relative_offset:" << (int)offset << " type: " << (int)type
               << " segment: " << (int)segment;
     if (segment == 2) {
-      Reloc(reloc_address, in_file, tbase, &t_seg, reloc_offset, type);
+      Reloc(reloc_address - tbase, in_file, &t_seg, reloc_offset, type);
     } else if (segment == 3) {
-      Reloc(reloc_address, in_file, tbase, &d_seg, reloc_offset, type);
+      Reloc(reloc_address - dbase, in_file, &d_seg, reloc_offset, type);
+    } else if (segment == 5) {
+      Reloc(zpbase, in_file, &t_seg, reloc_offset, type);
     } else {
-      CHECK(false) << "Unhandled segment type: " << std::hex << (int)segment;
+      CHECK(false) << "Unhandled segment: " << std::hex << (int)segment;
     }
     // TODO more rewrites for other segment types, etc.
   };
