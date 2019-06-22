@@ -90,7 +90,7 @@
 
 ; LUTHiAddr is LUTLowAddr + 4
 .macro CycleLut LUTHiAddr, LUTLoAddr
-	acc8i16
+	acc16i16
 
 	; save color at index 1 which is about
 	; to be clobbered
