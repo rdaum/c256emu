@@ -384,6 +384,11 @@ void GUI::DrawCPUStatus() const {
                      Addr(cpu->cpu_state.regs.d.u16).c_str(),
                      cpu->cpu_state.regs.d.u16);
 
+    bool turbo = system_->turbo();
+    if (ImGui::Checkbox("Turbo", &turbo)) {
+      system_->set_turbo(turbo);
+    }
+
     ImGui::Columns(3);
     DebugInterface *debug_interface = system_->GetDebugInterface();
     if (!debug_interface->paused() && ImGui::Button("Pause")) {

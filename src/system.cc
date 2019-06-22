@@ -29,7 +29,7 @@ DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
 }  // namespace
 
 System::System()
-    : system_bus_(std::make_unique<C256SystemBus>(this)),
+    : turbo_(FLAGS_turbo), system_bus_(std::make_unique<C256SystemBus>(this)),
       loader_(system_bus_.get()),
       gui_(std::make_unique<GUI>(this)),
       cpu_(system_bus_.get()),
@@ -94,7 +94,7 @@ void System::DrawNextLine() {
     system_bus_->int_controller()->RaiseFrameStart();
     system_bus_->vdma()->OnFrameStart();
 
-    if (!FLAGS_turbo) {
+    if (!turbo_) {
       auto sleep_time = next_frame_clock - frame_clock;
       std::this_thread::sleep_for(sleep_time);
     }

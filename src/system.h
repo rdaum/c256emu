@@ -49,7 +49,10 @@ class System {
 
   Loader* loader() { return &loader_; }
 
- protected:
+  bool turbo() const { return turbo_; }
+  void set_turbo(bool turbo) { turbo_ = turbo; }
+
+protected:
   friend class InterruptController;
 
   void RaiseIRQ();
@@ -58,6 +61,8 @@ class System {
  private:
   void DrawNextLine();
   void ScheduleNextScanline();
+
+  std::atomic_bool turbo_;
 
   uint32_t current_frame_ = 0;
   uint64_t total_scanlines_ = 0;
