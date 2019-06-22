@@ -116,6 +116,14 @@ init:
 
 	acc8i16
 
+	; populate $020000 with 16 zeroes
+	ldx #16
+	lda #00
+zero:
+	sta f:$020000,x
+	dex
+	bne zero
+
 	; turn off border
 	lda #0
 	sta BORDER_CTRL_REG
