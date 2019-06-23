@@ -266,6 +266,12 @@ void Reloc(uint32_t adjust, std::ifstream& in_file,
     LOG(INFO) << "LO relocated: " << std::hex << (int)*lo_addr << " to "
               << (int)*lo_addr + adjust;
     *lo_addr += adjust;
+  } else if (type == 0x40) { // HIGH
+    uint8_t *hi_addr = &seg->data()[reloc_offset - 1];
+    uint8_t b1 = in_file.get(); // not sure what to do with this?
+    LOG(INFO) << "HI relocated: " << std::hex << (int)*hi_addr << " to "
+              << (int)*hi_addr + adjust;
+    *hi_addr += adjust;
   } else {
     CHECK(false) << "Unhandled reloc type: " << std::hex << (int)type;
   }
