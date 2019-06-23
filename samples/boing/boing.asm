@@ -57,10 +57,11 @@ Lut1CycleHi: .res 3
 Lut2CycleHi: .res 3
 Lut3CycleHi: .res 3
 
-RC: .res 1	; tmp storage for color values
-GC: .res 1	; tmp storage for color values
-BC: .res 1	; tmp storage for color values
-Tmp: .res 1
+COLOR_SAVE_RG: .res 2	; tmp storage for color values
+COLOR_SAVE_BA: .res 2	; tmp storage for color values
+RC: .res 1
+GC: .res 1
+BC: .res 1
 
 .code
 

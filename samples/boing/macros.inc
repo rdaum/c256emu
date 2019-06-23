@@ -96,13 +96,11 @@
 	; to be clobbered
 	ldy #0
 	lda [LUTHiAddr],y
-	sta RC
+	sta COLOR_SAVE_RG
+	iny
 	iny
 	lda [LUTHiAddr],y
-	sta GC
-	iny
-	lda [LUTHiAddr],y
-	sta BC
+	sta COLOR_SAVE_BA
 
 	; move colors 2-59 down to 1-58
 	lda #239 ; 1 less than 60*4
@@ -112,13 +110,11 @@
 
 	; put saved color 1 into pos 59
 	ldy #240 ; 60 * 4
-	lda RC
+	lda COLOR_SAVE_RG
 	sta [LUTLoAddr],y
 	iny
-	lda GC
-	sta [LUTLoAddr],y
 	iny
-	lda BC
+	lda COLOR_SAVE_BA
 	sta [LUTLoAddr],y
 .endmacro
 
