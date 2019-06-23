@@ -40,6 +40,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
 include(cmake/External_circular_buffer.cmake)
 
 # Add RetroCpu as a subdirectory module.
+include(cmake/Submodule.cmake)
 add_subdirectory(retro_cpu)
 
 # The c256 bus devices
