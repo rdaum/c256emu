@@ -37,11 +37,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # Configure circular_buffer a downloadable library.
-# Configure circular_buffer a downloadable library.
 include(cmake/External_circular_buffer.cmake)
 
-# Add RetroCpu as an external library.
-include(cmake/External_RetroCpu.cmake)
+# Add RetroCpu as a subdirectory module.
+add_subdirectory(retro_cpu)
 
 # The c256 bus devices
 set(BUS_SOURCES
@@ -75,8 +74,10 @@ set(BUS_HEADERS
         src/bus/register_utils.h
         )
 add_library(bus ${BUS_SOURCES} ${BUS_HEADERS})
-add_dependencies(bus circular_buffer retrocpu)
-target_include_directories(bus PUBLIC ${SDL2_INCLUDE_DIRS}
+add_dependencies(bus circular_buffer retro_cpu_core retro_cpu_65816)
+target_include_directories(bus PUBLIC
+        retro_cpu
+        ${SDL2_INCLUDE_DIRS}
         ${GLOG_ROOT}/include
         ${CIRCULAR_BUFFER_INCLUDE_DIRS}
         ${RETROCPU_INCLUDE_DIRS}
@@ -91,10 +92,10 @@ add_executable(c256emu
         src/gui/automation_console.cc src/gui/automation_console.h
         src/gui/imgui_impl_glfw.cpp src/gui/imgui_impl_glfw.h
         src/gui/imgui_impl_opengl2.cpp src/gui/imgui_impl_opengl2.h)
-add_dependencies(c256emu bus gflags retrocpu circular_buffer)
+add_dependencies(c256emu bus gflags retro_cpu_core retro_cpu_65816 retro_host circular_buffer)
 target_include_directories(c256emu PUBLIC
+                           retro_cpu
         ${CIRCULAR_BUFFER_INCLUDE_DIRS}
-        ${RETROCPU_INCLUDE_DIRS}
         ./src)
 
 if (WIN32)
@@ -112,23 +113,20 @@ target_link_libraries(c256emu
         SDL2::SDL2
         glfw
         imgui::imgui
-        ${RETRO_CPU_CORE_LIBRARY_PATH}
-        ${RETRO_CPU_65816_LIBRARY_PATH}
-        ${RETRO_HOST_LIBRARY_PATH}
+                      retro_cpu_core retro_cpu_65816 retro_host
         Lua::lua_lib)
 
 # Unit tests.
 include(GoogleTest)
 add_executable(c256_tests src/bus/math_copro_test.cc)
-add_dependencies(c256_tests bus retrocpu)
+add_dependencies(c256_tests bus retro_cpu_core)
 target_include_directories(c256_tests PUBLIC
         ${GTEST_INCLUDE_DIRS}
         ${RETROCPU_INCLUDE_DIRS})
 target_link_libraries(c256_tests bus
         glog::glog gflags GTest::main
         ${GTEST_MAIN_LIBRARY}
-        ${RETRO_CPU_CORE_LIBRARY_PATH}
-        ${RETRO_CPU_65816_LIBRARY_PATH}
+                      retro_cpu_core
         )
 target_compile_options(c256_tests PUBLIC
         ${GLOG_CFLAGS_OTHER})
