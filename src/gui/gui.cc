@@ -107,19 +107,30 @@ void GUI::Render() {
   ImGui::NewFrame();
 
   ImGui::SetNextWindowPos({0, 0}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize(io_->DisplaySize, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({400, 800}, ImGuiCond_FirstUseEver);
   if (ImGui::Begin("System.Ctrl", nullptr)) {
     // TODO: almost none of this is thread safe with the CPU. locking required.
     DrawProfiler();
     DrawCPUStatus();
     DrawVickySettings();
     DrawBreakpoints();
-    DrawMemoryInspect();
-    DrawStackInspect();
-    DrawDirectPageInspect();
     DrawDisassembler();
   }
 
+  ImGui::SetNextWindowPos({400, 0}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({400, 200}, ImGuiCond_FirstUseEver);
+  DrawMemoryInspect();
+
+  ImGui::SetNextWindowPos({400, 200}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({400, 200}, ImGuiCond_FirstUseEver);
+  DrawStackInspect();
+
+  ImGui::SetNextWindowPos({400, 400}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({400, 200}, ImGuiCond_FirstUseEver);
+  DrawDirectPageInspect();
+
+  ImGui::SetNextWindowPos({400, 600}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({400, 200}, ImGuiCond_FirstUseEver);
   static AutomationConsole console(system_->automation());
   static bool console_open;
   console.Draw("Automation", &console_open);
@@ -149,51 +160,57 @@ void GUI::Render() {
 }
 
 void GUI::DrawDirectPageInspect() const {
-  if (ImGui::CollapsingHeader("Direct Page Inspect")) {
-    uint16_t dp = system_->cpu()->cpu_state.regs.d.u16;
-    std::vector<uint8_t> buffer;
-    for (int offset = 0; offset < 0x100; offset++) {
-      buffer.push_back(system_->ReadByte(dp + offset));
-    }
-
-    ImGui::Columns(5);
-    for (size_t i = 0; i < buffer.size(); i += 4) {
-      ImGui::Text("%s", Addr(dp + i).c_str());
-      ImGui::NextColumn();
-      for (int x = 0; x < 4; x++) {
-        if (i + x < buffer.size()) {
-          ImGui::Text("%02X", buffer[i + x]);
-        }
-        ImGui::NextColumn();
-      }
-    }
-    ImGui::Columns(1);
+  static bool open = true;
+  if (!ImGui::Begin("Direct Page Inspect", &open)) {
+    return ImGui::End();
   }
+  uint16_t dp = system_->cpu()->cpu_state.regs.d.u16;
+  std::vector<uint8_t> buffer;
+  for (int offset = 0; offset < 0x100; offset++) {
+    buffer.push_back(system_->ReadByte(dp + offset));
+  }
+
+  ImGui::Columns(5);
+  for (size_t i = 0; i < buffer.size(); i += 4) {
+    ImGui::Text("%s", Addr(dp + i).c_str());
+    ImGui::NextColumn();
+    for (int x = 0; x < 4; x++) {
+      if (i + x < buffer.size()) {
+        ImGui::Text("%02X", buffer[i + x]);
+      }
+      ImGui::NextColumn();
+    }
+  }
+  ImGui::Columns(1);
+  ImGui::End();
 }
 
 void GUI::DrawStackInspect() const {
-  if (ImGui::CollapsingHeader("Stack Inspect")) {
-    uint16_t sp = system_->cpu()->cpu_state.regs.sp.u16;
-    std::vector<uint8_t> buffer;
-    // Stuff bytes in the buffer descending from sp down 256 bytes.
-    for (int offset = 0; offset < 0x100; offset++) {
-      buffer.push_back(system_->ReadByte(sp - offset));
-    }
-
-    // Draw in ascending order.
-    ImGui::Columns(5);
-    for (size_t i = 0; i < buffer.size(); i += 4) {
-      ImGui::Text("%s", Addr(sp - i).c_str());
-      ImGui::NextColumn();
-      for (int x = 0; x < 4; x++) {
-        if (i + x < buffer.size()) {
-          ImGui::Text("%02X", buffer[i + x]);
-        }
-        ImGui::NextColumn();
-      }
-    }
-    ImGui::Columns(1);
+  static bool open = true;
+  if (!ImGui::Begin("Stack Inspect", &open)) {
+    return ImGui::End();
   }
+  uint16_t sp = system_->cpu()->cpu_state.regs.sp.u16;
+  std::vector<uint8_t> buffer;
+  // Stuff bytes in the buffer descending from sp down 256 bytes.
+  for (int offset = 0; offset < 0x100; offset++) {
+    buffer.push_back(system_->ReadByte(sp - offset));
+  }
+
+  // Draw in ascending order.
+  ImGui::Columns(5);
+  for (size_t i = 0; i < buffer.size(); i += 4) {
+    ImGui::Text("%s", Addr(sp - i).c_str());
+    ImGui::NextColumn();
+    for (int x = 0; x < 4; x++) {
+      if (i + x < buffer.size()) {
+        ImGui::Text("%02X", buffer[i + x]);
+      }
+      ImGui::NextColumn();
+    }
+  }
+  ImGui::Columns(1);
+  ImGui::End();
 }
 
 void GUI::DrawVickySettings() const {
@@ -239,78 +256,81 @@ void GUI::DrawDisassembler() const {
 }
 
 void GUI::DrawMemoryInspect() const {
-  if (ImGui::CollapsingHeader("Memory Inspect")) {
-    static std::vector<std::pair<cpuaddr_t, uint8_t>> inspect_points;
-    static bool adding_inspect = false;
-    if (!adding_inspect && ImGui::Button("Add")) {
-      adding_inspect = true;
-    }
-    if (adding_inspect) {
-      ImGui::Columns(4);
-      static cpuaddr_t addr = 0;
-      static uint8_t bytes = 0x10;
-      ImGui::InputScalar("Addr", ImGuiDataType_U32, &addr, nullptr, nullptr,
-                         "%06X", ImGuiInputTextFlags_CharsHexadecimal);
-      ImGui::NextColumn();
-      ImGui::InputScalar("Size", ImGuiDataType_U8, &bytes, nullptr, nullptr,
-                         "%02X", ImGuiInputTextFlags_CharsHexadecimal);
-      ImGui::NextColumn();
-      if (ImGui::Button("OK")) {
-        // Make sure the same address isn't already there.
-        auto found = std::find_if(inspect_points.begin(), inspect_points.end(),
-                                  [](const std::pair<cpuaddr_t, uint8_t> &x) {
-                                    return x.first == addr;
-                                  });
-        if (found == inspect_points.end()) {
-          inspect_points.emplace_back(addr, bytes);
-        }
-        adding_inspect = false;
-      }
-      ImGui::NextColumn();
-      if (ImGui::Button("Cancel")) {
-        adding_inspect = false;
-      }
-      ImGui::NextColumn();
-      ImGui::Columns(1);
-    }
-    ImGui::Separator();
-
-    // Draw the inspections.
-    auto it = inspect_points.begin();
-    while (it != inspect_points.end()) {
-      auto &item = *it;
-      bool erase = false;
-      uint32_t address = item.first;
-      std::string addr_label = Addr(address);
-      if (ImGui::TreeNode(addr_label.c_str())) {
-        uint32_t end_addr(address + item.second);
-        std::vector<uint8_t> buffer;
-        for (auto i = address; i < end_addr; i++) {
-          buffer.push_back(system_->ReadByte(i));
-        }
-        ImGui::Columns(5);
-        for (size_t i = 0; i < buffer.size(); i += 4) {
-          ImGui::Text("%s", Addr(address + i).c_str());
-          ImGui::NextColumn();
-          for (int x = 0; x < 4; x++) {
-            if (i + x < buffer.size()) {
-              ImGui::Text("%02X", buffer[i + x]);
-            }
-            ImGui::NextColumn();
-          }
-        }
-        ImGui::Columns(1);
-        if (ImGui::Button("Delete")) {
-          erase = true;
-        }
-        ImGui::TreePop();
-      }
-      if (erase)
-        inspect_points.erase(it);
-      else
-        it++;
-    }
+  static bool open = true;
+  if (!ImGui::Begin("Memory Inspect", &open)) {
+    return ImGui::End();
   }
+  static std::vector<std::pair<cpuaddr_t, uint8_t>> inspect_points;
+  static bool adding_inspect = false;
+  if (!adding_inspect && ImGui::Button("Add")) {
+    adding_inspect = true;
+  }
+  if (adding_inspect) {
+    ImGui::Columns(4);
+    static cpuaddr_t addr = 0;
+    static uint8_t bytes = 0x10;
+    ImGui::InputScalar("Addr", ImGuiDataType_U32, &addr, nullptr, nullptr,
+                       "%06X", ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::NextColumn();
+    ImGui::InputScalar("Size", ImGuiDataType_U8, &bytes, nullptr, nullptr,
+                       "%02X", ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::NextColumn();
+    if (ImGui::Button("OK")) {
+      // Make sure the same address isn't already there.
+      auto found = std::find_if(inspect_points.begin(), inspect_points.end(),
+                                [](const std::pair<cpuaddr_t, uint8_t> &x) {
+                                  return x.first == addr;
+                                });
+      if (found == inspect_points.end()) {
+        inspect_points.emplace_back(addr, bytes);
+      }
+      adding_inspect = false;
+    }
+    ImGui::NextColumn();
+    if (ImGui::Button("Cancel")) {
+      adding_inspect = false;
+    }
+    ImGui::NextColumn();
+    ImGui::Columns(1);
+  }
+  ImGui::Separator();
+
+  // Draw the inspections.
+  auto it = inspect_points.begin();
+  while (it != inspect_points.end()) {
+    auto &item = *it;
+    bool erase = false;
+    uint32_t address = item.first;
+    std::string addr_label = Addr(address);
+    if (ImGui::TreeNode(addr_label.c_str())) {
+      uint32_t end_addr(address + item.second);
+      std::vector<uint8_t> buffer;
+      for (auto i = address; i < end_addr; i++) {
+        buffer.push_back(system_->ReadByte(i));
+      }
+      ImGui::Columns(5);
+      for (size_t i = 0; i < buffer.size(); i += 4) {
+        ImGui::Text("%s", Addr(address + i).c_str());
+        ImGui::NextColumn();
+        for (int x = 0; x < 4; x++) {
+          if (i + x < buffer.size()) {
+            ImGui::Text("%02X", buffer[i + x]);
+          }
+          ImGui::NextColumn();
+        }
+      }
+      ImGui::Columns(1);
+      if (ImGui::Button("Delete")) {
+        erase = true;
+      }
+      ImGui::TreePop();
+    }
+    if (erase)
+      inspect_points.erase(it);
+    else
+      it++;
+  }
+  ImGui::End();
 }
 
 void GUI::DrawBreakpoints() const {
@@ -318,6 +338,7 @@ void GUI::DrawBreakpoints() const {
 
   if (ImGui::CollapsingHeader("Breakpoints")) {
     DebugInterface *debug_interface = system_->GetDebugInterface();
+
     static bool adding_breakpoint = false;
     if (!adding_breakpoint && ImGui::Button("Add")) {
       adding_breakpoint = true;
