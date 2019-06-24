@@ -334,6 +334,11 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
                                        : o65_offsets.word_mode.zbase;
   LOG(INFO) << "ZPBASE: " << std::hex << zpbase;
 
+
+  uint8_t bssbase = header.mode.m.size ? o65_offsets.long_mode.bbase
+                                       : o65_offsets.word_mode.bbase;
+  uint8_t bsslen = header.mode.m.size ? o65_offsets.long_mode.blen
+                                       : o65_offsets.word_mode.blen;
   // Obtain the external (undefined) references list. This is meaningless for us
   // tho.
   uint32_t num_references;
@@ -366,12 +371,14 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
     LOG(INFO) << "RelocEntry: offset: " << std::hex << (int)reloc_offset
               << " relative_offset:" << (int)offset << " type: " << (int)type
               << " segment: " << (int)segment;
-    if (segment == 2) {
+    if (segment == 2) { // text
       Reloc(reloc_address - tbase, in_file, &t_seg, reloc_offset, type);
-    } else if (segment == 3) {
+    } else if (segment == 3) { // data
       Reloc(reloc_address - dbase, in_file, &d_seg, reloc_offset, type);
-    } else if (segment == 5) {
+    } else if (segment == 5) { // zp
       Reloc(zpbase, in_file, &t_seg, reloc_offset, type);
+    } else if (segment == 4) { // bss
+      Reloc(reloc_address - bssbase, in_file, &t_seg, reloc_offset, type);
     } else {
       CHECK(false) << "Unhandled segment: " << std::hex << (int)segment;
     }
@@ -386,6 +393,9 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
   for (int i = 0; i < dlen; i++, offset++) {
     system_bus_->WriteByte(reloc_address + offset, d_seg[i]);
   }
-
+  // BSS
+  for (int i = 0; i < bsslen; i++, offset++) {
+    system_bus_->WriteByte(reloc_offset + offset, 0);
+  }
   // Look for exported global symbols.
 }
