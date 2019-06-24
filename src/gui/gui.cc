@@ -41,8 +41,8 @@ constexpr std::array<Vicky::ScalingQuality, 3> kScalingQualities{
 
 GUI::~GUI() { Close(); }
 
-void GUI::Start() {
-  gui_thread_ = std::thread([this] {
+void GUI::Start(int x, int y) {
+  gui_thread_ = std::thread([this, x, y] {
     {
       std::lock_guard<std::mutex> lock(gui_mutex_);
 
@@ -51,7 +51,7 @@ void GUI::Start() {
 
       window_ = glfwCreateWindow(800, 800, "c256emu", nullptr, nullptr);
       CHECK(window_);
-
+      glfwSetWindowPos(window_, x, y);
       glfwMakeContextCurrent(window_);
       glfwSwapInterval(1); // Enable vsync
 

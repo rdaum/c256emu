@@ -50,7 +50,7 @@ void System::Initialize() {
   LOG(INFO) << "Starting Vicky...";
 
   // Fire up Vicky
-  system_bus_->vicky()->Start();
+  auto window_geometry = system_bus_->vicky()->Start();
 
   LOG(INFO) << "Starting CPU...";
 
@@ -58,7 +58,7 @@ void System::Initialize() {
   cpu_.PowerOn();
 
   // Fire up the GUI debugger;
-  gui_->Start();
+  gui_->Start(window_geometry.x + window_geometry.w, window_geometry.y);
 }
 
 void System::Sys(uint32_t address) {

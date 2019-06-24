@@ -14,7 +14,7 @@ public:
   explicit GUI(System *sys) : system_(sys) {}
   ~GUI();
 
-  void Start();
+  void Start(int x, int y);
   void Stop();
 
  private:
