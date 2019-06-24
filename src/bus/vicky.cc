@@ -113,7 +113,7 @@ void Vicky::InitPages(Page* vicky_page_start) {
   map(kTileMapsBegin, (uint8_t*)tile_mem_, sizeof(tile_mem_));
 }
 
-void Vicky::Start() {
+SDL_Rect Vicky::Start() {
   window_ =
       SDL_CreateWindow("Vicky", SDL_WINDOWPOS_UNDEFINED,
                        SDL_WINDOWPOS_UNDEFINED, kVickyBitmapWidth * scale_,
@@ -131,6 +131,12 @@ void Vicky::Start() {
               ScalingQualityStr(scaling_quality_).c_str());
 
   CHECK(renderer_);
+
+  int x, y, w, h;
+  SDL_GetWindowPosition(window_, &x, &y);
+  SDL_GetWindowSize(window_, &w, &h);
+
+  return SDL_Rect{x, y, w, h};
 }
 
 Vicky::~Vicky() {

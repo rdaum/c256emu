@@ -35,7 +35,7 @@ class Vicky {
   ~Vicky();
 
   // Initialize.
-  void Start();
+  SDL_Rect Start();
 
   // Render a single scan line and advance to the next.
   void RenderLine();
