@@ -6,9 +6,9 @@
 	.a16
 	.i16
         lda #15			; copy 16 zeroes
-	ldx #0000		; src address of zeroes
+	ldx #.loword(ROW_CLEAR_BLOCK)		; src address of zeroes
 	sty Param1Word	; save current dest ptr
-        mvn #$02, #$af		; from page $02 into $af
+        mvn #.bankbyte(ROW_CLEAR_BLOCK), #$af		; from page $02 into $af
 	ldy Param1Word	; restore dest ptr
 	tya
 	clc

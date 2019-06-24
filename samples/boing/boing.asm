@@ -4,20 +4,16 @@
 	
 .rodata
 ball_tile_set:  .incbin "tiles.bin"
-
-.segment "BITMAP1"
 bmp_1:  .incbin "grid-00000.bin"
-.segment "BITMAP2"
 bmp_2:  .incbin "grid-10000.bin"
-.segment "BITMAP3"
 bmp_3:  .incbin "grid-20000.bin"
-.segment "BITMAP4"
 bmp_4:  .incbin "grid-30000.bin"
-.segment "BITMAP5"
 bmp_5:  .incbin "grid-40000.bin"
-.segment "LUT4"
 lut_4:  .incbin "grid.col"
 
+.bss
+ROW_CLEAR_BLOCK:	.res 16
+	
 .zeropage
 
 Ball0_x: .res 2	; x position
@@ -103,6 +99,8 @@ LUT_1 = $af24
 LUT_2 = $af28
 LUT_3 = $af2c
 
+
+	
 ; The structure of a tile
 .struct Tile
 	ctrl_reg .byte
@@ -113,6 +111,8 @@ LUT_3 = $af2c
 	y_offset .byte		; y offset
 .endstruct
 
+.import __ZEROPAGE_LOAD__ 	; symbol defining the start of the ZP
+	
 begin:
 	jmp init
 
@@ -120,11 +120,12 @@ begin:
 	.include "clear_tiles.asm"
 	.include "set_lut.asm"
 	.include "ball.asm"
+
 	
 init:
 	; set zero page to $fe00
 	acc16i16
-	lda #Ball0_x
+	lda #__ZEROPAGE_LOAD__
 	tcd
 
 	; stop IRQ handling
@@ -193,7 +194,7 @@ copy_lut_4:
 	ldx #16
 	lda #00
 zero:
-	sta f:$020000,x
+	sta f:ROW_CLEAR_BLOCK,x
 	dex
 	bne zero
 
