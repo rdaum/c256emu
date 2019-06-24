@@ -5,6 +5,19 @@
 .rodata
 ball_tile_set:  .incbin "tiles.bin"
 
+.segment "BITMAP1"
+bmp_1:  .incbin "grid-00000.bin"
+.segment "BITMAP2"
+bmp_2:  .incbin "grid-10000.bin"
+.segment "BITMAP3"
+bmp_3:  .incbin "grid-20000.bin"
+.segment "BITMAP4"
+bmp_4:  .incbin "grid-30000.bin"
+.segment "BITMAP5"
+bmp_5:  .incbin "grid-40000.bin"
+.segment "LUT4"
+lut_4:  .incbin "grid.col"
+
 .zeropage
 
 Ball0_x: .res 2	; x position
@@ -69,6 +82,8 @@ INT_PENDING_REG0 = $000140
 FNX0_INT00_SOF = $01
 BORDER_CTRL_REG = $af0004
 VICKY_CTRL_REG = $af0000
+BITMAP_CTRL_REG = $af0140
+
 BG_R = $af0008
 BG_G = $af0009
 BG_B = $af000a
@@ -125,7 +140,54 @@ copy_tile_loop:
 	inx
 	cpx #$ffff
 	bne copy_tile_loop
-	acc16i16
+
+	ldx #0
+copy_bmp_1:
+	lda f:bmp_1,x
+	sta $b10000,x
+	inx
+	cpx #$0
+	bne copy_bmp_1
+
+	ldx #0
+copy_bmp_2:
+	lda f:bmp_2,x
+	sta $b20000,x
+	inx
+	cpx #$0
+	bne copy_bmp_2
+
+	ldx #0
+copy_bmp_3:
+	lda f:bmp_3,x
+	sta $b30000,x
+	inx
+	cpx #$0
+	bne copy_bmp_3
+
+	ldx #0
+copy_bmp_4:
+	lda f:bmp_4,x
+	sta $b40000,x
+	inx
+	cpx #$0
+	bne copy_bmp_4
+
+	ldx #0
+copy_bmp_5:
+	lda f:bmp_5,x
+	sta $b50000,x
+	inx
+	cpx #$b000
+	bne copy_bmp_5
+
+	ldx #0
+copy_lut_4:
+	lda f:lut_4,x
+	sta $af3000,x
+	inx
+	cpx #$400
+	bne copy_lut_4
 
 	; populate $020000 with 16 zeroes
 	ldx #16
@@ -139,15 +201,27 @@ zero:
 	lda #0
 	sta BORDER_CTRL_REG
 
-	; set tile mode
-	lda #$10
+        ; black background
+        lda #$30
+        sta BG_R
+        sta BG_G
+        sta BG_B
+
+	; set tile and bitmap mode
+	lda #$18
 	sta VICKY_CTRL_REG
 
-	; black background
-	lda #$0
-	sta BG_R
-	sta BG_G
-	sta BG_B
+	; enable bitmap
+	lda #1 | (4 << 4)
+	sta BITMAP_CTRL_REG
+
+	; set bitmap addr to 0xb10000
+	acc16i16
+	lda #$0000
+	sta $af0141
+	acc8i16
+	lda #$01
+	sta $af0143
 
 	; Enable tiles + options + desired LUT for each
         EnableTiles TILE_0_REG, 0

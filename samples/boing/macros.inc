@@ -167,6 +167,7 @@
 .endmacro
 
 .macro EnableTiles TileRegBase, LutNum
+	acc8i16
         ; enable tile layer, turn on scroll x & y, lut 
         lda #$31+(LutNum<<1)
         sta TileRegBase+Tile::ctrl_reg
