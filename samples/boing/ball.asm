@@ -3,7 +3,8 @@
 BALL_W = 256
 BALL_H = 256
 MAX_BALL_X = 640 - BALL_W
-MAX_BALL_Y = 480 - BALL_H
+; ball should bounce slightly before bottom of screen
+MAX_BALL_Y = 450 - BALL_H
 
 .proc move_ball_x
 	.a16
