@@ -1,9 +1,18 @@
 .p816
 .feature c_comments
 .include "macros.inc"
-	
+
 .rodata
 ball_tile_set:  .incbin "tiles.bin"
+bmp_1:  .incbin "grid-00000.bin"
+bmp_2:  .incbin "grid-10000.bin"
+bmp_3:  .incbin "grid-20000.bin"
+bmp_4:  .incbin "grid-30000.bin"
+bmp_5:  .incbin "grid-40000.bin"
+lut_4:  .incbin "grid.col"
+
+.bss
+ROW_CLEAR_BLOCK:        .res 16
 
 .zeropage
 
@@ -63,6 +72,8 @@ RC: .res 1
 GC: .res 1
 BC: .res 1
 
+TmpPtr: .res 4
+
 .code
 
 INT_PENDING_REG0 = $000140
@@ -72,6 +83,9 @@ VICKY_CTRL_REG = $af0000
 BG_R = $af0008
 BG_G = $af0009
 BG_B = $af000a
+
+BMAP_CTRL = $af0140
+BMAP_ADDR = $af0141
 
 TILE_0_REG = $af0100
 TILE_1_REG = $af0108
@@ -88,6 +102,13 @@ LUT_1 = $af24
 LUT_2 = $af28
 LUT_3 = $af2c
 
+BMAP_1 = $b10000
+BMAP_2 = $b20000
+BMAP_3 = $b30000
+BMAP_4 = $b40000
+BMAP_5 = $b50000
+BMAP_LUT = $af3000
+
 ; The structure of a tile
 .struct Tile
 	ctrl_reg .byte
@@ -97,6 +118,8 @@ LUT_3 = $af2c
 	x_offset .byte		; x offset
 	y_offset .byte		; y offset
 .endstruct
+
+.import __ZEROPAGE_LOAD__       ; symbol defining the start of the ZP
 
 begin:
 	jmp init
@@ -109,7 +132,7 @@ begin:
 init:
 	; set zero page to $fe00
 	acc16i16
-	lda #Ball0_x
+	lda #__ZEROPAGE_LOAD__
 	tcd
 
 	; stop IRQ handling
@@ -118,6 +141,7 @@ init:
 	;; copy the tile set data into $b0;
 	;; can't just use one MVP as this spans across the bank into the next
 	acc8i16
+
 	ldx #0
 copy_tile_loop:	
 	lda f:ball_tile_set,x
@@ -125,22 +149,71 @@ copy_tile_loop:
 	inx
 	cpx #$ffff
 	bne copy_tile_loop
-	acc16i16
 
-	; populate $020000 with 16 zeroes
-	ldx #16
+	lda #(1 | 4 << 4) ; turn on bitmap with lut 4
+	; Point bitmap to $010000 (mapped $b10000)
+	sta BMAP_CTRL
 	lda #00
-zero:
-	sta f:$020000,x
-	dex
-	bne zero
+	sta BMAP_ADDR
+	lda #00
+	sta BMAP_ADDR+1
+	lda #01
+	sta BMAP_ADDR+2
+
+        ldx #0
+copy_bmp_1:
+        lda f:bmp_1,x
+        sta BMAP_1,x
+        inx
+        cpx #$0
+        bne copy_bmp_1
+
+        ldx #0
+copy_bmp_2:
+        lda f:bmp_2,x
+        sta BMAP_2,x
+        inx
+        cpx #$0
+        bne copy_bmp_2
+
+        ldx #0
+copy_bmp_3:
+        lda f:bmp_3,x
+        sta BMAP_3,x
+        inx
+        cpx #$0
+        bne copy_bmp_3
+
+        ldx #0
+copy_bmp_4:
+        lda f:bmp_4,x
+        sta BMAP_4,x
+        inx
+        cpx #$0
+        bne copy_bmp_4
+
+        ldx #0
+copy_bmp_5:
+        lda f:bmp_5,x
+        sta BMAP_5,x
+        inx
+        cpx #$b000
+        bne copy_bmp_5
+
+        ldx #0
+copy_bg_lut:
+        lda f:lut_4,x
+        sta BMAP_LUT,x
+        inx
+        cpx #$400
+        bne copy_bg_lut
 
 	; turn off border
 	lda #0
 	sta BORDER_CTRL_REG
 
-	; set tile mode
-	lda #$10
+	; set tile and bitmap mode
+	lda #$18
 	sta VICKY_CTRL_REG
 
 	; black background
