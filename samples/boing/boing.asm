@@ -3,7 +3,10 @@
 .include "macros.inc"
 
 .rodata
-ball_tile_set:  .incbin "tiles.bin"
+ball0_tile_set:  .incbin "tiles-256.bin"
+ball1_tile_set:  .incbin "tiles-224.bin"
+ball2_tile_set:  .incbin "tiles-192.bin"
+ball3_tile_set:  .incbin "tiles-160.bin"
 bmp_1:  .incbin "grid-00000.bin"
 bmp_2:  .incbin "grid-10000.bin"
 bmp_3:  .incbin "grid-20000.bin"
@@ -102,11 +105,22 @@ LUT_1 = $af24
 LUT_2 = $af28
 LUT_3 = $af2c
 
-BMAP_1 = $b10000
-BMAP_2 = $b20000
-BMAP_3 = $b30000
-BMAP_4 = $b40000
-BMAP_5 = $b50000
+; for tiles
+BALL_0_DST = $b00000
+BALL_1_DST = $b10000
+BALL_2_DST = $b20000
+BALL_3_DST = $b30000
+
+; for background bitmap
+; BMAP_HI/MD/LO must point to video ram relative to $000000
+BMAP_HI = $04
+BMAP_MD = $00
+BMAP_LO = $00
+BMAP_1 = $b40000
+BMAP_2 = $b50000
+BMAP_3 = $b60000
+BMAP_4 = $b70000
+BMAP_5 = $b80000
 BMAP_LUT = $af3000
 
 ; The structure of a tile
@@ -143,21 +157,45 @@ init:
 	acc8i16
 
 	ldx #0
-copy_tile_loop:	
-	lda f:ball_tile_set,x
-	sta $b00000,x
+copy_tile0_loop:	
+	lda f:ball0_tile_set,x
+	sta BALL_0_DST,x
 	inx
-	cpx #$ffff
-	bne copy_tile_loop
+	cpx #$0
+	bne copy_tile0_loop
+
+	ldx #0
+copy_tile1_loop:	
+	lda f:ball1_tile_set,x
+	sta BALL_1_DST,x
+	inx
+	cpx #$0
+	bne copy_tile1_loop
+
+	ldx #0
+copy_tile2_loop:	
+	lda f:ball2_tile_set,x
+	sta BALL_2_DST,x
+	inx
+	cpx #$0
+	bne copy_tile2_loop
+
+	ldx #0
+copy_tile3_loop:	
+	lda f:ball3_tile_set,x
+	sta BALL_3_DST,x
+	inx
+	cpx #$0
+	bne copy_tile3_loop
 
 	lda #(1 | 4 << 4) ; turn on bitmap with lut 4
-	; Point bitmap to $010000 (mapped $b10000)
+	; Point bitmap to where background data went
 	sta BMAP_CTRL
-	lda #00
+	lda #BMAP_LO
 	sta BMAP_ADDR
-	lda #00
+	lda #BMAP_MD
 	sta BMAP_ADDR+1
-	lda #01
+	lda #BMAP_HI
 	sta BMAP_ADDR+2
 
         ldx #0
@@ -223,10 +261,10 @@ copy_bg_lut:
 	sta BG_B
 
 	; Enable tiles + options + desired LUT for each
-        EnableTiles TILE_0_REG, 0
-        EnableTiles TILE_1_REG, 1
-        EnableTiles TILE_2_REG, 2
-        EnableTiles TILE_3_REG, 3
+        EnableTiles TILE_0_REG, 0, $0000, $00
+        EnableTiles TILE_1_REG, 1, $0000, $01
+        EnableTiles TILE_2_REG, 2, $0000, $02
+        EnableTiles TILE_3_REG, 3, $0000, $03
 
 	; BallNum, XPos, YPos, XVelocity, YVelocity, YAccel
 	SetBallParameters 0, 32, 48, 1, 0, 1
@@ -237,7 +275,7 @@ copy_bg_lut:
 	; Init LUT tables: LUTAddr, R, G, B
 	SetColorLut LUT_0, 127, 0, 0    ; Red
 	SetColorLut LUT_1, 0, 127, 0    ; Green
-	SetColorLut LUT_2, 127, 0, 127  ; Yellow
+	SetColorLut LUT_2, 127, 127, 0  ; Purple
 	SetColorLut LUT_3, 0, 0, 127    ; Blue
 
 	; Pre-compute lut hi/lo addresses for lut cycle macros

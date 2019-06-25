@@ -166,14 +166,16 @@
         sty Ball0_dy,x
 .endmacro
 
-.macro EnableTiles TileRegBase, LutNum
+.macro EnableTiles TileRegBase, LutNum, VideoAddr, VideoPage
+        ; point tile to video memory 
+	acc16i16
+        lda #VideoAddr
+        sta TileRegBase+Tile::start_addr
+	acc8i16
+	lda #VideoPage
+        sta TileRegBase+Tile::start_addr_page
+
         ; enable tile layer, turn on scroll x & y, lut 
         lda #$31+(LutNum<<1)
         sta TileRegBase+Tile::ctrl_reg
-
-        ; point tile 0 to video memory $000000
-        ; (load tile bitmap into mapped $b00000)
-        lda #$00
-        sta TileRegBase+Tile::start_addr
-        sta TileRegBase+Tile::start_addr_page
 .endmacro
