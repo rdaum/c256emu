@@ -160,16 +160,22 @@ void GUI::Render() {
 }
 
 void GUI::DrawDirectPageInspect() const {
-  static bool open = true;
+  bool is_enabled = system_->direct_page_watch_enabled();
+  static bool open = is_enabled;
   if (!ImGui::Begin("Direct Page Inspect", &open)) {
+    if (is_enabled)
+      system_->set_direct_page_watch_enabled(false);
     return ImGui::End();
   }
-  uint16_t dp = system_->cpu()->cpu_state.regs.d.u16;
-  std::vector<uint8_t> buffer;
-  for (int offset = 0; offset < 0x100; offset++) {
-    buffer.push_back(system_->ReadByte(dp + offset));
+  if (!is_enabled) {
+    system_->set_direct_page_watch_enabled(true);
   }
-
+  std::vector<uint8_t> buffer = system_->direct_page_watch();
+  if (buffer.empty()) {
+    ImGui::End();
+    return;
+  }
+  uint16_t dp = system_->cpu()->cpu_state.regs.d.u16;
   ImGui::Columns(5);
   for (size_t i = 0; i < buffer.size(); i += 4) {
     ImGui::Text("%s", Addr(dp + i).c_str());
@@ -186,16 +192,22 @@ void GUI::DrawDirectPageInspect() const {
 }
 
 void GUI::DrawStackInspect() const {
-  static bool open = true;
+  bool is_enabled = system_->stack_watch_enabled();
+  static bool open = is_enabled;
   if (!ImGui::Begin("Stack Inspect", &open)) {
+    if (is_enabled)
+      system_->set_stack_watch_enabled(false);
     return ImGui::End();
   }
-  uint16_t sp = system_->cpu()->cpu_state.regs.sp.u16;
-  std::vector<uint8_t> buffer;
-  // Stuff bytes in the buffer descending from sp down 256 bytes.
-  for (int offset = 0; offset < 0x100; offset++) {
-    buffer.push_back(system_->ReadByte(sp - offset));
+  if (!is_enabled) {
+    system_->set_stack_watch_enabled(true);
   }
+  std::vector<uint8_t> buffer = system_->stack_watch();
+  if (buffer.empty()) {
+    ImGui::End();
+    return;
+  }
+  uint16_t sp = system_->cpu()->cpu_state.regs.sp.u16;
 
   // Draw in ascending order.
   ImGui::Columns(5);
@@ -256,11 +268,11 @@ void GUI::DrawDisassembler() const {
 }
 
 void GUI::DrawMemoryInspect() const {
-  static bool open = true;
+  static bool open = false;
   if (!ImGui::Begin("Memory Inspect", &open)) {
     return ImGui::End();
   }
-  static std::vector<std::pair<cpuaddr_t, uint8_t>> inspect_points;
+  const auto inspect_points = system_->memory_watches();
   static bool adding_inspect = false;
   if (!adding_inspect && ImGui::Button("Add")) {
     adding_inspect = true;
@@ -277,12 +289,11 @@ void GUI::DrawMemoryInspect() const {
     ImGui::NextColumn();
     if (ImGui::Button("OK")) {
       // Make sure the same address isn't already there.
-      auto found = std::find_if(inspect_points.begin(), inspect_points.end(),
-                                [](const std::pair<cpuaddr_t, uint8_t> &x) {
-                                  return x.first == addr;
-                                });
+      auto found = std::find_if(
+          inspect_points.begin(), inspect_points.end(),
+          [](const System::MemoryWatch &x) { return x.start_addr == addr; });
       if (found == inspect_points.end()) {
-        inspect_points.emplace_back(addr, bytes);
+        system_->AddMemoryWatch(addr, bytes);
       }
       adding_inspect = false;
     }
@@ -300,14 +311,10 @@ void GUI::DrawMemoryInspect() const {
   while (it != inspect_points.end()) {
     auto &item = *it;
     bool erase = false;
-    uint32_t address = item.first;
+    uint32_t address = item.start_addr;
     std::string addr_label = Addr(address);
     if (ImGui::TreeNode(addr_label.c_str())) {
-      uint32_t end_addr(address + item.second);
-      std::vector<uint8_t> buffer;
-      for (auto i = address; i < end_addr; i++) {
-        buffer.push_back(system_->ReadByte(i));
-      }
+      std::vector<uint8_t> buffer = item.last_results;
       ImGui::Columns(5);
       for (size_t i = 0; i < buffer.size(); i += 4) {
         ImGui::Text("%s", Addr(address + i).c_str());
@@ -326,7 +333,7 @@ void GUI::DrawMemoryInspect() const {
       ImGui::TreePop();
     }
     if (erase)
-      inspect_points.erase(it);
+      system_->DelMemoryWatch(it->start_addr);
     else
       it++;
   }
@@ -381,6 +388,7 @@ void GUI::DrawBreakpoints() const {
     }
   }
 }
+
 void GUI::DrawCPUStatus() const {
   ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Appearing);
   if (ImGui::CollapsingHeader("CPU")) {

@@ -52,6 +52,23 @@ class System {
   bool turbo() const { return turbo_; }
   void set_turbo(bool turbo) { turbo_ = turbo; }
 
+  struct MemoryWatch {
+    cpuaddr_t start_addr;
+    size_t num_bytes;
+    std::vector<uint8_t> last_results;
+  };
+  void AddMemoryWatch(cpuaddr_t start_addr, size_t num_bytes);
+  void DelMemoryWatch(cpuaddr_t start_addr);
+  std::vector<MemoryWatch> memory_watches();
+
+  void set_stack_watch_enabled(bool enable);
+  bool stack_watch_enabled() const;
+  std::vector<uint8_t> stack_watch();
+
+  void set_direct_page_watch_enabled(bool enable);
+  bool direct_page_watch_enabled() const;
+  std::vector<uint8_t> direct_page_watch();
+
 protected:
   friend class InterruptController;
 
@@ -84,4 +101,14 @@ protected:
   EventQueue events_;
   DebugInterface debug_;
   Automation automation_;
+
+  std::mutex memory_watch_mutex_;
+
+  std::vector<MemoryWatch> memory_watches_;
+
+  bool stack_watch_enabled_ = false;
+  std::vector<uint8_t> stack_watch_;
+
+  bool direct_page_watch_enabled_ = false;
+  std::vector<uint8_t> direct_page_watch_;
 };

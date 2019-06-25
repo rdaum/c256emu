@@ -26,14 +26,12 @@ constexpr int kRasterLinesPerSecond =
 
 DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
 
-}  // namespace
+} // namespace
 
 System::System()
     : turbo_(FLAGS_turbo), system_bus_(std::make_unique<C256SystemBus>(this)),
-      loader_(system_bus_.get()),
-      gui_(std::make_unique<GUI>(this)),
-      cpu_(system_bus_.get()),
-      debug_(&cpu_, &events_, system_bus_.get(), true),
+      loader_(system_bus_.get()), gui_(std::make_unique<GUI>(this)),
+      cpu_(system_bus_.get()), debug_(&cpu_, &events_, system_bus_.get(), true),
       automation_(&cpu_, this, &debug_) {}
 
 System::~System() = default;
@@ -66,9 +64,7 @@ void System::Sys(uint32_t address) {
   cpu_.cpu_state.code_segment_base = address & 0xFF0000;
 }
 
-DebugInterface* System::GetDebugInterface() {
-  return &debug_;
-}
+DebugInterface *System::GetDebugInterface() { return &debug_; }
 
 void System::DrawNextLine() {
   system_bus_->vicky()->RenderLine();
@@ -118,14 +114,37 @@ void System::DrawNextLine() {
     frame_clock = now;
     next_frame_clock += kVickyFrameDelayDurationNs;
   }
+  std::unique_lock<std::mutex> l(memory_watch_mutex_);
+
+  for (auto &mw : memory_watches_) {
+    mw.last_results.clear();
+    for (uint32_t addr = mw.start_addr; addr < mw.start_addr + mw.num_bytes;
+         addr++) {
+      mw.last_results.push_back(ReadByte(addr));
+    }
+  }
+  if (stack_watch_enabled_) {
+    stack_watch_.clear();
+    uint16_t sp = cpu_.cpu_state.regs.sp.u16;
+    for (uint8_t i = 0; i < 0xff; i++) {
+      stack_watch_.push_back(ReadByte(sp - i));
+    }
+  }
+  if (direct_page_watch_enabled_) {
+    direct_page_watch_.clear();
+    uint16_t dp = cpu_.cpu_state.regs.d.u16;
+    for (uint8_t i = 0; i < 0xff; i++) {
+      direct_page_watch_.push_back(ReadByte(dp + i));
+    }
+  }
   ScheduleNextScanline();
 }
 
 void System::ScheduleNextScanline() {
   total_scanlines_++;
-  events_.ScheduleNoLock(
-      (kTargetClockRate * total_scanlines_) / kRasterLinesPerSecond,
-      std::bind(&System::DrawNextLine, this));
+  events_.ScheduleNoLock((kTargetClockRate * total_scanlines_) /
+                             kRasterLinesPerSecond,
+                         std::bind(&System::DrawNextLine, this));
 }
 
 void System::Run() {
@@ -142,34 +161,68 @@ void System::Run() {
   cpu_.Emulate(&events_);
 }
 
-uint16_t System::ReadTwoBytes(uint32_t addr) {
-  return cpu_.PeekU16(addr);
-}
+uint16_t System::ReadTwoBytes(uint32_t addr) { return cpu_.PeekU16(addr); }
 
-uint16_t System::ReadByte(uint32_t addr) {
-  return system_bus_->ReadByte(addr);
-}
+uint16_t System::ReadByte(uint32_t addr) { return system_bus_->ReadByte(addr); }
 
 void System::StoreByte(uint32_t addr, uint8_t val) {
   system_bus_->WriteByte(addr, val);
 }
 
-void System::RaiseIRQ() {
-  cpu_.cpu_state.SetInterruptSource(1);
+void System::RaiseIRQ() { cpu_.cpu_state.SetInterruptSource(1); }
+
+void System::ClearIRQ() { cpu_.cpu_state.ClearInterruptSource(1); }
+
+void System::SetStop() { cpu_.cpu_state.cycle_stop = 0; }
+
+Automation *System::automation() { return &automation_; }
+
+Vicky *System::vicky() const { return system_bus_->vicky(); }
+
+void System::AddMemoryWatch(uint32_t start_addr, size_t num_bytes) {
+  std::unique_lock<std::mutex> l(memory_watch_mutex_);
+
+  memory_watches_.push_back(MemoryWatch{start_addr, num_bytes, {}});
 }
 
-void System::ClearIRQ() {
-  cpu_.cpu_state.ClearInterruptSource(1);
+void System::DelMemoryWatch(uint32_t start_addr) {
+  std::unique_lock<std::mutex> l(memory_watch_mutex_);
+
+  auto it = std::find_if(memory_watches_.begin(), memory_watches_.end(),
+                         [start_addr](const MemoryWatch &m) {
+                           return m.start_addr == start_addr;
+                         });
+  if (it != memory_watches_.end()) {
+    memory_watches_.erase(it);
+  }
 }
 
-void System::SetStop() {
-  cpu_.cpu_state.cycle_stop = 0;
+std::vector<System::MemoryWatch> System::memory_watches() {
+  std::unique_lock<std::mutex> l(memory_watch_mutex_);
+
+  return memory_watches_;
 }
 
-Automation* System::automation() {
-  return &automation_;
+void System::set_stack_watch_enabled(bool enable) {
+  stack_watch_enabled_ = enable;
 }
 
-Vicky* System::vicky() const {
-  return system_bus_->vicky();
+bool System::stack_watch_enabled() const { return stack_watch_enabled_; }
+
+std::vector<uint8_t> System::stack_watch() {
+  std::unique_lock<std::mutex> l(memory_watch_mutex_);
+  return stack_watch_;
+}
+
+void System::set_direct_page_watch_enabled(bool enable) {
+  direct_page_watch_enabled_ = enable;
+}
+
+bool System::direct_page_watch_enabled() const {
+  return direct_page_watch_enabled_;
+}
+
+std::vector<uint8_t> System::direct_page_watch() {
+  std::unique_lock<std::mutex> l(memory_watch_mutex_);
+  return direct_page_watch_;
 }
