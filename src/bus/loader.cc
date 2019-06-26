@@ -334,10 +334,9 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
                                        : o65_offsets.word_mode.zbase;
   LOG(INFO) << "ZPBASE: " << std::hex << zpbase;
 
-
-  uint8_t bssbase = header.mode.m.size ? o65_offsets.long_mode.bbase
-                                       : o65_offsets.word_mode.bbase;
-  uint8_t bsslen = header.mode.m.size ? o65_offsets.long_mode.blen
+  uint32_t bssbase = header.mode.m.size ? o65_offsets.long_mode.bbase
+                                        : o65_offsets.word_mode.bbase;
+  uint32_t bsslen = header.mode.m.size ? o65_offsets.long_mode.blen
                                        : o65_offsets.word_mode.blen;
   // Obtain the external (undefined) references list. This is meaningless for us
   // tho.

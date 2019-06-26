@@ -30,16 +30,16 @@ wkrow:
 	.a16
 	.i16
 
-        ;lda #15			; copy 16 zeroes
-        ;ldx #0000          ; src address of zeroes
-	;ldx #.loword(ROW_CLEAR_BLOCK)		; src address of zeroes
-	;sty Param1Word	; save current dest ptr
-        ;mvn #.bankbyte(ROW_CLEAR_BLOCK), #$af	; from src page into $af
-	;tya
-	;clc
-	;adc #64			; advance to next row
-	;tay			; put back into dest arg
-	jsr workaround
+        lda #15			; copy 16 zeroes
+        ldx #0000          ; src address of zeroes
+	ldx #.loword(ROW_CLEAR_BLOCK)		; src address of zeroes
+	sty Param1Word	; save current dest ptr
+        mvn #.bankbyte(ROW_CLEAR_BLOCK), #$af	; from src page into $af
+	tya
+	clc
+	adc #64			; advance to next row
+	tay			; put back into dest arg
+	;jsr workaround
 .endmacro
 
 .proc clear_tile_map
