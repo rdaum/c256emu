@@ -2,36 +2,11 @@
         ; ZPStruct::Param1Word = 16 bit X location
         ; ZPStruct::Param2Word = 16 bit Y location
 
-; TODO: Workaround for MVN not behaving correctly
-.proc workaround
-	.a16
-	.i16
-	sty TmpPtr
-	lda #$00af
-	sta TmpPtr+2
-
-	ldy #0
-	lda #0
-wkrow:
-	sta (TmpPtr),y
-	iny
-	iny
-	cpy #16
-	bne wkrow
-
-	lda TmpPtr
-	clc
-	adc #64
-	tay
-	rts
-.endproc
-
 .macro ClearRow RowNum
 	.a16
 	.i16
 
         lda #15			; copy 16 zeroes
-        ldx #0000          ; src address of zeroes
 	ldx #.loword(ROW_CLEAR_BLOCK)		; src address of zeroes
 	sty Param1Word	; save current dest ptr
         mvn #.bankbyte(ROW_CLEAR_BLOCK), #$af	; from src page into $af
@@ -39,7 +14,6 @@ wkrow:
 	clc
 	adc #64			; advance to next row
 	tay			; put back into dest arg
-	;jsr workaround
 .endmacro
 
 .proc clear_tile_map
