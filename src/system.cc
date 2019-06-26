@@ -90,6 +90,10 @@ void System::DrawNextLine() {
     system_bus_->int_controller()->RaiseFrameStart();
     system_bus_->vdma()->OnFrameStart();
 
+    if (live_watches_) {
+      PerformWatches();
+    }
+
     if (!turbo_) {
       auto sleep_time = next_frame_clock - frame_clock;
       std::this_thread::sleep_for(sleep_time);
@@ -113,29 +117,6 @@ void System::DrawNextLine() {
     }
     frame_clock = now;
     next_frame_clock += kVickyFrameDelayDurationNs;
-  }
-  std::unique_lock<std::mutex> l(memory_watch_mutex_);
-
-  for (auto &mw : memory_watches_) {
-    mw.last_results.clear();
-    for (uint32_t addr = mw.start_addr; addr < mw.start_addr + mw.num_bytes;
-         addr++) {
-      mw.last_results.push_back(ReadByte(addr));
-    }
-  }
-  if (stack_watch_enabled_) {
-    stack_watch_.clear();
-    uint16_t sp = cpu_.cpu_state.regs.sp.u16;
-    for (uint8_t i = 0; i < 0xff; i++) {
-      stack_watch_.push_back(ReadByte(sp - i));
-    }
-  }
-  if (direct_page_watch_enabled_) {
-    direct_page_watch_.clear();
-    uint16_t dp = cpu_.cpu_state.regs.d.u16;
-    for (uint8_t i = 0; i < 0xff; i++) {
-      direct_page_watch_.push_back(ReadByte(dp + i));
-    }
   }
   ScheduleNextScanline();
 }
@@ -178,6 +159,32 @@ void System::SetStop() { cpu_.cpu_state.cycle_stop = 0; }
 Automation *System::automation() { return &automation_; }
 
 Vicky *System::vicky() const { return system_bus_->vicky(); }
+
+void System::PerformWatches() {
+  std::unique_lock<std::mutex> l(memory_watch_mutex_);
+
+  for (auto &mw : memory_watches_) {
+    mw.last_results.clear();
+    for (uint32_t addr = mw.start_addr; addr < mw.start_addr + mw.num_bytes;
+         addr++) {
+      mw.last_results.push_back(ReadByte(addr));
+    }
+  }
+  if (stack_watch_enabled_) {
+    stack_watch_.clear();
+    uint16_t sp = cpu_.cpu_state.regs.sp.u16;
+    for (uint8_t i = 0; i < 0xff; i++) {
+      stack_watch_.push_back(ReadByte(sp - i));
+    }
+  }
+  if (direct_page_watch_enabled_) {
+    direct_page_watch_.clear();
+    uint16_t dp = cpu_.cpu_state.regs.d.u16;
+    for (uint8_t i = 0; i < 0xff; i++) {
+      direct_page_watch_.push_back(ReadByte(dp + i));
+    }
+  }
+}
 
 void System::AddMemoryWatch(uint32_t start_addr, size_t num_bytes) {
   std::unique_lock<std::mutex> l(memory_watch_mutex_);

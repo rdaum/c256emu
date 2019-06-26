@@ -169,6 +169,7 @@ void GUI::DrawDirectPageInspect() const {
   }
   if (!is_enabled) {
     system_->set_direct_page_watch_enabled(true);
+    system_->PerformWatches();
   }
   std::vector<uint8_t> buffer = system_->direct_page_watch();
   if (buffer.empty()) {
@@ -201,6 +202,7 @@ void GUI::DrawStackInspect() const {
   }
   if (!is_enabled) {
     system_->set_stack_watch_enabled(true);
+    system_->PerformWatches();
   }
   std::vector<uint8_t> buffer = system_->stack_watch();
   if (buffer.empty()) {
@@ -294,6 +296,7 @@ void GUI::DrawMemoryInspect() const {
           [](const System::MemoryWatch &x) { return x.start_addr == addr; });
       if (found == inspect_points.end()) {
         system_->AddMemoryWatch(addr, bytes);
+        system_->PerformWatches();
       }
       adding_inspect = false;
     }
@@ -433,6 +436,7 @@ void GUI::DrawCPUStatus() const {
 
       if (ImGui::Button("Step")) {
         debug_interface->SingleStep();
+        system_->PerformWatches();
       }
       ImGui::NextColumn();
     }

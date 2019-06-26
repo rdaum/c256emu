@@ -52,6 +52,11 @@ class System {
   bool turbo() const { return turbo_; }
   void set_turbo(bool turbo) { turbo_ = turbo; }
 
+  void set_live_watches(bool live_watch) { live_watches_ = true; }
+  bool live_watches() const { return live_watches_; }
+
+  void PerformWatches();
+
   struct MemoryWatch {
     cpuaddr_t start_addr;
     size_t num_bytes;
@@ -102,13 +107,12 @@ protected:
   DebugInterface debug_;
   Automation automation_;
 
+  std::atomic_bool live_watches_ = true;
+
   std::mutex memory_watch_mutex_;
-
   std::vector<MemoryWatch> memory_watches_;
-
   bool stack_watch_enabled_ = false;
   std::vector<uint8_t> stack_watch_;
-
   bool direct_page_watch_enabled_ = false;
   std::vector<uint8_t> direct_page_watch_;
 };
