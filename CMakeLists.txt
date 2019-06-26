@@ -81,7 +81,6 @@ target_include_directories(bus PUBLIC
         ${SDL2_INCLUDE_DIRS}
         ${GLOG_ROOT}/include
         ${CIRCULAR_BUFFER_INCLUDE_DIRS}
-        ${RETROCPU_INCLUDE_DIRS}
         ./src)
 target_compile_options(bus PUBLIC ${SDL2_CFLAGS_OTHER} ${glog_CFLAGS_OTHER})
 
@@ -95,7 +94,7 @@ add_executable(c256emu
         src/gui/imgui_impl_opengl2.cpp src/gui/imgui_impl_opengl2.h)
 add_dependencies(c256emu bus gflags retro_cpu_core retro_cpu_65816 retro_host circular_buffer)
 target_include_directories(c256emu PUBLIC
-                           retro_cpu
+        retro_cpu
         ${CIRCULAR_BUFFER_INCLUDE_DIRS}
         ./src)
 
@@ -114,7 +113,7 @@ target_link_libraries(c256emu
         SDL2::SDL2
         glfw
         imgui::imgui
-                      retro_cpu_core retro_cpu_65816 retro_host
+        retro_cpu_core retro_cpu_65816 retro_host
         Lua::lua_lib)
 
 # Unit tests.
@@ -122,12 +121,11 @@ include(GoogleTest)
 add_executable(c256_tests src/bus/math_copro_test.cc)
 add_dependencies(c256_tests bus retro_cpu_core)
 target_include_directories(c256_tests PUBLIC
-        ${GTEST_INCLUDE_DIRS}
-        ${RETROCPU_INCLUDE_DIRS})
+        ${GTEST_INCLUDE_DIRS})
 target_link_libraries(c256_tests bus
         glog::glog gflags GTest::main
         ${GTEST_MAIN_LIBRARY}
-                      retro_cpu_core
+        retro_cpu_core
         )
 target_compile_options(c256_tests PUBLIC
         ${GLOG_CFLAGS_OTHER})

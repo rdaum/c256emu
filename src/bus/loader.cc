@@ -9,13 +9,13 @@ namespace fs = std::experimental::filesystem;
 
 namespace {
 
-uint8_t hstouc(std::string const& in) {
+uint8_t hstouc(std::string const &in) {
   static const std::string v{"0123456789ABCDEF"};
 
   return (uint8_t)v.find(toupper(in[0])) * 16 + v.find(toupper(in[1]));
 }
 
-bool ReadHex(std::istream& line_stream, uint8_t* h) {
+bool ReadHex(std::istream &line_stream, uint8_t *h) {
   line_stream.width(2);
   std::string byte_count_str;
   line_stream >> std::setw(2) >> byte_count_str;
@@ -25,7 +25,7 @@ bool ReadHex(std::istream& line_stream, uint8_t* h) {
   return true;
 }
 
-std::istream& safeGetline(std::istream& is, std::string& t) {
+std::istream &safeGetline(std::istream &is, std::string &t) {
   t.clear();
 
   // The characters in the stream are read one-by-one using a std::streambuf.
@@ -35,31 +35,31 @@ std::istream& safeGetline(std::istream& is, std::string& t) {
   // such as thread synchronization and updating the stream state.
 
   std::istream::sentry se(is, true);
-  std::streambuf* sb = is.rdbuf();
+  std::streambuf *sb = is.rdbuf();
 
   for (;;) {
     int c = sb->sbumpc();
     switch (c) {
-      case '\n':
-        return is;
-      case '\r':
-        if (sb->sgetc() == '\n')
-          sb->sbumpc();
-        return is;
-      case std::streambuf::traits_type::eof():
-        // Also handle the case when the last line has no line ending
-        if (t.empty())
-          is.setstate(std::ios::eofbit);
-        return is;
-      default:
-        t += (char)c;
+    case '\n':
+      return is;
+    case '\r':
+      if (sb->sgetc() == '\n')
+        sb->sbumpc();
+      return is;
+    case std::streambuf::traits_type::eof():
+      // Also handle the case when the last line has no line ending
+      if (t.empty())
+        is.setstate(std::ios::eofbit);
+      return is;
+    default:
+      t += (char)c;
     }
   }
 }
 
-}  // namespace
+} // namespace
 
-void LoadFromS28(const std::string& filename, SystemBus* system_bus) {
+void LoadFromS28(const std::string &filename, SystemBus *system_bus) {
   std::ifstream srec_stream;
   srec_stream.open(filename);
   while (!srec_stream.eof()) {
@@ -96,7 +96,7 @@ void LoadFromS28(const std::string& filename, SystemBus* system_bus) {
   }
 }
 
-void LoadFromIHex(const std::string& filename, SystemBus* system_bus) {
+void LoadFromIHex(const std::string &filename, SystemBus *system_bus) {
   std::ifstream hex(filename);
   CHECK(hex);
   int line_no = 0;
@@ -127,9 +127,9 @@ void LoadFromIHex(const std::string& filename, SystemBus* system_bus) {
     uint8_t record_type;
     CHECK(ReadHex(line_stream, &record_type));
     sum += record_type;
-    if (record_type == 1) {  // EOF
+    if (record_type == 1) { // EOF
       return;
-    } else if (record_type == 0) {  // DATA
+    } else if (record_type == 0) { // DATA
       while (byte_count--) {
         uint8_t data;
         CHECK(ReadHex(line_stream, &data));
@@ -142,7 +142,7 @@ void LoadFromIHex(const std::string& filename, SystemBus* system_bus) {
       CHECK(ReadHex(line_stream, &checksum));
       checksum += sum;
       CHECK_EQ(checksum, 0);
-    } else if (record_type == 4) {  // Extended Linear Address
+    } else if (record_type == 4) { // Extended Linear Address
       uint8_t page_addr_hi;
       uint8_t page_addr_lo;
       CHECK(ReadHex(line_stream, &page_addr_lo));
@@ -153,7 +153,7 @@ void LoadFromIHex(const std::string& filename, SystemBus* system_bus) {
   }
 }
 
-void Loader::LoadFromHex(const std::string& filename) {
+void Loader::LoadFromHex(const std::string &filename) {
   fs::path path(filename);
   if (path.extension().string() == ".hex") {
     LoadFromIHex(filename, system_bus_);
@@ -164,7 +164,7 @@ void Loader::LoadFromHex(const std::string& filename) {
   }
 }
 
-void Loader::LoadFromBin(const std::string& filename, uint32_t base_address) {
+void Loader::LoadFromBin(const std::string &filename, uint32_t base_address) {
   std::ifstream in_file(filename);
   CHECK(in_file.is_open());
   uint32_t address = base_address;
@@ -177,9 +177,9 @@ void Loader::LoadFromBin(const std::string& filename, uint32_t base_address) {
 }
 
 struct O65Header {
-  uint8_t non_c64_marker[2];  // should be $01, $00
-  uint8_t magic_marker[3];    // should be $6f, $36, $35
-  uint8_t version;            // should be 0
+  uint8_t non_c64_marker[2]; // should be $01, $00
+  uint8_t magic_marker[3];   // should be $6f, $36, $35
+  uint8_t version;           // should be 0
 
   union {
     struct {
@@ -187,13 +187,12 @@ struct O65Header {
       uint8_t unused1 : 2;
       uint8_t cpu_2 : 4;
       uint8_t unused2 : 1;
-      bool bsszero : 1;    // true if plz zero our the bss segment for this file
-      bool chain : 1;      // true = another file follows this one
-      bool simple : 1;     // true = simple file address
-      bool is_object : 1;  // false if executable
-      bool
-          size : 1;  // determine if we use long or short mode header, true = 32
-      bool reloc : 1;  // true = bytewise, 1 = page (256byte)wise reloc allowed
+      bool bsszero : 1;   // true if plz zero our the bss segment for this file
+      bool chain : 1;     // true = another file follows this one
+      bool simple : 1;    // true = simple file address
+      bool is_object : 1; // false if executable
+      bool size : 1; // determine if we use long or short mode header, true = 32
+      bool reloc : 1; // true = bytewise, 1 = page (256byte)wise reloc allowed
       bool is_65816 : 1;
     } m;
     uint16_t v;
@@ -232,66 +231,99 @@ struct HeaderOption {
   std::string option_bytes;
 };
 
-void Reloc(uint32_t adjust, std::ifstream& in_file,
-           std::vector<uint8_t>* seg,
-           uint32_t reloc_offset,
-           uint8_t type) {
-  if (type == 0x80) { // WORD
-    uint16_t* word =
-        reinterpret_cast<uint16_t*>(&seg->data()[reloc_offset - 1]);
-    LOG(INFO) << "WORD relocated: " << std::hex << *word << " to "
-              << *word + adjust;
+enum RelocationSegment {
+  UNDEFINED = 0,
+  ABSOLUTE_VALUE = 1,  // never used
+  TEXT_SEGMENT = 2,
+  DATA_SEGMENT = 3,
+  BSS_SEGMENT = 4,
+  ZP_SEGMENT = 5,
+};
+
+enum RelocationType {
+  RELOC_WORD = 0x80,
+  RELOC_HIGH = 0x40,
+  RELOC_LOW = 0x20,
+  RELOC_SEGADDR = 0xc0,
+  RELOC_SEG = 0xa0,
+};
+
+void DoReloc(uint32_t adjust, std::ifstream &in_file, std::vector<uint8_t> *seg,
+             uint32_t reloc_offset, RelocationType type, bool verbose) {
+  if (type == RELOC_WORD) {
+    uint16_t *word =
+        reinterpret_cast<uint16_t *>(&seg->data()[reloc_offset - 1]);
+    if (verbose)
+      LOG(INFO) << "WORD relocated: " << std::hex << *word << " to "
+                << *word + adjust;
     *word += adjust;
-  } else if (type == 0xa0) {  // SEG
-    uint8_t* seg_byte = &seg->data()[reloc_offset - 1];
+    return;
+  }
+
+  if (type == RELOC_SEG) {
+    uint8_t *seg_byte = &(*seg)[reloc_offset - 1];
     uint8_t b1 = in_file.get();
     uint8_t b2 = in_file.get();
     //    uint16_t location = (b1<<8) | b2;  // not sure what we can do with
     //    this, most SEG references are just the bank?
     uint8_t rewrite = ((*seg_byte << 16) + adjust) >> 16;
-    LOG(INFO) << "SEG relocated: " << std::hex << (int)*seg_byte << " to "
-              << (int)rewrite;
+    if (verbose)
+      LOG(INFO) << "SEG relocated: " << std::hex << (int)*seg_byte << " to "
+                << (int)rewrite;
     *seg_byte = rewrite;
-  } else if (type == 0xc0) {  // SEGADDR
-    uint8_t* seg_addr = &seg->data()[reloc_offset - 1];
+    return;
+  }
+  if (type == RELOC_SEGADDR) {
+    uint8_t *seg_addr = &(*seg)[reloc_offset - 1];
     uint32_t value;
     memcpy(&value, seg_addr, 3);
-    LOG(INFO) << "SEGADDR relocated: " << std::hex << value << " to "
-              << value + adjust;
+    if (verbose)
+      LOG(INFO) << "SEGADDR relocated: " << std::hex << value << " to "
+                << value + adjust;
     value += adjust;
     memcpy(seg_addr, &value, 3);
-  } else if (type == 0x20) { // LOW
-    uint8_t *lo_addr = &seg->data()[reloc_offset - 1];
-
-    LOG(INFO) << "LO relocated: " << std::hex << (int)*lo_addr << " to "
-              << (int)*lo_addr + adjust;
-    *lo_addr += adjust;
-  } else if (type == 0x40) { // HIGH
-    uint8_t *hi_addr = &seg->data()[reloc_offset - 1];
-    uint8_t b1 = in_file.get(); // not sure what to do with this?
-    LOG(INFO) << "HI relocated: " << std::hex << (int)*hi_addr << " to "
-              << (int)*hi_addr + adjust;
-    *hi_addr += adjust;
-  } else {
-    CHECK(false) << "Unhandled reloc type: " << std::hex << (int)type;
+    return;
   }
+
+  if (type == RELOC_LOW) {
+    uint8_t *lo_addr = &(*seg)[reloc_offset - 1];
+
+    if (verbose)
+      LOG(INFO) << "LO relocated: " << std::hex << (int)*lo_addr << " to "
+                << (int)*lo_addr + adjust;
+    *lo_addr += adjust;
+    return;
+  }
+
+  if (type == RELOC_HIGH) {
+    uint8_t *hi_addr = &(*seg)[reloc_offset - 1];
+    uint8_t b1 = in_file.get(); // not sure what to do with this?
+    if (verbose)
+      LOG(INFO) << "HI relocated: " << std::hex << (int)*hi_addr << " to "
+                << (int)*hi_addr + adjust;
+    *hi_addr += adjust;
+    return;
+  }
+  CHECK(false) << "Unhandled reloc type: " << std::hex << (int)type;
 }
 
-void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
-  LOG(INFO) << "Relocating relative to " << std::hex << reloc_address;
+void Loader::LoadFromO65(const std::string &filename, uint32_t reloc_address,
+                         bool verbose) {
+  LOG(INFO) << "Relocating '" << filename << "' relative to " << std::hex
+            << reloc_address;
   std::ifstream in_file(filename);
   CHECK(in_file.is_open());
 
   // Load and validate the header.
   O65Header header;
-  in_file.read(reinterpret_cast<char*>(&header), 8);
+  in_file.read(reinterpret_cast<char *>(&header), 8);
   CHECK(!in_file.eof());
   CHECK(header.magic_marker[0] == 'o' && header.magic_marker[1] == '6' &&
         header.magic_marker[2] == '5');
 
   // Now load offsets, choosing the right size depending on what mode.
   O65Offsets o65_offsets;
-  in_file.read(reinterpret_cast<char*>(&o65_offsets),
+  in_file.read(reinterpret_cast<char *>(&o65_offsets),
                header.mode.m.size ? 36 : 18);
 
   // Now header options
@@ -302,7 +334,7 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
   while ((olen = in_file.get())) {
     HeaderOption opt;
     opt.otype = in_file.get();
-    olen -= 2;  // take out len and type bytes from count
+    olen -= 2; // take out len and type bytes from count
     while (olen--) {
       opt.option_bytes.push_back(in_file.get());
     }
@@ -314,9 +346,10 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
                                       : o65_offsets.word_mode.tbase;
   uint32_t tlen = header.mode.m.size ? o65_offsets.long_mode.tlen
                                      : o65_offsets.word_mode.tlen;
-  LOG(INFO) << "TBASE: " << std::hex << tbase << " TLEN: " << tlen;
+  if (verbose)
+    LOG(INFO) << "TBASE: " << std::hex << tbase << " TLEN: " << tlen;
   std::vector<uint8_t> t_seg(tlen);
-  in_file.read(reinterpret_cast<char*>(t_seg.data()), tlen);
+  in_file.read(reinterpret_cast<char *>(t_seg.data()), tlen);
   CHECK(!in_file.eof());
 
   // And data
@@ -324,25 +357,35 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
                                       : o65_offsets.word_mode.dbase;
   uint32_t dlen = header.mode.m.size ? o65_offsets.long_mode.dlen
                                      : o65_offsets.word_mode.dlen;
-  LOG(INFO) << "DBASE: " << std::hex << dbase << " DLEN: " << dlen;
+  if (verbose)
+    LOG(INFO) << "DBASE: " << std::hex << dbase << " DLEN: " << dlen;
 
   std::vector<uint8_t> d_seg(dlen);
-  in_file.read(reinterpret_cast<char*>(d_seg.data()), dlen);
+  in_file.read(reinterpret_cast<char *>(d_seg.data()), dlen);
   CHECK(!in_file.eof());
 
   uint32_t zpbase = header.mode.m.size ? o65_offsets.long_mode.zbase
                                        : o65_offsets.word_mode.zbase;
-  LOG(INFO) << "ZPBASE: " << std::hex << zpbase;
+  if (verbose)
+    LOG(INFO) << "ZPBASE: " << std::hex << zpbase;
 
   uint32_t bssbase = header.mode.m.size ? o65_offsets.long_mode.bbase
                                         : o65_offsets.word_mode.bbase;
   uint32_t bsslen = header.mode.m.size ? o65_offsets.long_mode.blen
                                        : o65_offsets.word_mode.blen;
+  if (verbose)
+    LOG(INFO) << "BSSBASE: " << std::hex << zpbase;
+
+  uint32_t stack = header.mode.m.size ? o65_offsets.long_mode.stack
+                                      : o65_offsets.word_mode.stack;
+  if (verbose)
+    LOG(INFO) << "STACK: " << std::hex << stack;
+
   // Obtain the external (undefined) references list. This is meaningless for us
   // tho.
   uint32_t num_references;
   std::vector<std::string> external_references;
-  in_file.read(reinterpret_cast<char*>(&num_references),
+  in_file.read(reinterpret_cast<char *>(&num_references),
                header.mode.m.size ? 4 : 2);
   while (num_references--) {
     std::string ref;
@@ -365,19 +408,23 @@ void Loader::LoadFromO65(const std::string& filename, uint32_t reloc_address) {
     }
     reloc_offset += offset;
     uint8_t type_seg = in_file.get();
-    uint8_t type = type_seg & 0xf0;
-    uint8_t segment = (type_seg & 0x0f);
-    LOG(INFO) << "RelocEntry: offset: " << std::hex << (int)reloc_offset
-              << " relative_offset:" << (int)offset << " type: " << (int)type
-              << " segment: " << (int)segment;
-    if (segment == 2) { // text
-      Reloc(reloc_address - tbase, in_file, &t_seg, reloc_offset, type);
-    } else if (segment == 3) { // data
-      Reloc(reloc_address - dbase, in_file, &d_seg, reloc_offset, type);
-    } else if (segment == 5) { // zp
-      Reloc(zpbase, in_file, &t_seg, reloc_offset, type);
-    } else if (segment == 4) { // bss
-      Reloc(reloc_address - bssbase, in_file, &t_seg, reloc_offset, type);
+    RelocationType type = static_cast<RelocationType>(type_seg & 0xf0);
+    RelocationSegment segment = static_cast<RelocationSegment>(type_seg & 0x0f);
+    if (verbose)
+      LOG(INFO) << "RelocEntry: offset: " << std::hex << (int)reloc_offset
+                << " relative_offset:" << (int)offset << " type: " << (int)type
+                << " segment: " << (int)segment;
+    if (segment == TEXT_SEGMENT) { // text
+      DoReloc(reloc_address - tbase, in_file, &t_seg, reloc_offset, type,
+              verbose);
+    } else if (segment == DATA_SEGMENT) { // data
+      DoReloc(reloc_address - dbase, in_file, &d_seg, reloc_offset, type,
+              verbose);
+    } else if (segment == ZP_SEGMENT) { // zp
+      DoReloc(zpbase, in_file, &t_seg, reloc_offset, type, verbose);
+    } else if (segment == BSS_SEGMENT) { // bss
+      DoReloc(reloc_address - bssbase, in_file, &t_seg, reloc_offset, type,
+              verbose);
     } else {
       CHECK(false) << "Unhandled segment: " << std::hex << (int)segment;
     }
