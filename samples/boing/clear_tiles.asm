@@ -10,6 +10,7 @@
 	ldx #.loword(ROW_CLEAR_BLOCK)		; src address of zeroes
 	sty Param1Word	; save current dest ptr
         mvn #.bankbyte(ROW_CLEAR_BLOCK), #$af	; from src page into $af
+	ldy Param1Word
 	tya
 	clc
 	adc #64			; advance to next row

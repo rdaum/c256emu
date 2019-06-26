@@ -156,6 +156,24 @@ init:
 	;; can't just use one MVP as this spans across the bank into the next
 	acc8i16
 
+	;lda #0
+	;sta ROW_CLEAR_BLOCK
+	;sta ROW_CLEAR_BLOCK+1
+	;sta ROW_CLEAR_BLOCK+2
+	;sta ROW_CLEAR_BLOCK+3
+	;sta ROW_CLEAR_BLOCK+4
+	;sta ROW_CLEAR_BLOCK+5
+	;sta ROW_CLEAR_BLOCK+6
+	;sta ROW_CLEAR_BLOCK+7
+	;sta ROW_CLEAR_BLOCK+8
+	;sta ROW_CLEAR_BLOCK+9
+	;sta ROW_CLEAR_BLOCK+10
+	;sta ROW_CLEAR_BLOCK+11
+	;sta ROW_CLEAR_BLOCK+12
+	;sta ROW_CLEAR_BLOCK+13
+	;sta ROW_CLEAR_BLOCK+14
+	;sta ROW_CLEAR_BLOCK+15
+
 	ldx #0
 copy_tile0_loop:	
 	lda f:ball0_tile_set,x
