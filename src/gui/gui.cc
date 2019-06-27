@@ -397,6 +397,32 @@ void GUI::DrawCPUStatus() const {
   if (ImGui::CollapsingHeader("CPU")) {
     ImGui::BeginGroup();
     WDC65C816 *cpu = system_->cpu();
+    ImGui::Columns(7);
+    if (ImGui::Button("RESET")) {
+      cpu->Reset();
+    }
+    ImGui::NextColumn();
+    if (ImGui::Button("REBOOT")) {
+      cpu->PowerOn();
+    }
+    ImGui::NextColumn();
+    ImGui::NextColumn();
+    if (ImGui::Button("IRQ")) {
+      cpu->DoInterrupt(WDC65C816::IRQ);
+    }
+    ImGui::NextColumn();
+    if (ImGui::Button("BRK")) {
+      cpu->DoInterrupt(WDC65C816::BRK);
+    }
+    ImGui::NextColumn();
+    if (ImGui::Button("NMI")) {
+      cpu->DoInterrupt(WDC65C816::NMI);
+    }
+    ImGui::NextColumn();
+    if (ImGui::Button("COP")) {
+      cpu->DoInterrupt(WDC65C816::COP);
+    }
+    ImGui::Columns(1);
     uint32_t program_address = cpu->program_address();
     ImGui::LabelText("PC", "%s (%d)", Addr(program_address).c_str(),
                      program_address);
