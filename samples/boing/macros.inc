@@ -26,6 +26,19 @@
 	.i8
 .endmacro
 
+; mem block copy from SrcSymbol to DestAddr with Count
+.macro CopyBlock SrcAddr,DestAddr,Count
+.scope
+        ldx #0
+copy_loop:
+        lda f:SrcAddr,x
+        sta DestAddr,x
+        inx
+        cpx #Count
+        bne copy_loop
+.endscope
+.endmacro
+
 ; Macro to set one of our zp lut address fields (hi/lo)
 .macro SetLUTAddress LUTRegAddr, LUTHiField, LUTLoField
         acc16i16

@@ -75,8 +75,6 @@ RC: .res 1
 GC: .res 1
 BC: .res 1
 
-TmpPtr: .res 4
-
 .code
 
 INT_PENDING_REG0 = $000140
@@ -156,55 +154,10 @@ init:
 	;; can't just use one MVP as this spans across the bank into the next
 	acc8i16
 
-	;lda #0
-	;sta ROW_CLEAR_BLOCK
-	;sta ROW_CLEAR_BLOCK+1
-	;sta ROW_CLEAR_BLOCK+2
-	;sta ROW_CLEAR_BLOCK+3
-	;sta ROW_CLEAR_BLOCK+4
-	;sta ROW_CLEAR_BLOCK+5
-	;sta ROW_CLEAR_BLOCK+6
-	;sta ROW_CLEAR_BLOCK+7
-	;sta ROW_CLEAR_BLOCK+8
-	;sta ROW_CLEAR_BLOCK+9
-	;sta ROW_CLEAR_BLOCK+10
-	;sta ROW_CLEAR_BLOCK+11
-	;sta ROW_CLEAR_BLOCK+12
-	;sta ROW_CLEAR_BLOCK+13
-	;sta ROW_CLEAR_BLOCK+14
-	;sta ROW_CLEAR_BLOCK+15
-
-	ldx #0
-copy_tile0_loop:	
-	lda f:ball0_tile_set,x
-	sta BALL_0_DST,x
-	inx
-	cpx #$0
-	bne copy_tile0_loop
-
-	ldx #0
-copy_tile1_loop:	
-	lda f:ball1_tile_set,x
-	sta BALL_1_DST,x
-	inx
-	cpx #$0
-	bne copy_tile1_loop
-
-	ldx #0
-copy_tile2_loop:	
-	lda f:ball2_tile_set,x
-	sta BALL_2_DST,x
-	inx
-	cpx #$0
-	bne copy_tile2_loop
-
-	ldx #0
-copy_tile3_loop:	
-	lda f:ball3_tile_set,x
-	sta BALL_3_DST,x
-	inx
-	cpx #$0
-	bne copy_tile3_loop
+	CopyBlock ball0_tile_set, BALL_0_DST, 0 ; 64k
+	CopyBlock ball1_tile_set, BALL_1_DST, 0 ; 64k
+	CopyBlock ball2_tile_set, BALL_2_DST, 0 ; 64k
+	CopyBlock ball3_tile_set, BALL_3_DST, 0 ; 64k
 
 	lda #(1 | 4 << 4) ; turn on bitmap with lut 4
 	; Point bitmap to where background data went
@@ -216,53 +169,13 @@ copy_tile3_loop:
 	lda #BMAP_HI
 	sta BMAP_ADDR+2
 
-        ldx #0
-copy_bmp_1:
-        lda f:bmp_1,x
-        sta BMAP_1,x
-        inx
-        cpx #$0
-        bne copy_bmp_1
+	CopyBlock bmp_1, BMAP_1, 0 ; 64k
+	CopyBlock bmp_2, BMAP_2, 0 ; 64k
+	CopyBlock bmp_3, BMAP_3, 0 ; 64k
+	CopyBlock bmp_4, BMAP_4, 0 ; 64k
+	CopyBlock bmp_5, BMAP_5, $b000
 
-        ldx #0
-copy_bmp_2:
-        lda f:bmp_2,x
-        sta BMAP_2,x
-        inx
-        cpx #$0
-        bne copy_bmp_2
-
-        ldx #0
-copy_bmp_3:
-        lda f:bmp_3,x
-        sta BMAP_3,x
-        inx
-        cpx #$0
-        bne copy_bmp_3
-
-        ldx #0
-copy_bmp_4:
-        lda f:bmp_4,x
-        sta BMAP_4,x
-        inx
-        cpx #$0
-        bne copy_bmp_4
-
-        ldx #0
-copy_bmp_5:
-        lda f:bmp_5,x
-        sta BMAP_5,x
-        inx
-        cpx #$b000
-        bne copy_bmp_5
-
-        ldx #0
-copy_bg_lut:
-        lda f:lut_4,x
-        sta BMAP_LUT,x
-        inx
-        cpx #$400
-        bne copy_bg_lut
+	CopyBlock lut_4, BMAP_LUT, $400
 
 	; turn off border
 	lda #0

@@ -1,22 +1,20 @@
-        ; ZPStruct::Param1Addr points to destination tile map start addr
-        ; ZPStruct::Param1Word = 16 bit X location
-        ; ZPStruct::Param2Word = 16 bit Y location
-
+	; Y ptr to top left corner byte of square to clear
 .macro ClearRow RowNum
 	.a16
 	.i16
 
-        lda #15			; copy 16 zeroes
+        lda #15					; copy 16 zeroes
 	ldx #.loword(ROW_CLEAR_BLOCK)		; src address of zeroes
-	sty Param1Word	; save current dest ptr
         mvn #.bankbyte(ROW_CLEAR_BLOCK), #$af	; from src page into $af
-	ldy Param1Word
 	tya
 	clc
-	adc #64			; advance to next row
+	adc #48			; advance to next row
 	tay			; put back into dest arg
 .endmacro
 
+        ; Param1Addr points to destination tile map start addr
+        ; Param1Word = 16 bit X location
+        ; Param2Word = 16 bit Y location
 .proc clear_tile_map
 	acc16i16
 
