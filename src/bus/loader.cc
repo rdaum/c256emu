@@ -233,7 +233,7 @@ struct HeaderOption {
 
 enum RelocationSegment {
   UNDEFINED = 0,
-  ABSOLUTE_VALUE = 1,  // never used
+  ABSOLUTE_VALUE = 1, // never used
   TEXT_SEGMENT = 2,
   DATA_SEGMENT = 3,
   BSS_SEGMENT = 4,
@@ -248,15 +248,26 @@ enum RelocationType {
   RELOC_SEG = 0xa0,
 };
 
-void DoReloc(uint32_t adjust, std::ifstream &in_file, std::vector<uint8_t> *seg,
+uint32_t AdjustAddr(uint32_t cur_segment_base, uint32_t new_segment_base,
+                    uint32_t addr) {
+  addr -= cur_segment_base;
+  addr += new_segment_base;
+  return addr;
+}
+
+void DoReloc(uint32_t cur_segment_base, uint32_t new_segment_base,
+             std::ifstream &in_file, std::vector<uint8_t> *seg,
              uint32_t reloc_offset, RelocationType type, bool verbose) {
   if (type == RELOC_WORD) {
     uint16_t *word =
         reinterpret_cast<uint16_t *>(&seg->data()[reloc_offset - 1]);
+    uint32_t full_addr = *word + (cur_segment_base & 0x00ff0000);
+    uint32_t adjust_full_addr =
+        AdjustAddr(cur_segment_base, new_segment_base, full_addr);
+    uint32_t w = adjust_full_addr & 0x0000ffff;
     if (verbose)
-      LOG(INFO) << "WORD relocated: " << std::hex << *word << " to "
-                << *word + adjust;
-    *word += adjust;
+      LOG(INFO) << "WORD relocated: " << std::hex << *word << " to " << w;
+    *word = w;
     return;
   }
 
@@ -266,42 +277,53 @@ void DoReloc(uint32_t adjust, std::ifstream &in_file, std::vector<uint8_t> *seg,
     uint8_t b2 = in_file.get();
     //    uint16_t location = (b1<<8) | b2;  // not sure what we can do with
     //    this, most SEG references are just the bank?
-    uint8_t rewrite = ((*seg_byte << 16) + adjust) >> 16;
+    uint32_t full_addr = (*seg_byte) << 16;
+    uint32_t adjust_full_addr =
+        AdjustAddr(cur_segment_base, new_segment_base, full_addr);
+    uint8_t new_seg = adjust_full_addr >> 16;
     if (verbose)
       LOG(INFO) << "SEG relocated: " << std::hex << (int)*seg_byte << " to "
-                << (int)rewrite;
-    *seg_byte = rewrite;
+                << (int)new_seg;
+    *seg_byte = new_seg;
     return;
   }
+
   if (type == RELOC_SEGADDR) {
     uint8_t *seg_addr = &(*seg)[reloc_offset - 1];
     uint32_t value;
     memcpy(&value, seg_addr, 3);
     if (verbose)
       LOG(INFO) << "SEGADDR relocated: " << std::hex << value << " to "
-                << value + adjust;
-    value += adjust;
+                << AdjustAddr(cur_segment_base, new_segment_base, value);
+    value = AdjustAddr(cur_segment_base, new_segment_base, value);
     memcpy(seg_addr, &value, 3);
     return;
   }
 
   if (type == RELOC_LOW) {
     uint8_t *lo_addr = &(*seg)[reloc_offset - 1];
-
+    uint32_t full_addr = cur_segment_base + *lo_addr;
+    uint32_t adjust_full_addr =
+        AdjustAddr(cur_segment_base, new_segment_base, full_addr);
+    uint8_t new_lo = adjust_full_addr & 0x000000ff;
     if (verbose)
       LOG(INFO) << "LO relocated: " << std::hex << (int)*lo_addr << " to "
-                << (int)*lo_addr + adjust;
-    *lo_addr += adjust;
+                << (int)new_lo;
+    *lo_addr = new_lo;
     return;
   }
 
   if (type == RELOC_HIGH) {
     uint8_t *hi_addr = &(*seg)[reloc_offset - 1];
+    uint32_t full_addr = cur_segment_base + (*hi_addr << 8);
+    uint32_t adjust_full_addr =
+        AdjustAddr(cur_segment_base, new_segment_base, full_addr);
+    uint16_t new_hi = (adjust_full_addr & 0x0000ff00) >> 8;
     uint8_t b1 = in_file.get(); // not sure what to do with this?
     if (verbose)
       LOG(INFO) << "HI relocated: " << std::hex << (int)*hi_addr << " to "
-                << (int)*hi_addr + adjust;
-    *hi_addr += adjust;
+                << (int)new_hi;
+    *hi_addr += new_hi;
     return;
   }
   CHECK(false) << "Unhandled reloc type: " << std::hex << (int)type;
@@ -348,9 +370,6 @@ void Loader::LoadFromO65(const std::string &filename, uint32_t reloc_address,
                                      : o65_offsets.word_mode.tlen;
   if (verbose)
     LOG(INFO) << "TBASE: " << std::hex << tbase << " TLEN: " << tlen;
-  std::vector<uint8_t> t_seg(tlen);
-  in_file.read(reinterpret_cast<char *>(t_seg.data()), tlen);
-  CHECK(!in_file.eof());
 
   // And data
   uint32_t dbase = header.mode.m.size ? o65_offsets.long_mode.dbase
@@ -360,26 +379,27 @@ void Loader::LoadFromO65(const std::string &filename, uint32_t reloc_address,
   if (verbose)
     LOG(INFO) << "DBASE: " << std::hex << dbase << " DLEN: " << dlen;
 
-  std::vector<uint8_t> d_seg(dlen);
-  in_file.read(reinterpret_cast<char *>(d_seg.data()), dlen);
-  CHECK(!in_file.eof());
-
-  uint32_t zpbase = header.mode.m.size ? o65_offsets.long_mode.zbase
-                                       : o65_offsets.word_mode.zbase;
-  if (verbose)
-    LOG(INFO) << "ZPBASE: " << std::hex << zpbase;
 
   uint32_t bssbase = header.mode.m.size ? o65_offsets.long_mode.bbase
                                         : o65_offsets.word_mode.bbase;
   uint32_t bsslen = header.mode.m.size ? o65_offsets.long_mode.blen
                                        : o65_offsets.word_mode.blen;
   if (verbose)
-    LOG(INFO) << "BSSBASE: " << std::hex << zpbase;
+    LOG(INFO) << "BSSBASE: " << std::hex << bssbase << " BSSLEN: " << bsslen;
+
+  uint32_t zpbase = header.mode.m.size ? o65_offsets.long_mode.zbase
+                                       : o65_offsets.word_mode.zbase;
+  if (verbose)
+    LOG(INFO) << "ZPBASE: " << std::hex << zpbase;
 
   uint32_t stack = header.mode.m.size ? o65_offsets.long_mode.stack
                                       : o65_offsets.word_mode.stack;
   if (verbose)
     LOG(INFO) << "STACK: " << std::hex << stack;
+
+  std::vector<uint8_t> program(tlen + dlen);
+  in_file.read(reinterpret_cast<char *>(program.data()), tlen);
+  CHECK(!in_file.eof());
 
   // Obtain the external (undefined) references list. This is meaningless for us
   // tho.
@@ -403,7 +423,7 @@ void Loader::LoadFromO65(const std::string &filename, uint32_t reloc_address,
     if (offset == 0)
       break;
     if (offset == 0xff) {
-      reloc_offset += 254;
+      reloc_offset += 0xfe;
       continue;
     }
     reloc_offset += offset;
@@ -415,16 +435,16 @@ void Loader::LoadFromO65(const std::string &filename, uint32_t reloc_address,
                 << " relative_offset:" << (int)offset << " type: " << (int)type
                 << " segment: " << (int)segment;
     if (segment == TEXT_SEGMENT) { // text
-      DoReloc(reloc_address - tbase, in_file, &t_seg, reloc_offset, type,
+      DoReloc(tbase, reloc_address, in_file, &program, reloc_offset, type,
               verbose);
     } else if (segment == DATA_SEGMENT) { // data
-      DoReloc(reloc_address - dbase, in_file, &d_seg, reloc_offset, type,
-              verbose);
+      DoReloc(dbase, reloc_address + tlen, in_file, &program, reloc_offset,
+              type, verbose);
     } else if (segment == ZP_SEGMENT) { // zp
-      DoReloc(zpbase, in_file, &t_seg, reloc_offset, type, verbose);
+      DoReloc(0, zpbase, in_file, &program, reloc_offset, type, verbose);
     } else if (segment == BSS_SEGMENT) { // bss
-      DoReloc(reloc_address - bssbase, in_file, &t_seg, reloc_offset, type,
-              verbose);
+      DoReloc(bssbase, reloc_address + tlen + dlen, in_file, &program,
+              reloc_offset, type, verbose);
     } else {
       CHECK(false) << "Unhandled segment: " << std::hex << (int)segment;
     }
@@ -433,15 +453,13 @@ void Loader::LoadFromO65(const std::string &filename, uint32_t reloc_address,
 
   // Now load the segments into memory.
   int offset = 0;
-  for (int i = 0; i < tlen; i++, offset++) {
-    system_bus_->WriteByte(reloc_address + offset, t_seg[i]);
-  }
-  for (int i = 0; i < dlen; i++, offset++) {
-    system_bus_->WriteByte(reloc_address + offset, d_seg[i]);
-  }
+  for (offset = 0; offset < tlen + dlen; offset++)
+    system_bus_->WriteByte(reloc_address + offset, program[offset]);
+
   // BSS
-  for (int i = 0; i < bsslen; i++, offset++) {
-    system_bus_->WriteByte(reloc_offset + offset, 0);
+  while (bsslen--) {
+    system_bus_->WriteByte(reloc_address + (offset++), 0);
   }
+
   // Look for exported global symbols.
 }
