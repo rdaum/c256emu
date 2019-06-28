@@ -1,0 +1,300 @@
+.p816
+
+.import __ZEROPAGE_LOAD__       ; symbol defining the start of the ZP
+
+;:ts=8
+R0 = 1
+R1 = 5
+R2 = 3
+R3 = 13
+
+.macro acc8i16
+	sep #$20
+	.a8
+	.i16
+.endmacro
+
+.macro acc16i16
+	rep #$30
+	.a16
+	.i16
+.endmacro
+
+.macro acc8i8
+	sep #$30
+	.a8
+	.i8
+.endmacro
+
+.macro acc16i8
+	sep #$10
+	.a16
+	.i8
+.endmacro
+
+.macro StartFrame offset
+  .a16
+  .i16
+	tsc         ; sp -> acc
+	sec         ; set carry
+  sbc #offset ; sub zp offset
+	tcs         ; acc -> sp
+	phd         ; push direct page
+	tcd         ; acc -> direct page
+.endmacro
+
+.macro EndFrame offset, width
+	lda	offset+2         ; ?
+	sta	offset+2+width   ; ?
+	lda	offset+1         ; ?
+	sta	offset+1+width   ; ?
+	pld                  ; pop direct page
+	tsc                  ; sp -> acc
+	clc                  ; clear carry
+	adc	#offset+width    ; acc += width
+	tcs                  ;  sp = acc
+.endmacro
+
+.macro Store32 v, d
+  lda .loword(v)
+  sta d
+  lda .hiword(v)
+  sta d+2
+.endmacro
+
+.macro AdjustAddr addr, cur,  new
+  lda .loword(addr)
+  sbc .loword(cur_segment_base)
+  sta working_addr
+  lda .hiword(addr)
+  sbc .hiword(cur_segment_base)
+  sta working_addr+2
+
+  lda .loword(addr)
+  adc .loword(new_segment_base)
+  sta working_addr
+  lda .hiword(addr)
+  adc .hiword(new_segment_base)
+  sta working_addr+2
+.endmacro
+
+.macro CopyBytes source, dest, count
+  .repeat count, N
+    lda [source+N*2]
+    sta [dest+N*2]
+    lda [source+(N*2)+2]
+    sta [dest+(N*2)+2]
+  .endrep
+.endmacro
+
+.zeropage
+.org $00
+  status:            .res 1  ; 0 if ok, otherwise some error code
+  program:           .res 4  ; ptr to bottom of program bank
+  program_offset:    .res 4
+
+  ; for relocations
+  cur_segment_base:  .res 4  ; the current segment base for reloc
+  new_segment_base:  .res 4  ; desired segment base
+  working_addr:      .res 4  ; where to stash relocated addresses
+
+  ; read from the header
+  mode:              .res 2
+  tbase:             .res 4
+  tlen:              .res 4
+  dbase:             .res 4
+  dlen:              .res 4
+  bbase:             .res 4
+  blen:              .res 4
+  zbase:             .res 4
+  zlen:              .res 4
+  stack:             .res 4
+
+  olen:              .res 1
+  otype:             .res 1
+
+.code
+.org $8000
+
+Start:
+  ; clear zero page vars
+  acc8i16
+  stz status
+  stz olen
+  stz otype
+
+  acc16i16
+  stz program_offset
+  stz program_offset+2
+  stz cur_segment_base
+  stz cur_segment_base+2
+  stz new_segment_base
+  stz new_segment_base+2
+  stz working_addr
+  stz working_addr+2
+
+  lda #.loword($20000)
+  sta program
+  lda #.hiword($20000)
+  sta program+2
+
+  jsl LoadHeader
+
+O65_BAD_HEADER_MAGIC = $01
+
+PNext:
+.scope
+; Read current value @ program, put in A.
+; corrupts Y
+; Then increment program to next position
+  acc16i16
+  lda #0000
+  lda program_offset
+  tay
+  acc8i16
+  lda [program],Y
+  acc16i16
+  tay
+  lda program_offset
+  sta program_offset
+  inc
+  bcc Done
+  lda program+2
+  inc
+  sta program+2
+Done:
+  tya
+  rtl
+
+.endscope
+
+PNextWord:
+.scope
+  lda program_offset
+  tay
+  lda #0000
+  lda [program], Y
+  tay
+  lda program_offset
+  inc
+  inc
+  sta program_offset
+  bcc Done
+  lda program+2
+  inc
+  sta program+2
+Done:
+  tya
+  rtl
+
+.endscope
+
+.macro PNext32To D
+  jsr PNextWord
+  sta D
+  jsr PNextWord
+  sta D+2
+.endmacro
+
+.macro PNext16To D
+  jsr PNextWord
+  sta D
+.endmacro
+
+LoadHeader:
+.scope
+	; set zero page to $fe00
+	acc16i16
+	lda #__ZEROPAGE_LOAD__
+	tcd
+
+  ; First two bytes must be $01 $00 for non-c64
+  jsr PNextWord
+  cmp #$0001
+  bne FailHeader
+
+  ; Next 4 bytes should be 'o65\0' ($65 $36 $35 $00)
+  jsr PNextWord
+  cmp #$366f
+  bne FailHeader
+  jsr PNextWord
+  cmp #$0035
+  beq MagicSuccess
+
+FailHeader:
+  acc8i16
+  lda #O65_BAD_HEADER_MAGIC
+  sta status
+  acc16i16
+  rtl
+
+MagicSuccess:
+  jsr PNextWord
+  sta mode
+
+  and #$2000
+  cmp #$2000
+  bne Read16Sizes
+
+  PNext32To tbase
+  PNext32To tlen
+  PNext32To dbase
+  PNext32To dlen
+  PNext32To bbase
+  PNext32To blen
+  PNext32To zbase
+  PNext32To zlen
+  PNext32To stack
+  bra Done
+
+Read16Sizes:
+  PNext16To tbase
+  PNext16To tlen
+  PNext16To dbase
+  PNext16To dlen
+  PNext16To bbase
+  PNext16To blen
+  PNext16To zbase
+  PNext16To zlen
+  PNext16To stack
+
+Done:
+  rtl
+
+.endscope
+
+LoadHeaderOptions:
+.scope
+
+;  while ((olen = *(program++))) {
+StartLoop:
+  jsr PNext
+  sta olen
+  cmp #0
+	bne StartHeader
+  brl Done
+StartHeader:
+;    uint8_t otype = *(program++);
+;    olen -= 2;  // take out len and type bytes from count
+	jsr PNext ; otype.
+  sta otype
+  acc8i16
+  lda olen
+  dec
+  dec
+  sta olen
+
+ReadHeaderLoop:
+  lda olen
+  dec
+  sta olen
+  cmp #0
+  bne EatBytes
+  brl StartLoop
+EatBytes:
+  jsr PNext
+  bra ReadHeaderLoop
+Done:
+	rtl
+
+.endscope
