@@ -2,12 +2,6 @@
 
 .import __ZEROPAGE_LOAD__       ; symbol defining the start of the ZP
 
-;:ts=8
-R0 = 1
-R1 = 5
-R2 = 3
-R3 = 13
-
 .macro acc8i16
 	sep #$20
 	.a8
@@ -87,6 +81,29 @@ R3 = 13
   .endrep
 .endmacro
 
+.macro ProcStart
+  pha  ; save working registers
+  phx
+  phy
+  phd  ; save frame pointer and reset accordingly.
+  tsc
+  tcd
+.endmacro
+
+.macro ProcExit
+  tdc
+  tcs
+
+  ; pop statically-allocated variables here,
+  ; since they sit above the caller's D register.
+
+  pld  ; remember to restore the previous caller's D register!
+  ply
+  plx
+  pla
+  rtl
+.endmacro
+
 .zeropage
 .org $00
   status:            .res 1  ; 0 if ok, otherwise some error code
@@ -115,8 +132,9 @@ R3 = 13
 
 .code
 .org $10000
-
 Start:
+  ProcStart
+
 	; set zero page to $fe00
 	acc16i16
 	lda #__ZEROPAGE_LOAD__
@@ -143,7 +161,10 @@ Start:
   lda #.hiword($20000)
   sta program+2
 
-  jsl LoadHeader
+  jsl LoadHeader        ; load the header
+  jsl LoadHeaderOptions ; eat the header options
+
+  ProcExit
 
 O65_BAD_HEADER_MAGIC = $01
 
@@ -170,7 +191,7 @@ PNext:
   sta program+2
 Done:
   tya
-  rts
+  rtl
 
 .endscope
 
@@ -191,19 +212,19 @@ PNextWord:
   sta program+2
 Done:
   tya
-  rts
+  rtl
 
 .endscope
 
 .macro PNext32To D
-  jsr PNextWord
+  jsl PNextWord
   sta D
-  jsr PNextWord
+  jsl PNextWord
   sta D+2
 .endmacro
 
 .macro PNext16To D
-  jsr PNextWord
+  jsl PNextWord
   sta D
 .endmacro
 
@@ -211,15 +232,15 @@ LoadHeader:
 .scope
 
   ; First two bytes must be $01 $00 for non-c64
-  jsr PNextWord
+  jsl PNextWord
   cmp #$0001
   bne FailHeader
 
   ; Next 4 bytes should be 'o65\0' ($65 $36 $35 $00)
-  jsr PNextWord
+  jsl PNextWord
   cmp #$366f
   bne FailHeader
-  jsr PNextWord
+  jsl PNextWord
   cmp #$0035
   beq MagicSuccess
 
@@ -231,7 +252,7 @@ FailHeader:
   rtl
 
 MagicSuccess:
-  jsr PNextWord
+  jsl PNextWord
   sta mode
 
   and #$2000
@@ -267,10 +288,11 @@ Done:
 
 LoadHeaderOptions:
 .scope
-
+  ProcStart
+  
 ;  while ((olen = *(program++))) {
 StartLoop:
-  jsr PNext
+  jsl PNext
   sta olen
   cmp #0
 	bne StartHeader
@@ -278,7 +300,7 @@ StartLoop:
 StartHeader:
 ;    uint8_t otype = *(program++);
 ;    olen -= 2;  // take out len and type bytes from count
-	jsr PNext ; otype.
+	jsl PNext ; otype.
   sta otype
   acc8i16
   lda olen
@@ -294,7 +316,7 @@ ReadHeaderLoop:
   bne EatBytes
   brl StartLoop
 EatBytes:
-  jsr PNext
+  jsl PNext
   bra ReadHeaderLoop
 Done:
 	rtl
