@@ -49,7 +49,7 @@ void GUI::Start(int x, int y) {
       glfwSetErrorCallback(glfw_error_callback);
       CHECK(glfwInit());
 
-      window_ = glfwCreateWindow(800, 800, "c256emu", nullptr, nullptr);
+      window_ = glfwCreateWindow(999, 800, "c256emu", nullptr, nullptr);
       CHECK(window_);
       glfwSetWindowPos(window_, x, y);
       glfwMakeContextCurrent(window_);
@@ -107,33 +107,36 @@ void GUI::Render() {
   ImGui::NewFrame();
 
   ImGui::SetNextWindowPos({0, 0}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize({400, 800}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({333, 800}, ImGuiCond_FirstUseEver);
   if (ImGui::Begin("System.Ctrl", nullptr)) {
     // TODO: almost none of this is thread safe with the CPU. locking required.
     DrawProfiler();
     DrawCPUStatus();
     DrawVickySettings();
     DrawBreakpoints();
-    DrawDisassembler();
   }
 
-  ImGui::SetNextWindowPos({400, 0}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize({400, 200}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowPos({333, 0}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({333, 200}, ImGuiCond_FirstUseEver);
   DrawMemoryInspect();
 
-  ImGui::SetNextWindowPos({400, 200}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize({400, 200}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowPos({333, 200}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({333, 200}, ImGuiCond_FirstUseEver);
   DrawStackInspect();
 
-  ImGui::SetNextWindowPos({400, 400}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize({400, 200}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowPos({333, 400}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({333, 200}, ImGuiCond_FirstUseEver);
   DrawDirectPageInspect();
 
-  ImGui::SetNextWindowPos({400, 600}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize({400, 200}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowPos({333, 600}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({333, 200}, ImGuiCond_FirstUseEver);
   static AutomationConsole console(system_->automation());
   static bool console_open;
   console.Draw("Automation", &console_open);
+
+  ImGui::SetNextWindowPos({666, 0}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({333, 800}, ImGuiCond_FirstUseEver);
+  DrawDisassembler();
 
   ImGui::End();
   ImGui::EndFrame();
@@ -252,21 +255,61 @@ void GUI::DrawVickySettings() const {
 }
 
 void GUI::DrawDisassembler() const {
-  if (ImGui::CollapsingHeader("Disassembler")) {
-    Disassembler *disassembler = system_->cpu()->GetDisassembler();
-    std::vector<CpuInstruction> program = disassembler->Disassemble(
-        Disassembler::Config(), &system_->cpu()->cpu_state);
-    ImGui::Columns(3);
-    for (auto instruction : program) {
-      ImGui::Text("%s", Addr(instruction.canonical_address).c_str());
+  static bool open = false;
+  if (!ImGui::Begin("Disassembler", &open)) {
+    return ImGui::End();
+  }
+  Disassembler *disassembler = system_->cpu()->GetDisassembler();
+  ImGui::Columns(3);
+  ImVec4 yellow{0xff, 0xd3, 0x00, 0xff};
+  ImVec4 red{0xde, 0x17, 0x38, 0xff};
+  ImVec4 blue{0x00, 0xb2, 0xff, 0xff};
+  ImVec4 white{0xff, 0xff, 0xff, 0xff};
+
+  std::vector<cpuaddr_t> past_addrs;
+
+  CpuTrace &cpu_trace = system_->cpu()->tracing;
+  for (int i = cpu_trace.write; i < cpu_trace.addrs.size(); i++) {
+    past_addrs.push_back(cpu_trace.addrs[i]);
+  }
+  for (int i = 0; i < cpu_trace.write; i++) {
+    past_addrs.push_back(cpu_trace.addrs[i]);
+  }
+
+  for (cpuaddr_t addr : past_addrs) {
+    const Disassembler::Config config{1};
+    std::vector<CpuInstruction> past_program =
+        disassembler->Disassemble(config, addr);
+    for (auto instruction : past_program) {
+      ImGui::TextColored(red, "%s",
+                         Addr(instruction.canonical_address).c_str());
       ImGui::NextColumn();
-      ImGui::Text("%s", instruction.asm_string.substr(8, 12).c_str());
+      ImGui::TextColored(yellow, "%s",
+                         instruction.asm_string.substr(8, 12).c_str());
       ImGui::NextColumn();
-      ImGui::Text("%s", instruction.asm_string.substr(20).c_str());
+      ImGui::TextColored(yellow, "%s",
+                         instruction.asm_string.substr(20).c_str());
       ImGui::NextColumn();
     }
-    ImGui::Columns(1);
   }
+
+  bool is_first = true;
+  ImGui::Separator();
+  std::vector<CpuInstruction> upcoming_program = disassembler->Disassemble(
+      Disassembler::Config(), &system_->cpu()->cpu_state);
+  for (auto instruction : upcoming_program) {
+    ImGui::TextColored(red, "%s", Addr(instruction.canonical_address).c_str());
+    ImGui::NextColumn();
+    ImGui::TextColored(is_first ? blue : white, "%s",
+                       instruction.asm_string.substr(8, 12).c_str());
+    ImGui::NextColumn();
+    ImGui::TextColored(is_first ? blue : white, "%s",
+                       instruction.asm_string.substr(20).c_str());
+    ImGui::NextColumn();
+    is_first = false;
+  }
+  ImGui::Columns(1);
+  ImGui::End();
 }
 
 void GUI::DrawMemoryInspect() const {

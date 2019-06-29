@@ -52,6 +52,7 @@ void System::Initialize() {
 
   LOG(INFO) << "Starting CPU...";
 
+  cpu_.tracing.addrs.resize(16);
   // Lower the reset pin.
   cpu_.PowerOn();
 
