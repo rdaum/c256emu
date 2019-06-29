@@ -212,7 +212,11 @@ void GUI::DrawStackInspect() const {
     ImGui::End();
     return;
   }
-  uint16_t sp = system_->cpu()->cpu_state.regs.sp.u16;
+  uint16_t sp = system_->watched_sp();
+
+  uint32_t peek_rtsl = system_->peek_rtsl();
+  ImGui::LabelText("RTS/L", "%02x:%04x", peek_rtsl >> 16,
+                   peek_rtsl & 0x0000ffff);
 
   // Draw in ascending order.
   ImGui::Columns(5);
@@ -442,11 +446,11 @@ void GUI::DrawCPUStatus() const {
     WDC65C816 *cpu = system_->cpu();
     ImGui::Columns(7);
     if (ImGui::Button("RESET")) {
-      cpu->Reset();
+      system_->BootCPU(false);
     }
     ImGui::NextColumn();
     if (ImGui::Button("REBOOT")) {
-      cpu->PowerOn();
+      system_->BootCPU(true);
     }
     ImGui::NextColumn();
     ImGui::NextColumn();

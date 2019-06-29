@@ -37,12 +37,6 @@ System::System()
 System::~System() = default;
 
 void System::Initialize() {
-  // Copy Bank 18 to Bank 0
-  LOG(INFO) << "Copying flash bank 18 to bank 0...";
-  for (int i = 0; i < 1 << 16; i++) {
-    system_bus_->WriteByte(i, system_bus_->ReadByte(0x180000 + i));
-  }
-
   SDL_Init(SDL_INIT_VIDEO);
 
   LOG(INFO) << "Starting Vicky...";
@@ -50,19 +44,34 @@ void System::Initialize() {
   // Fire up Vicky
   auto window_geometry = system_bus_->vicky()->Start();
 
-  LOG(INFO) << "Starting CPU...";
-
   cpu_.tracing.addrs.resize(16);
-  // Lower the reset pin.
-  cpu_.PowerOn();
+
+  BootCPU();
 
   // Fire up the GUI debugger;
   gui_->Start(window_geometry.x + window_geometry.w, window_geometry.y);
 }
 
+void System::BootCPU(bool hard_boot) {
+  // Copy Flash bank 18 to Bank 0
+  LOG(INFO) << "Copying flash bank 18 to bank 0...";
+  for (int i = 0; i < 1 << 16; i++) {
+    system_bus_->WriteByte(i, system_bus_->ReadByte(0x180000 + i));
+  }
+
+  LOG(INFO) << "PowerOn CPU...";
+  // Lower the reset pin.
+
+  if (hard_boot) {
+    cpu_.PowerOn();
+  } else
+    cpu_.Reset();
+}
+
 void System::Sys(uint32_t address) {
-  cpu_.cpu_state.ip = address & 0xFFFF;
+  // Emulate a JML. Stack won't be in a good state.
   cpu_.cpu_state.code_segment_base = address & 0xFF0000;
+  cpu_.cpu_state.ip = address & 0xFFFF;
 }
 
 DebugInterface *System::GetDebugInterface() { return &debug_; }
@@ -174,9 +183,13 @@ void System::PerformWatches() {
   if (stack_watch_enabled_) {
     stack_watch_.clear();
     uint16_t sp = cpu_.cpu_state.regs.sp.u16;
+    watched_sp_ = sp;
     for (uint8_t i = 0; i < 0xff; i++) {
-      stack_watch_.push_back(ReadByte(sp - i));
+      stack_watch_.push_back(ReadByte(watched_sp_ - i));
     }
+    peek_rtsl_ = ReadByte(sp + 1);
+    peek_rtsl_ |= ReadByte(sp + 2) << 8;
+    peek_rtsl_ |= ReadByte(sp + 3) << 16;
   }
   if (direct_page_watch_enabled_) {
     direct_page_watch_.clear();
@@ -217,6 +230,8 @@ void System::set_stack_watch_enabled(bool enable) {
 
 bool System::stack_watch_enabled() const { return stack_watch_enabled_; }
 
+uint16_t System::watched_sp() const { return watched_sp_; }
+
 std::vector<uint8_t> System::stack_watch() {
   std::unique_lock<std::mutex> l(memory_watch_mutex_);
   return stack_watch_;
@@ -229,6 +244,8 @@ void System::set_direct_page_watch_enabled(bool enable) {
 bool System::direct_page_watch_enabled() const {
   return direct_page_watch_enabled_;
 }
+
+uint32_t System::peek_rtsl() const { return peek_rtsl_; }
 
 std::vector<uint8_t> System::direct_page_watch() {
   std::unique_lock<std::mutex> l(memory_watch_mutex_);

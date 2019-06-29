@@ -27,11 +27,14 @@ class System {
 
   void Initialize();
 
-  // Launch the loop thread and run the CPU.
+  // Launch the CPU scheduler.
   void Run();
 
-  // Stop the loop thread completely.
+  // Stop the CPU scheduler completely.
   void SetStop();
+
+  // [Re]Boot the CPU; usually called by Initialize
+  void BootCPU(bool hard_boot = true);
 
   // Ask the bus to read or write addresses in a thread safe way.
   uint16_t ReadTwoBytes(uint32_t addr);
@@ -68,6 +71,8 @@ class System {
 
   void set_stack_watch_enabled(bool enable);
   bool stack_watch_enabled() const;
+  uint16_t watched_sp() const;
+  uint32_t peek_rtsl() const;
   std::vector<uint8_t> stack_watch();
 
   void set_direct_page_watch_enabled(bool enable);
@@ -112,6 +117,8 @@ protected:
   std::mutex memory_watch_mutex_;
   std::vector<MemoryWatch> memory_watches_;
   bool stack_watch_enabled_ = false;
+  uint16_t watched_sp_; // the sp at the time the stack watch was captured.
+  uint32_t peek_rtsl_;  // 3 bytes behind the sp, to peek at potential RTL/RTS
   std::vector<uint8_t> stack_watch_;
   bool direct_page_watch_enabled_ = false;
   std::vector<uint8_t> direct_page_watch_;
