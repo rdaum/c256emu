@@ -1,108 +1,8 @@
 .p816
 
-.import __ZEROPAGE_LOAD__       ; symbol defining the start of the ZP
+.include "macros.a65"
 
-.macro acc8i16
-	sep #$20
-	.a8
-	.i16
-.endmacro
-
-.macro acc16i16
-	rep #$30
-	.a16
-	.i16
-.endmacro
-
-.macro acc8i8
-	sep #$30
-	.a8
-	.i8
-.endmacro
-
-.macro acc16i8
-	sep #$10
-	.a16
-	.i8
-.endmacro
-
-.macro StartFrame offset
-  .a16
-  .i16
-	tsc         ; sp -> acc
-	sec         ; set carry
-  sbc #offset ; sub zp offset
-	tcs         ; acc -> sp
-	phd         ; push direct page
-	tcd         ; acc -> direct page
-.endmacro
-
-.macro EndFrame offset, width
-	lda	offset+2         ; ?
-	sta	offset+2+width   ; ?
-	lda	offset+1         ; ?
-	sta	offset+1+width   ; ?
-	pld                  ; pop direct page
-	tsc                  ; sp -> acc
-	clc                  ; clear carry
-	adc	#offset+width    ; acc += width
-	tcs                  ;  sp = acc
-.endmacro
-
-.macro Store32 v, d
-  lda .loword(v)
-  sta d
-  lda .hiword(v)
-  sta d+2
-.endmacro
-
-.macro AdjustAddr addr, cur,  new
-  lda .loword(addr)
-  sbc .loword(cur_segment_base)
-  sta working_addr
-  lda .hiword(addr)
-  sbc .hiword(cur_segment_base)
-  sta working_addr+2
-
-  lda .loword(addr)
-  adc .loword(new_segment_base)
-  sta working_addr
-  lda .hiword(addr)
-  adc .hiword(new_segment_base)
-  sta working_addr+2
-.endmacro
-
-.macro CopyBytes source, dest, count
-  .repeat count, N
-    lda [source+N*2]
-    sta [dest+N*2]
-    lda [source+(N*2)+2]
-    sta [dest+(N*2)+2]
-  .endrep
-.endmacro
-
-.macro ProcStart
-  pha  ; save working registers
-  phx
-  phy
-  phd  ; save frame pointer and reset accordingly.
-  tsc
-  tcd
-.endmacro
-
-.macro ProcExit
-  tdc
-  tcs
-
-  ; pop statically-allocated variables here,
-  ; since they sit above the caller's D register.
-
-  pld  ; remember to restore the previous caller's D register!
-  ply
-  plx
-  pla
-  rtl
-.endmacro
+.import __ZEROPAGE_LOAD__    ; symbol defining the start of the ZP
 
 .zeropage
 .org $00
@@ -135,7 +35,7 @@
 Start:
   ProcStart
 
-	; set zero page to $fe00
+	; set zero page to where the linker tells us it should be
 	acc16i16
 	lda #__ZEROPAGE_LOAD__
 	tcd
@@ -161,14 +61,14 @@ Start:
   lda #.hiword($20000)
   sta program+2
 
-  jsl LoadHeader        ; load the header
-  jsl LoadHeaderOptions ; eat the header options
+  jsl load_header         ; load the header
+  jsl load_header_options ; eat the header options
 
   ProcExit
 
 O65_BAD_HEADER_MAGIC = $01
 
-PNext:
+prg_next_byte:
 .scope
 ; Read current value @ program, put in A.
 ; corrupts Y
@@ -185,17 +85,17 @@ PNext:
   clc
   adc #1
   sta program_offset
-  bcc Done
+  bcc done
   lda program+2
   inc
   sta program+2
-Done:
+done:
   tya
   rtl
 
 .endscope
 
-PNextWord:
+prg_next_word:
 .scope
   lda program_offset
   tay
@@ -206,119 +106,103 @@ PNextWord:
   clc
   adc #2
   sta program_offset
-  bcc Done
+  bcc done
   lda program+2
   inc
   sta program+2
-Done:
+done:
   tya
   rtl
 
 .endscope
 
-.macro PNext32To D
-  jsl PNextWord
-  sta D
-  jsl PNextWord
-  sta D+2
-.endmacro
-
-.macro PNext16To D
-  jsl PNextWord
-  sta D
-.endmacro
-
-LoadHeader:
+load_header:
 .scope
 
   ; First two bytes must be $01 $00 for non-c64
-  jsl PNextWord
+  jsl prg_next_word
   cmp #$0001
-  bne FailHeader
+  bne fail_bad_magic
 
   ; Next 4 bytes should be 'o65\0' ($65 $36 $35 $00)
-  jsl PNextWord
+  jsl prg_next_word
   cmp #$366f
-  bne FailHeader
-  jsl PNextWord
+  bne fail_bad_magic
+  jsl prg_next_word
   cmp #$0035
-  beq MagicSuccess
+  beq good_magic
 
-FailHeader:
+fail_bad_magic:
   acc8i16
   lda #O65_BAD_HEADER_MAGIC
   sta status
   acc16i16
   rtl
 
-MagicSuccess:
-  jsl PNextWord
+good_magic:
+  jsl prg_next_word
   sta mode
 
   and #$2000
   cmp #$2000
-  bne Read16Sizes
+  bne read_16_sizes
 
-  PNext32To tbase
-  PNext32To tlen
-  PNext32To dbase
-  PNext32To dlen
-  PNext32To bbase
-  PNext32To blen
-  PNext32To zbase
-  PNext32To zlen
-  PNext32To stack
-  bra Done
+  PrgNext32To tbase
+  PrgNext32To tlen
+  PrgNext32To dbase
+  PrgNext32To dlen
+  PrgNext32To bbase
+  PrgNext32To blen
+  PrgNext32To zbase
+  PrgNext32To zlen
+  PrgNext32To stack
+  bra done
 
-Read16Sizes:
-  PNext16To tbase
-  PNext16To tlen
-  PNext16To dbase
-  PNext16To dlen
-  PNext16To bbase
-  PNext16To blen
-  PNext16To zbase
-  PNext16To zlen
-  PNext16To stack
+read_16_sizes:
+  PrgNext16To tbase
+  PrgNext16To tlen
+  PrgNext16To dbase
+  PrgNext16To dlen
+  PrgNext16To bbase
+  PrgNext16To blen
+  PrgNext16To zbase
+  PrgNext16To zlen
+  PrgNext16To stack
 
-Done:
+done:
   rtl
 
 .endscope
 
-LoadHeaderOptions:
+load_header_options:
 .scope
-  ProcStart
   
 ;  while ((olen = *(program++))) {
-StartLoop:
-  jsl PNext
-  sta olen
+start_loop:
+  clc
+  PrgNext8To olen
   cmp #0
-	bne StartHeader
-  brl Done
-StartHeader:
+	bne start_header_option
+  brl done
+start_header_option:
 ;    uint8_t otype = *(program++);
 ;    olen -= 2;  // take out len and type bytes from count
-	jsl PNext ; otype.
-  sta otype
+  PrgNext8To otype
   acc8i16
-  lda olen
-  dec
-  dec
-  sta olen
+  dec olen
 
-ReadHeaderLoop:
+read_header_option:
+  acc8i16
+  dec olen
   lda olen
-  dec
-  sta olen
   cmp #0
-  bne EatBytes
-  brl StartLoop
-EatBytes:
-  jsl PNext
-  bra ReadHeaderLoop
-Done:
+  bne eat_header_bytes
+  brl start_loop
+eat_header_bytes:
+  jsl prg_next_byte
+  bra read_header_option
+done:
+  acc16i16
 	rtl
 
 .endscope
