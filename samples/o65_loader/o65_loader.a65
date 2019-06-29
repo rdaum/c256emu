@@ -114,9 +114,14 @@ R3 = 13
   otype:             .res 1
 
 .code
-.org $8000
+.org $10000
 
 Start:
+	; set zero page to $fe00
+	acc16i16
+	lda #__ZEROPAGE_LOAD__
+	tcd
+
   ; clear zero page vars
   acc8i16
   stz status
@@ -156,15 +161,16 @@ PNext:
   acc16i16
   tay
   lda program_offset
+  clc
+  adc #1
   sta program_offset
-  inc
   bcc Done
   lda program+2
   inc
   sta program+2
 Done:
   tya
-  rtl
+  rts
 
 .endscope
 
@@ -176,8 +182,8 @@ PNextWord:
   lda [program], Y
   tay
   lda program_offset
-  inc
-  inc
+  clc
+  adc #2
   sta program_offset
   bcc Done
   lda program+2
@@ -185,7 +191,7 @@ PNextWord:
   sta program+2
 Done:
   tya
-  rtl
+  rts
 
 .endscope
 
@@ -203,10 +209,6 @@ Done:
 
 LoadHeader:
 .scope
-	; set zero page to $fe00
-	acc16i16
-	lda #__ZEROPAGE_LOAD__
-	tcd
 
   ; First two bytes must be $01 $00 for non-c64
   jsr PNextWord
