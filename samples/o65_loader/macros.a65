@@ -63,19 +63,22 @@
 .endmacro
 
 .macro AdjustAddr
-  lda .loword(working_addr)
-  sbc .loword(cur_segment_base)
-  sta working_addr
-  lda .hiword(working_addr)
-  sbc .hiword(cur_segment_base)
-  sta working_addr+2
-
-  lda .loword(working_addr)
-  adc .loword(new_segment_base)
-  sta working_addr
-  lda .hiword(working_addr)
-  adc .hiword(new_segment_base)
-  sta working_addr+2
+;  working_addr -= cur_segment_base;
+	sec
+	lda	working_addr
+	sbc	cur_segment_base
+	sta	working_addr
+	lda	working_addr+2
+	sbc	cur_segment_base+2
+	sta	working_addr+2
+;  working_addr += new_segment_base;
+	clc
+	lda	working_addr
+	adc	new_segment_base
+	sta	working_addr
+	lda	working_addr+2
+	adc	new_segment_base+2
+	sta	working_addr+2
 .endmacro
 
 .macro CopyBytesUnrolled source, dest, count

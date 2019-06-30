@@ -42,7 +42,7 @@ ADDER32_A = $000120
 ADDER32_B = $000124
 ADDER32_R = $000128
 
-TEXT_SEGMENT = 1
+TEXT_SEGMENT = 2
 DATA_SEGMENT = 3
 BSS_SEGMENT = 4
 ZP_SEGMENT = 5
@@ -59,6 +59,8 @@ O65_UNKNOWN_RELOC_TYPE = $03
 
 .code
 .org $10000
+
+
 Start:
   ProcStart
 
@@ -143,7 +145,7 @@ step_load_external_references:
   beq step_perform_text_relocations
   jml done
 step_perform_text_relocations:
-  jsl perform_locations     ; perform text seg relocations
+  jsl perform_relocations     ; perform text seg relocations
   acc8i16
   clc
   lda status
@@ -152,7 +154,7 @@ step_perform_text_relocations:
   beq step_perform_data_relocations
   jml done
 step_perform_data_relocations:
-  jsl perform_locations
+  jsl perform_relocations
   acc8i16
   clc
   lda status
@@ -161,10 +163,13 @@ step_perform_data_relocations:
   beq step_perform_bss_clear
   jml done
 step_perform_bss_clear:
-    
+step_execute_program:
+  jsl seg_base
 done:
   ProcExit
 
+
+; util functions
 
 prg_next_byte:
 .scope
@@ -213,6 +218,7 @@ done:
   rtl
 
 .endscope
+
 
 load_header:
 .scope
@@ -332,7 +338,7 @@ done:
 
 .endscope
 
-perform_locations:
+perform_relocations:
 .scope
   stz offset
   stz offset+2
@@ -348,7 +354,7 @@ check_continue_offset:
   Store32 #$0000fe, ADDER32_A
   Store32 offset, ADDER32_B
   Store32 ADDER32_R, offset
-  jmp perform_locations
+  jmp perform_relocations
 
 accumulate_offset:    
   sta ADDER32_A
@@ -512,3 +518,4 @@ done:
   rtl
 
 .endscope
+
