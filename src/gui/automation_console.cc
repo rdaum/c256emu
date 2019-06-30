@@ -105,10 +105,12 @@ void AutomationConsole::AddLog(const char *fmt, ...) {
 }
 
 void AutomationConsole::Draw(const char *title, bool *p_open) {
-  if (!ImGui::Begin(title, p_open)) {
-    ImGui::End();
-    return;
+  static std::vector<cpuaddr_t> breakpoints;
+  ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Appearing);
+  if (!ImGui::CollapsingHeader(title)) {
+    return ImGui::End();
   }
+
 
   // As a specific feature guaranteed by the library, after calling Begin()
   // the last Item represent the title bar. So e.g. IsItemHovered() will
@@ -120,19 +122,13 @@ void AutomationConsole::Draw(const char *title, bool *p_open) {
     ImGui::EndPopup();
   }
 
-  ImGui::TextWrapped(
-      "Enter 'HELP' for help, press TAB to use text completion.");
-
-  // TODO: display items starting from the bottom
-
-  ImGui::SameLine();
   if (ImGui::SmallButton("Clear")) {
     ClearLog();
   }
   ImGui::SameLine();
   bool copy_to_clipboard = ImGui::SmallButton("Copy");
   ImGui::SameLine();
-  if (ImGui::SmallButton("Scroll to bottom"))
+  if (ImGui::SmallButton("Bottom"))
     scroll_to_bottom_ = true;
   // static float t = 0.0f; if (ImGui::GetTime() - t > 0.02f) { t =
   // ImGui::GetTime(); AddLog("Spam %f", t); }
@@ -151,12 +147,12 @@ void AutomationConsole::Draw(const char *title, bool *p_open) {
   if (ImGui::Button("Options"))
     ImGui::OpenPopup("Options");
   ImGui::SameLine();
-  filter_.Draw("Filter (\"incl,-excl\") (\"error\")", 180);
+  filter_.Draw("Filter");
   ImGui::Separator();
 
   const float footer_height_to_reserve =
-      ImGui::GetStyle().ItemSpacing.y +
-      ImGui::GetFrameHeightWithSpacing(); // 1 separator, 1 input text
+      (ImGui::GetStyle().ItemSpacing.y * 2)+
+      ImGui::GetFrameHeightWithSpacing(); // 1 separator, 1 input text, 1 title
   ImGui::BeginChild(
       "ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false,
       ImGuiWindowFlags_HorizontalScrollbar); // Leave room for 1 separator + 1

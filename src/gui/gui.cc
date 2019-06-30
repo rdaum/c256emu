@@ -114,25 +114,22 @@ void GUI::Render() {
     DrawCPUStatus();
     DrawVickySettings();
     DrawBreakpoints();
+    static AutomationConsole console(system_->automation());
+    static bool console_open;
+    console.Draw("Automation", &console_open);
   }
 
   ImGui::SetNextWindowPos({333, 0}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize({333, 200}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({333, 266}, ImGuiCond_FirstUseEver);
   DrawMemoryInspect();
 
-  ImGui::SetNextWindowPos({333, 200}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize({333, 200}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowPos({333, 266}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({333, 266}, ImGuiCond_FirstUseEver);
   DrawStackInspect();
 
-  ImGui::SetNextWindowPos({333, 400}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize({333, 200}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowPos({333, 532}, ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize({333, 266}, ImGuiCond_FirstUseEver);
   DrawDirectPageInspect();
-
-  ImGui::SetNextWindowPos({333, 600}, ImGuiCond_FirstUseEver);
-  ImGui::SetNextWindowSize({333, 200}, ImGuiCond_FirstUseEver);
-  static AutomationConsole console(system_->automation());
-  static bool console_open;
-  console.Draw("Automation", &console_open);
 
   ImGui::SetNextWindowPos({666, 0}, ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowSize({333, 800}, ImGuiCond_FirstUseEver);
@@ -299,8 +296,9 @@ void GUI::DrawDisassembler() const {
 
   bool is_first = true;
   ImGui::Separator();
-  std::vector<CpuInstruction> upcoming_program = disassembler->Disassemble(
-      Disassembler::Config(), &system_->cpu()->cpu_state);
+  const Disassembler::Config d_config{28};
+  std::vector<CpuInstruction> upcoming_program =
+      disassembler->Disassemble(d_config, &system_->cpu()->cpu_state);
   for (auto instruction : upcoming_program) {
     ImGui::TextColored(red, "%s", Addr(instruction.canonical_address).c_str());
     ImGui::NextColumn();
@@ -392,7 +390,7 @@ void GUI::DrawMemoryInspect() const {
 
 void GUI::DrawBreakpoints() const {
   static std::vector<cpuaddr_t> breakpoints;
-
+  ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Appearing);
   if (ImGui::CollapsingHeader("Breakpoints")) {
     DebugInterface *debug_interface = system_->GetDebugInterface();
 
@@ -444,7 +442,7 @@ void GUI::DrawCPUStatus() const {
   if (ImGui::CollapsingHeader("CPU")) {
     ImGui::BeginGroup();
     WDC65C816 *cpu = system_->cpu();
-    ImGui::Columns(7);
+    ImGui::Columns(6);
     if (ImGui::Button("RESET")) {
       system_->BootCPU(false);
     }
@@ -452,7 +450,6 @@ void GUI::DrawCPUStatus() const {
     if (ImGui::Button("REBOOT")) {
       system_->BootCPU(true);
     }
-    ImGui::NextColumn();
     ImGui::NextColumn();
     if (ImGui::Button("IRQ")) {
       cpu->DoInterrupt(WDC65C816::IRQ);
@@ -473,36 +470,13 @@ void GUI::DrawCPUStatus() const {
     uint32_t program_address = cpu->program_address();
     ImGui::LabelText("PC", "%s (%d)", Addr(program_address).c_str(),
                      program_address);
-    ImGui::LabelText("Native/Emulation", "%s",
-                     cpu->mode_emulation ? "Emulation" : "Native");
-    ImGui::LabelText("Accumulator width", "%s", cpu->mode_long_a ? "16" : "8");
-    ImGui::LabelText("Index width", "%s", cpu->mode_long_xy ? "16" : "8");
-    ImGui::LabelText("A", "%06x (%d)", cpu->a(), cpu->a());
-    ImGui::LabelText("X", "%06x (%d)", cpu->x(), cpu->x());
-    ImGui::LabelText("Y", "%06x (%d)", cpu->y(), cpu->y());
-    ImGui::LabelText("DBR", "%06x (%d)", cpu->cpu_state.code_segment_base,
-                     cpu->cpu_state.code_segment_base);
-    ImGui::LabelText("Stack", "%s (%d)",
-                     Addr(cpu->cpu_state.regs.sp.u16).c_str(),
-                     cpu->cpu_state.regs.sp.u16);
-    ImGui::LabelText("Direct page", "%s (%d)",
-                     Addr(cpu->cpu_state.regs.d.u16).c_str(),
-                     cpu->cpu_state.regs.d.u16);
 
-    ImGui::Columns(2);
-    ImGui::Checkbox("Fast MVN/MVP", &cpu->fast_block_moves);
-    ImGui::NextColumn();
-    bool turbo = system_->turbo();
-    if (ImGui::Checkbox("Turbo", &turbo)) {
-      system_->set_turbo(turbo);
-    }
     ImGui::Columns(3);
     DebugInterface *debug_interface = system_->GetDebugInterface();
     if (!debug_interface->paused() && ImGui::Button("Pause")) {
       debug_interface->Pause();
     }
     ImGui::NextColumn();
-
     if (debug_interface->paused()) {
       if (ImGui::Button("Resume")) {
         debug_interface->Resume();
@@ -513,10 +487,46 @@ void GUI::DrawCPUStatus() const {
         debug_interface->SingleStep();
         system_->PerformWatches();
       }
+    } else {
       ImGui::NextColumn();
     }
-    ImGui::Columns(1);
+    ImGui::NextColumn();
+    ImGui::Separator();
+    ImGui::LabelText("Mode", "%s",
+                     cpu->mode_emulation ? "Emulation" : "Native");
+    ImGui::NextColumn();
+    ImGui::LabelText("Acc", "%s", cpu->mode_long_a ? "16" : "8");
+    ImGui::NextColumn();
+    ImGui::LabelText("Index", "%s", cpu->mode_long_xy ? "16" : "8");
+    ImGui::NextColumn();
 
+    ImGui::Separator();
+    ImGui::LabelText("A", "$%04x (%d)", cpu->a(), cpu->a());
+    ImGui::NextColumn();
+    ImGui::LabelText("X", "$%04x (%d)", cpu->x(), cpu->x());
+    ImGui::NextColumn();
+    ImGui::LabelText("Y", "$%04x (%d)", cpu->y(), cpu->y());
+    ImGui::NextColumn();
+    ImGui::LabelText("DBR", "$%02x (%d)",
+                     cpu->cpu_state.code_segment_base >> 16,
+                     cpu->cpu_state.code_segment_base >> 16);
+    ImGui::NextColumn();
+    ImGui::LabelText("SP", "$%04x (%d)", cpu->cpu_state.regs.sp.u16,
+                     cpu->cpu_state.regs.sp.u16);
+    ImGui::NextColumn();
+    ImGui::LabelText("D", "$%04x (%d)", cpu->cpu_state.regs.d.u16,
+                     cpu->cpu_state.regs.d.u16);
+    ImGui::NextColumn();
+    ImGui::Separator();
+    ImGui::Columns(2);
+    ImGui::Checkbox("Fast MVN/MVP", &cpu->fast_block_moves);
+    ImGui::NextColumn();
+    bool turbo = system_->turbo();
+    if (ImGui::Checkbox("Turbo", &turbo)) {
+      system_->set_turbo(turbo);
+    }
+
+    ImGui::Columns(1);
     ImGui::EndGroup();
   }
 }
