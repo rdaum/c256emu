@@ -9,8 +9,12 @@
   status:            .res 1  ; 0 if ok, otherwise some error code
   program:           .res 4  ; ptr to bottom of program bank
   program_offset:    .res 2
+  seg_base:          .res 4
 
-  ; relocations working area
+  ; relocations working area 
+  offset:            .res 4
+  type:              .res 1
+  segment:           .res 1
   cur_segment_base:  .res 4  ; the current segment base for reloc
   new_segment_base:  .res 4  ; desired segment base
   working_addr:      .res 4  ; where to stash relocated addresses
@@ -37,6 +41,21 @@
 ADDER32_A = $000120
 ADDER32_B = $000124
 ADDER32_R = $000128
+
+TEXT_SEGMENT = 1
+DATA_SEGMENT = 3
+BSS_SEGMENT = 4
+ZP_SEGMENT = 5
+
+RELOC_WORD = $80
+RELOC_HIGH = $40
+RELOC_LOW = $20
+RELOC_SEGADDR = $c0
+RELOC_SEG = $a0
+
+O65_BAD_HEADER_MAGIC = $01
+O65_UNKNOWN_RELOC_SEGMENT = $02
+O65_UNKNOWN_RELOC_TYPE = $03
 
 .code
 .org $10000
@@ -82,21 +101,22 @@ step_load_header_options:
   lda status
   cmp #0
   acc16i16
-  beq step_jump_past_segments
+  beq store_seg_base
   jml done
-step_jump_past_segments:
+store_seg_base:  
   ; program = program + program_offset, c256 32 bit adder used
   Store32 program, f:ADDER32_A
   lda program_offset
   sta f:ADDER32_B
   lda #$0000
   sta f:ADDER32_B+2
-  lda f:ADDER32_R
-  sta program
-  lda f:ADDER32_R+2
-  sta program+2
+  Store32 ADDER32_R, program
   stz program_offset
 
+  ; stash that in seg_base
+  Store32 program, seg_base
+
+step_jump_past_segments:
   ; jump offset by tlen+dlen
   Store32 program, f:ADDER32_A
   Store32 tlen, f:ADDER32_B
@@ -120,14 +140,31 @@ step_load_external_references:
   lda status
   cmp #0
   acc16i16
-  beq step_perform_relocations
+  beq step_perform_text_relocations
   jml done
-step_perform_relocations:
-
+step_perform_text_relocations:
+  jsl perform_locations     ; perform text seg relocations
+  acc8i16
+  clc
+  lda status
+  cmp #0
+  acc16i16
+  beq step_perform_data_relocations
+  jml done
+step_perform_data_relocations:
+  jsl perform_locations
+  acc8i16
+  clc
+  lda status
+  cmp #0
+  acc16i16
+  beq step_perform_bss_clear
+  jml done
+step_perform_bss_clear:
+    
 done:
   ProcExit
 
-O65_BAD_HEADER_MAGIC = $01
 
 prg_next_byte:
 .scope
@@ -290,6 +327,187 @@ eat_references_loop:
   jsr prg_next_byte
   cmp #0
   beq eat_references_loop
+done:
+  rtl
+
+.endscope
+
+perform_locations:
+.scope
+  stz offset
+  stz offset+2
+continue_relocations:
+  clc
+  jsl prg_next_byte
+  cmp #0
+  bne check_continue_offset
+  jmp done
+check_continue_offset:
+  cmp #$ff            ; if 0xff add to the ongoing offset and go again
+  bne accumulate_offset
+  Store32 #$0000fe, ADDER32_A
+  Store32 offset, ADDER32_B
+  Store32 ADDER32_R, offset
+  jmp perform_locations
+
+accumulate_offset:    
+  sta ADDER32_A
+  lda #$0000
+  sta ADDER32_A+2
+  Store32 offset, ADDER32_B
+  Store32 ADDER32_R, offset  
+get_type_and_segment:
+  jsr prg_next_byte
+  acc8i16
+  tax
+  and #$f0
+  sta type
+  txa
+  and #$0f
+  sta segment
+start_text_seg_reloc:
+  cmp #TEXT_SEGMENT
+  bne start_data_seg_reloc
+  ; do text seg reloc
+  Store32 tbase, cur_segment_base
+  Store32 seg_base, new_segment_base
+  jsl do_reloc
+  jmp continue_relocations
+start_data_seg_reloc:
+  cmp #DATA_SEGMENT
+  bne start_zp_seg_reloc
+  ; do data segment
+  Store32 tbase, cur_segment_base
+  Store32 seg_base, ADDER32_A
+  Store32 tlen, ADDER32_B
+  Store32 ADDER32_R, new_segment_base
+  jsl do_reloc
+  jmp continue_relocations
+start_zp_seg_reloc:
+  cmp #ZP_SEGMENT
+  bne start_bss_seg_reloc
+  ; do zp segment
+  Store32 #$00000000, cur_segment_base
+  Store32 zbase, new_segment_base
+  jsl do_reloc
+  jmp continue_relocations
+start_bss_seg_reloc:
+  cmp #BSS_SEGMENT
+  bne unknown_segment_type
+  ; do bss_reloc
+  Store32 bbase, cur_segment_base
+  Store32 seg_base, ADDER32_A
+  Store32 tlen, ADDER32_B
+  Store32 ADDER32_R, ADDER32_A
+  Store32 dlen, ADDER32_B
+  Store32 ADDER32_R, new_segment_base
+  jsl do_reloc
+  jmp continue_relocations
+unknown_segment_type:
+  acc8i16
+  lda #O65_UNKNOWN_RELOC_SEGMENT
+  sta status
+  acc16i16
+done:
+  rtl
+.endscope
+
+do_reloc:
+.scope
+  acc16i8
+  ldx type
+  acc16i16
+  stz working_addr
+  stz working_addr+2
+reloc_word:  
+  cpx #RELOC_WORD
+  bne reloc_seg
+  ldy offset
+  dey
+  lda [seg_base],y          ; word = seg_base[offset-1]
+  sta working_addr
+  lda cur_segment_base+2
+  sta working_addr+2     
+  AdjustAddr
+  lda working_addr
+  sta [seg_base],y
+  jmp done
+reloc_seg: 
+  cpx #RELOC_SEG
+  bne reloc_segaddr
+  jsr prg_next_byte       ; eat these two bytes,
+  jsr prg_next_byte       ;  not sure what to do with them
+  ldy offset
+  dey
+  acc8i16
+  lda [seg_base],y
+  sta working_addr+2
+  acc16i16
+  AdjustAddr
+  lda working_addr
+  sta [seg_base],y
+  jmp done
+reloc_segaddr:
+  cpx #RELOC_SEGADDR
+  bne reloc_low
+  ldy offset
+  iny
+  acc8i16
+  lda [seg_base],y
+  sta working_addr+2
+  acc16i16
+  dey
+  dey
+  lda [seg_base],y
+  sta working_addr
+  AdjustAddr
+  lda working_addr
+  sta [seg_base],Y
+  iny
+  iny
+  acc8i16
+  lda working_addr+2
+  sta [seg_base],Y
+  acc16i16
+  jmp done
+reloc_low:
+  cpx #RELOC_LOW
+  bne reloc_high
+  ldy offset
+  dey
+  lda [seg_base],y         
+  sta working_addr
+  Store32 working_addr, ADDER32_A
+  Store32 cur_segment_base, ADDER32_B
+  Store32 ADDER32_R, working_addr
+  AdjustAddr
+  acc8i16
+  lda working_addr
+  sta [seg_base],y
+  acc16i16
+  jmp done
+reloc_high:
+  cpx #RELOC_HIGH
+  bne unknown_reloc_type
+  ldy offset
+  dey
+  lda [seg_base],y
+  sta working_addr+2
+  Store32 working_addr, ADDER32_A
+  Store32 cur_segment_base, ADDER32_B
+  Store32 ADDER32_R, working_addr
+  AdjustAddr
+  acc8i16
+  lda working_addr+1
+  sta [seg_base],y
+  acc16i16
+  jsr prg_next_byte
+  jmp done
+unknown_reloc_type:
+  acc8i16
+  lda #O65_UNKNOWN_RELOC_TYPE
+  sta status
+  acc16i16
 done:
   rtl
 

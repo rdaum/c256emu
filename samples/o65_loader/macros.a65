@@ -1,0 +1,107 @@
+
+.macro acc8i16
+	sep #$20
+	.a8
+	.i16
+.endmacro
+
+.macro acc16i16
+	rep #$30
+	.a16
+	.i16
+.endmacro
+
+.macro acc8i8
+	sep #$30
+	.a8
+	.i8
+.endmacro
+
+.macro acc16i8
+	sep #$10
+	.a16
+	.i8
+.endmacro
+
+.macro ProcStart
+  pha  ; save working registers
+  phx
+  phy
+  phd  ; save frame pointer and reset accordingly.
+  tsc
+  tcd
+.endmacro
+
+.macro ProcExit
+  tdc
+  tcs
+
+  ; pop statically-allocated variables here,
+  ; since they sit above the caller's D register.
+
+  pld  ; remember to restore the previous caller's D register!
+  ply
+  plx
+  pla
+  rtl
+.endmacro
+
+.macro Store32 v, d
+.if (.match (.left (1, {v}), #))
+  ; immediate mode
+  lda #.loword(.right (.tcount ({v})-1, {v}))
+.else
+  lda v
+.endif
+  sta d
+.if (.match (.left (1, {v}), #))
+  lda #.hiword(.right (.tcount ({v})-1, {v}))
+.else
+  lda v+2
+.endif
+  sta d+2
+.endmacro
+
+.macro AdjustAddr
+  lda .loword(working_addr)
+  sbc .loword(cur_segment_base)
+  sta working_addr
+  lda .hiword(working_addr)
+  sbc .hiword(cur_segment_base)
+  sta working_addr+2
+
+  lda .loword(working_addr)
+  adc .loword(new_segment_base)
+  sta working_addr
+  lda .hiword(working_addr)
+  adc .hiword(new_segment_base)
+  sta working_addr+2
+.endmacro
+
+.macro CopyBytesUnrolled source, dest, count
+  .repeat count, N
+    lda [source+N*2]
+    sta [dest+N*2]
+    lda [source+(N*2)+2]
+    sta [dest+(N*2)+2]
+  .endrep
+.endmacro
+
+.macro PrgNext32To D
+  jsl prg_next_word
+  sta D
+  jsl prg_next_word
+  sta D+2
+.endmacro
+
+.macro PrgNext16To D
+  jsl prg_next_word
+  sta D
+.endmacro
+
+.macro PrgNext8To D
+  jsl prg_next_byte
+  acc8i16
+  sta D
+  acc16i16
+.endmacro
