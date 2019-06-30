@@ -5,12 +5,12 @@
 .import __ZEROPAGE_LOAD__    ; symbol defining the start of the ZP
 
 .zeropage
-.org $00
+.org $00  
   status:            .res 1  ; 0 if ok, otherwise some error code
   program:           .res 4  ; ptr to bottom of program bank
-  program_offset:    .res 4
+  program_offset:    .res 2
 
-  ; for relocations
+  ; relocations working area
   cur_segment_base:  .res 4  ; the current segment base for reloc
   new_segment_base:  .res 4  ; desired segment base
   working_addr:      .res 4  ; where to stash relocated addresses
@@ -27,8 +27,16 @@
   zlen:              .res 4
   stack:             .res 4
 
+  ; header options working area
   olen:              .res 1
   otype:             .res 1
+
+  ; ext references working area
+  num_references:    .res 4
+
+ADDER32_A = $000120
+ADDER32_B = $000124
+ADDER32_R = $000128
 
 .code
 .org $10000
@@ -48,7 +56,7 @@ Start:
 
   acc16i16
   stz program_offset
-  stz program_offset+2
+
   stz cur_segment_base
   stz cur_segment_base+2
   stz new_segment_base
@@ -56,14 +64,67 @@ Start:
   stz working_addr
   stz working_addr+2
 
-  lda #.loword($20000)
+  Store32 #$20000, program
+
+step_load_header:
+  jsl load_header         ; load the header
+  acc8i16
+  clc
+  lda status
+  cmp #0
+  acc16i16
+  beq step_load_header_options
+  jml done
+step_load_header_options:  
+  jsl load_header_options ; eat the header options
+  acc8i16
+  clc
+  lda status
+  cmp #0
+  acc16i16
+  beq step_jump_past_segments
+  jml done
+step_jump_past_segments:
+  ; program = program + program_offset, c256 32 bit adder used
+  Store32 program, f:ADDER32_A
+  lda program_offset
+  sta f:ADDER32_B
+  lda #$0000
+  sta f:ADDER32_B+2
+  lda f:ADDER32_R
   sta program
-  lda #.hiword($20000)
+  lda f:ADDER32_R+2
+  sta program+2
+  stz program_offset
+
+  ; jump offset by tlen+dlen
+  Store32 program, f:ADDER32_A
+  Store32 tlen, f:ADDER32_B
+  lda f:ADDER32_R
+  sta program
+  lda f:ADDER32_R+2
+  sta program+2
+  Store32 program, f:ADDER32_A
+  Store32 dlen, f:ADDER32_B
+  lda f:ADDER32_R
+  sta program
+  lda f:ADDER32_R+2
   sta program+2
 
-  jsl load_header         ; load the header
-  jsl load_header_options ; eat the header options
+step_load_external_references:
+  ; We've jumped to the start of the external references list
+  ; eat that
+  jsl load_external_references
+  acc8i16
+  clc
+  lda status
+  cmp #0
+  acc16i16
+  beq step_perform_relocations
+  jml done
+step_perform_relocations:
 
+done:
   ProcExit
 
 O65_BAD_HEADER_MAGIC = $01
@@ -204,5 +265,32 @@ eat_header_bytes:
 done:
   acc16i16
 	rtl
+
+.endscope
+
+load_external_references:
+.scope
+  clc
+  lda mode
+  and #$2000
+  cmp #$2000
+  bne read_num_refs_16
+  stz num_references
+  stz num_references+2
+read_num_refs_32:
+  PrgNext32To num_references
+  bra eat_references_loop
+read_num_refs_16:
+  PrgNext16To num_references
+eat_references_loop:
+  lda num_references
+  cmp #0
+  beq done
+  inc num_references
+  jsr prg_next_byte
+  cmp #0
+  beq eat_references_loop
+done:
+  rtl
 
 .endscope
