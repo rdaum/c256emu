@@ -135,7 +135,6 @@ void GUI::Render() {
   ImGui::SetNextWindowSize({333, 800}, ImGuiCond_FirstUseEver);
   DrawDisassembler();
 
-  ImGui::End();
   ImGui::EndFrame();
   ImGui::Render();
 
