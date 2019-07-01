@@ -28,14 +28,16 @@ class Automation {
   bool LoadScript(const std::string& path);
   std::string Eval(const std::string& expression);
 
-  void AddBreakpoint(uint32_t address, const std::string& function_name);
-  void ClearBreakpoint(uint32_t address);
+  void AddBreakpoint(cpuaddr_t address, const std::string &function_name);
+  void ClearBreakpoint(cpuaddr_t address);
 
   struct Breakpoint {
-    uint32_t address;
+    cpuaddr_t address;
     std::string lua_function_name;
   };
   std::vector<Breakpoint> GetBreakpoints() const;
+
+  bool HasBreakpoint(cpuaddr_t addr) const;
 
   System* system() { return system_; }
 

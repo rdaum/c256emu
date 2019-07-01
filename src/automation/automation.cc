@@ -263,7 +263,7 @@ std::string Automation::Eval(const std::string& expression) {
   return ExecuteLua(&status);
 }
 
-void Automation::AddBreakpoint(uint32_t address,
+void Automation::AddBreakpoint(cpuaddr_t address,
                                const std::string& function_name) {
   std::lock_guard<std::recursive_mutex> lua_lock(lua_mutex_);
 
@@ -280,7 +280,7 @@ void Automation::AddBreakpoint(uint32_t address,
   });
 }
 
-void Automation::ClearBreakpoint(uint32_t address) {
+void Automation::ClearBreakpoint(cpuaddr_t address) {
   auto bp = std::find_if(
       breakpoints_.begin(), breakpoints_.end(),
       [address](const Breakpoint& b) { return b.address == address; });
@@ -294,12 +294,19 @@ std::vector<Automation::Breakpoint> Automation::GetBreakpoints() const {
   return breakpoints_;
 }
 
+bool Automation::HasBreakpoint(cpuaddr_t addr) const {
+  return std::find_if(breakpoints_.begin(), breakpoints_.end(),
+                      [addr](const Breakpoint &b) {
+                        return b.address == addr;
+                      }) != breakpoints_.end();
+}
+
 // static
 int Automation::LuaAddBreakpoint(lua_State* L) {
   Automation* automation = GetAutomation(L);
-  uint32_t addr = lua_tointeger(L, -3);
+  uint32_t addr = lua_tointeger(L, -2);
   size_t len;
-  const char* function_cstr = lua_tolstring(L, -2, &len);
+  const char *function_cstr = lua_tolstring(L, -1, &len);
   std::string function(function_cstr, len);
   automation->AddBreakpoint(addr, function);
 
@@ -309,7 +316,7 @@ int Automation::LuaAddBreakpoint(lua_State* L) {
 // static
 int Automation::LuaClearBreakpoint(lua_State* L) {
   Automation* automation = GetAutomation(L);
-  uint32_t addr = lua_tointeger(L, -2);
+  uint32_t addr = lua_tointeger(L, -1);
   automation->ClearBreakpoint(addr);
 
   return 0;

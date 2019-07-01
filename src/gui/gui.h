@@ -4,8 +4,10 @@
 #include <mutex>
 #include <thread>
 
-#include <imgui.h>
+#include "cpu.h"
 #include <GLFW/glfw3.h>
+#include <imgui.h>
+#include <vector>
 
 class System;
 
@@ -23,9 +25,12 @@ public:
 
   void DrawProfiler() const;
   void DrawCPUStatus() const;
-  void DrawBreakpoints() const;
+  void DrawBreakpoints();
   void DrawMemoryInspect() const;
-  void DrawDisassembler() const;
+  void DrawDisassembler();
+  void DrawVickySettings() const;
+  void DrawStackInspect() const;
+  void DrawDirectPageInspect() const;
 
   std::mutex gui_mutex_;
   std::thread gui_thread_;
@@ -36,7 +41,4 @@ public:
 
   GLFWwindow *window_ = nullptr;
   ImGuiIO *io_;
-  void DrawVickySettings() const;
-void DrawStackInspect() const;
-void DrawDirectPageInspect() const;
 };

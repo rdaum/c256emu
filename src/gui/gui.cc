@@ -254,7 +254,7 @@ void GUI::DrawVickySettings() const {
   }
 }
 
-void GUI::DrawDisassembler() const {
+void GUI::DrawDisassembler() {
   static bool open = false;
   if (!ImGui::Begin("Disassembler", &open)) {
     return ImGui::End();
@@ -281,8 +281,8 @@ void GUI::DrawDisassembler() const {
     std::vector<CpuInstruction> past_program =
         disassembler->Disassemble(config, addr);
     for (auto instruction : past_program) {
-      ImGui::TextColored(red, "%s",
-                         Addr(instruction.canonical_address).c_str());
+      cpuaddr_t address = instruction.canonical_address;
+      ImGui::TextColored(red, "%s", Addr(address).c_str());
       ImGui::NextColumn();
       ImGui::TextColored(yellow, "%s",
                          instruction.asm_string.substr(8, 12).c_str());
@@ -299,7 +299,18 @@ void GUI::DrawDisassembler() const {
   std::vector<CpuInstruction> upcoming_program =
       disassembler->Disassemble(d_config, &system_->cpu()->cpu_state);
   for (auto instruction : upcoming_program) {
-    ImGui::TextColored(red, "%s", Addr(instruction.canonical_address).c_str());
+    cpuaddr_t address = instruction.canonical_address;
+
+    bool has_breakpoint = system_->automation()->HasBreakpoint(address);
+    bool had_breakpoint = has_breakpoint;
+    if (ImGui::Checkbox(Addr(address).c_str(), &has_breakpoint)) {
+      if (had_breakpoint) {
+        system_->automation()->ClearBreakpoint(address);
+      } else {
+        system_->automation()->AddBreakpoint(address, "");
+      }
+    }
+
     ImGui::NextColumn();
     ImGui::TextColored(is_first ? blue : white, "%s",
                        instruction.asm_string.substr(8, 12).c_str());
@@ -387,28 +398,25 @@ void GUI::DrawMemoryInspect() const {
   ImGui::End();
 }
 
-void GUI::DrawBreakpoints() const {
-  static std::vector<cpuaddr_t> breakpoints;
+void GUI::DrawBreakpoints() {
   ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Appearing);
   if (ImGui::CollapsingHeader("Breakpoints")) {
-    DebugInterface *debug_interface = system_->GetDebugInterface();
-
     static bool adding_breakpoint = false;
     if (!adding_breakpoint && ImGui::Button("Add")) {
       adding_breakpoint = true;
     }
     ImGui::Separator();
+    auto breakpoints = system_->automation()->GetBreakpoints();
     auto it = breakpoints.begin();
     while (it != breakpoints.end()) {
-      cpuaddr_t breakpoint = *it;
+      cpuaddr_t breakpoint = it->address;
       ImGui::Columns(2);
       uint8_t bank = breakpoint >> 16;
       uint16_t addr = breakpoint & 0x0000ffff;
       ImGui::LabelText("Address", "%02x:%04x", bank, addr);
       ImGui::NextColumn();
       if (ImGui::Button("Delete")) {
-        debug_interface->ClearBreakpoint(breakpoint);
-        breakpoints.erase(it);
+        system_->automation()->ClearBreakpoint(it->address);
       } else {
         it++;
       }
@@ -422,8 +430,7 @@ void GUI::DrawBreakpoints() const {
                          "%06X", ImGuiInputTextFlags_CharsHexadecimal);
       ImGui::NextColumn();
       if (ImGui::Button("OK")) {
-        breakpoints.push_back(addr);
-        debug_interface->SetBreakpoint(addr, [](EmulatedCpu *) {});
+        system_->automation()->AddBreakpoint(addr, "");
         adding_breakpoint = false;
       }
       ImGui::NextColumn();
