@@ -19,7 +19,7 @@ constexpr uint32_t VKY_RESERVED_00(0x0002);
 constexpr uint32_t VKY_RESERVED_01(0x0003);
 
 constexpr uint32_t kBorderCtrlReg(0x0004);
-constexpr uint8_t Border_Ctrl_Enable = 0x0;
+constexpr uint8_t Border_Ctrl_Enable = 0x01;
 constexpr uint32_t kBorderColour(0x0005);
 
 constexpr uint32_t kBackgroundColour(0x0008);
@@ -81,6 +81,7 @@ constexpr uint8_t SPRITE_LUT2 = 0x08;
 constexpr uint8_t SPRITE_DEPTH0 = 0x10;
 constexpr uint8_t SPRITE_DEPTH1 = 0x20;
 constexpr uint8_t SPRITE_DEPTH2 = 0x40;
+constexpr uint8_t SPRITE_Striding = 0x80;
 
 constexpr uint32_t kSpriteRegistersBegin(0x0200);
 constexpr uint32_t kSpriteRegistersEnd(0x02F8);

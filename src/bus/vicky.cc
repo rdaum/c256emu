@@ -154,13 +154,46 @@ uint8_t Vicky::ReadByte(uint32_t addr) {
     return v;
   }
 
-  // TODO: read more complex registers (tiles, sprites, bitmasked things, etc.)
+  if (addr == kMousePtrCtrlReg) {
+    if (mouse_cursor_enable_) v|= 0x01;
+    if (mouse_cursor_select_) v|= 0x02;
+    return v;
+  }
+  if (addr == kBorderCtrlReg) {
+    if (border_enabled_) v |= Border_Ctrl_Enable;
+    return v;
+  }
+  if (addr == kBitmapCtrlReg) {
+    if (bitmap_enabled_) v |= 0x01;
+    v |= (bitmap_lut_ << 4);
+    return v;
+  }
+
+  if (addr >= kTextFgColourLUT && addr < kTextBgColourLUT) {
+    memcpy(&v, (uint8_t*)fg_colour_mem_ + addr - kTextFgColourLUT, 1);
+    return v;
+  } else if (addr >= kTextBgColourLUT && addr < 0x1fc0) {
+    memcpy(&v, (uint8_t*)bg_colour_mem_ + addr - kTextBgColourLUT, 1);
+    return v;
+  } else if (addr >= GAMMA_B_LUT_PTR && addr < GAMMA_G_LUT_PTR) {
+    return gamma_.b[addr & 0xff];
+  } else if (addr >= GAMMA_G_LUT_PTR && addr < GAMMA_R_LUT_PTR) {
+    return gamma_.g[addr & 0xff];
+  } else if (addr >= GAMMA_R_LUT_PTR && addr < 0x4300) {
+    return gamma_.r[addr & 0xff];
+  } else if (addr >= kMousePtrGrap0Begin && addr <= kMousePtrGrap0End) {
+    return mouse_cursor_0_[addr - kMousePtrGrap0Begin];
+  } else if (addr >= kMousePtrGrap1Begin && addr <= kMousePtrGrap1End) {
+    return mouse_cursor_1_[addr - kMousePtrGrap1Begin];
+  }
+
+
   if (addr >= kTileRegistersBegin && addr <= kTileRegistersEnd) {
     uint8_t v = 0;
     uint16_t tile_offset = addr - kTileRegistersBegin;
     uint8_t tile_num = tile_offset / kNumTileRegisters;
     uint8_t register_num = tile_offset % kNumTileRegisters;
-    TileSet& tile_set = tile_sets_[tile_num];
+    TileSet &tile_set = tile_sets_[tile_num];
     if (register_num == 0) {
       if (tile_set.enabled)
         v |= TILE_Enable;
@@ -182,8 +215,45 @@ uint8_t Vicky::ReadByte(uint32_t addr) {
     } else if (register_num == 5) {
       v = (tile_set.offset_y);
     } else {
-      LOG(ERROR) << "Unsupported tile reg: " << std::hex << (int)register_num
-                 << " @ " << std::hex << addr;
+      LOG(ERROR) << "Unsupported tile reg read: " << std::hex
+                 << (int)register_num << " @ " << std::hex << addr;
+    }
+    return v;
+  }
+
+  if (addr >= kSpriteRegistersBegin && addr <= kSpriteRegistersEnd + 8) {
+    uint8_t v = 0;
+    uint16_t sprite_offset = addr - kSpriteRegistersBegin;
+    uint16_t sprite_num = sprite_offset / kNumSpriteRegisters;
+    uint16_t register_num = sprite_offset % kNumSpriteRegisters;
+    Sprite &sprite = sprites_[sprite_num];
+    if (register_num == 0) /* control register */ {
+      v |= (sprite.layer << 4);
+      if (sprite.enabled)
+        v |= SPRITE_Enable;
+      v |= (sprite.lut << 1);
+      if (sprite.tile_striding)
+        v |= SPRITE_Striding;
+    } else if (register_num == 1) {
+      v = sprite.start_addr & 0x000000ff;
+    } else if (register_num == 2) {
+      v = sprite.start_addr & 0x0000ff00;
+      v >>= 8;
+    } else if (register_num == 3) {
+      v = sprite.start_addr & 0x00ff0000;
+      v >>= 16;
+    } else if (register_num == 4) {
+      v = sprite.x & 0x00ff;
+    } else if (register_num == 5) {
+      v = sprite.x & 0xff00;
+      v >>= 8;
+    } else if (register_num == 6) {
+      v = sprite.x & 0x00ff;
+    } else if (register_num == 7) {
+      v = sprite.y & 0xff00;
+      v >>= 8;
+    } else {
+      LOG(ERROR) << "Unsupported sprite reg read: " << register_num;
     }
     return v;
   }
@@ -195,8 +265,6 @@ uint8_t Vicky::ReadByte(uint32_t addr) {
 void Vicky::StoreByte(uint32_t addr, uint8_t v) {
   if (StoreRegister(addr, v, registers_))
     return;
-
-  uint16_t offset = addr;
 
   if (addr >= kTextFgColourLUT && addr < kTextBgColourLUT) {
     memcpy((uint8_t*)fg_colour_mem_ + addr - kTextFgColourLUT, &v, 1);
@@ -226,7 +294,7 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
   }
 
   if (addr >= kTileRegistersBegin && addr <= kTileRegistersEnd) {
-    uint16_t tile_offset = offset - kTileRegistersBegin;
+    uint16_t tile_offset = addr - kTileRegistersBegin;
     uint8_t tile_num = tile_offset / kNumTileRegisters;
     uint8_t register_num = tile_offset % kNumTileRegisters;
     TileSet& tile_set = tile_sets_[tile_num];
@@ -254,7 +322,7 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
   }
 
   if (addr >= kSpriteRegistersBegin && addr <= kSpriteRegistersEnd + 8) {
-    uint16_t sprite_offset = offset - kSpriteRegistersBegin;
+    uint16_t sprite_offset = addr - kSpriteRegistersBegin;
     uint16_t sprite_num = sprite_offset / kNumSpriteRegisters;
     uint16_t register_num = sprite_offset % kNumSpriteRegisters;
     Sprite& sprite = sprites_[sprite_num];
@@ -290,7 +358,7 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
     return;
   }
   if (addr == kBorderCtrlReg) {
-    border_enabled_ = v & (1 << Border_Ctrl_Enable);
+    border_enabled_ = v & Border_Ctrl_Enable;
     return;
   }
   LOG(INFO) << "Unknown Vicky register: " << std::hex << addr;
