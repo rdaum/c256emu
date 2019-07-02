@@ -6,6 +6,7 @@
 
 #include <circular_buffer.hpp>
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include "bus/vicky.h"
 #include "gui/automation_console.h"
@@ -258,6 +259,11 @@ void GUI::DrawDisassembler() {
   static bool open = false;
   if (!ImGui::Begin("Disassembler", &open)) {
     return ImGui::End();
+  }
+  static bool live_trace = false;
+  ImGui::Checkbox("Live trace", &live_trace);
+  if (!live_trace && !system_->GetDebugInterface()->paused()) {
+    return;
   }
   Disassembler *disassembler = system_->cpu()->GetDisassembler();
   ImGui::Columns(3);
