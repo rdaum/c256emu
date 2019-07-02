@@ -33,33 +33,32 @@
 
 #define absolute(L, i) (i < 0 ? lua_gettop(L) + i + 1 : i)
 
-static int width(const char* s) {
-  const char* c;
-  int n, discard = 0;
+namespace {
+
+int printed_width(const std::string &s) {
+  int n;
+  bool discard = 0;
 
   /* Calculate the printed width of the chunk s ignoring escape
    * sequences. */
-
-  for (c = s, n = 0; *c; c += 1) {
-    if (!discard && *c == '\033') {
-      discard = 1;
+  for (char c : s) {
+    if (!discard && c == '\033') {
+      discard = true;
     }
-
     if (!discard) {
-      n += 1;
+      n++;
     }
-
-    if (discard && *c == 'm') {
-      discard = 0;
+    if (discard && c == 'm') {
+      discard = false;
     }
   }
-
   return n;
+}
 }
 
 void LuaDescribe::dump_literal(const std::string& s) {
   dump_ << s;
-  column_ += width(s.c_str());
+  column_ += printed_width(s);
 }
 
 void LuaDescribe::dump_character(const char c) {
@@ -104,7 +103,7 @@ void LuaDescribe::dump_string(const std::string& s) {
   /* Break the line if the current chunk doesn't fit but it would
    * fit if we started on a fresh line at the current indent. */
 
-  l = width(s.c_str());
+  l = printed_width(s);
 
   if (column_ + l > line_width_ && indent_ + l <= line_width_) {
     break_line();

@@ -513,6 +513,22 @@ void GUI::DrawCPUStatus() const {
     ImGui::NextColumn();
     ImGui::LabelText("Y", "$%04x (%d)", cpu->y(), cpu->y());
     ImGui::NextColumn();
+
+    ImGui::LabelText("C", "%d", cpu->cpu_state.carry);
+    ImGui::NextColumn();
+    ImGui::LabelText("N", "%d", cpu->cpu_state.negative);
+    ImGui::NextColumn();
+    ImGui::LabelText("V", "%d", cpu->cpu_state.is_overflow());
+    ImGui::NextColumn();
+
+    ImGui::LabelText("D", "%d", cpu->cpu_state.is_decimal());
+    ImGui::NextColumn();
+    ImGui::LabelText("Z", "%d", cpu->cpu_state.is_zero());
+    ImGui::NextColumn();
+    ImGui::LabelText("Int", "%d", cpu->cpu_state.interrupts_enabled());
+    ImGui::NextColumn();
+
+
     ImGui::LabelText("DBR", "$%02x (%d)",
                      cpu->cpu_state.code_segment_base >> 16,
                      cpu->cpu_state.code_segment_base >> 16);
