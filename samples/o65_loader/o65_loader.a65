@@ -5,19 +5,22 @@
 .import __ZEROPAGE_LOAD__    ; symbol defining the start of the ZP
 
 .zeropage
-.org $00  
+.org $00
   status:            .res 1  ; 0 if ok, otherwise some error code
-  program:           .res 4  ; ptr to bottom of program bank
-  program_offset:    .res 2
+  program:           .res 4  ; ptr to bottom of program bank @ start
   seg_base:          .res 4
 
-  ; relocations working area 
+  ; relocations working area
   offset:            .res 4
   type:              .res 1
   segment:           .res 1
   cur_segment_base:  .res 4  ; the current segment base for reloc
   new_segment_base:  .res 4  ; desired segment base
   working_addr:      .res 4  ; where to stash relocated addresses
+  working_byte:      .res 1  ;
+  reloc_start:       .res 4
+  R0:                .res 4  ; tmp 16-bit vals for swapping around
+  R1:                .res 4
 
   ; read from the header
   mode:              .res 2
@@ -37,6 +40,7 @@
 
   ; ext references working area
   num_references:    .res 4
+
 
 ADDER32_A = $000120
 ADDER32_B = $000124
@@ -60,179 +64,192 @@ O65_UNKNOWN_RELOC_TYPE = $03
 .code
 .org $10000
 
-
-Start:
-  ProcStart
-
-	; set zero page to where the linker tells us it should be
-	acc16i16
-	lda #__ZEROPAGE_LOAD__
-	tcd
-
-  ; clear zero page vars
-  acc8i16
-  stz status
-  stz olen
-  stz otype
-
-  acc16i16
-  stz program_offset
-
-  stz cur_segment_base
-  stz cur_segment_base+2
-  stz new_segment_base
-  stz new_segment_base+2
-  stz working_addr
-  stz working_addr+2
-
-  Store32 #$20000, program
-
-step_load_header:
-  jsl load_header         ; load the header
-  acc8i16
-  clc
-  lda status
-  cmp #0
-  acc16i16
-  beq step_load_header_options
-  jml done
-step_load_header_options:  
-  jsl load_header_options ; eat the header options
-  acc8i16
-  clc
-  lda status
-  cmp #0
-  acc16i16
-  beq store_seg_base
-  jml done
-store_seg_base:  
-  ; program = program + program_offset, c256 32 bit adder used
-  Store32 program, f:ADDER32_A
-  lda program_offset
-  sta f:ADDER32_B
-  lda #$0000
-  sta f:ADDER32_B+2
-  Store32 ADDER32_R, program
-  stz program_offset
-
-  ; stash that in seg_base
-  Store32 program, seg_base
-
-step_jump_past_segments:
-  ; jump offset by tlen+dlen
-  Store32 program, f:ADDER32_A
-  Store32 tlen, f:ADDER32_B
-  lda f:ADDER32_R
-  sta program
-  lda f:ADDER32_R+2
-  sta program+2
-  Store32 program, f:ADDER32_A
-  Store32 dlen, f:ADDER32_B
-  lda f:ADDER32_R
-  sta program
-  lda f:ADDER32_R+2
-  sta program+2
-
-step_load_external_references:
-  ; We've jumped to the start of the external references list
-  ; eat that
-  jsl load_external_references
-  acc8i16
-  clc
-  lda status
-  cmp #0
-  acc16i16
-  beq step_perform_text_relocations
-  jml done
-step_perform_text_relocations:
-  jsl perform_relocations     ; perform text seg relocations
-  acc8i16
-  clc
-  lda status
-  cmp #0
-  acc16i16
-  beq step_perform_data_relocations
-  jml done
-step_perform_data_relocations:
-  jsl perform_relocations
-  acc8i16
-  clc
-  lda status
-  cmp #0
-  acc16i16
-  beq step_perform_bss_clear
-  jml done
-step_perform_bss_clear:
-step_execute_program:
-  jsl seg_base
-done:
-  ProcExit
-
+start:
+  jml load_program
 
 ; util functions
 
-prg_next_byte:
+; Read 16 bits value from seg_base[offset-1]
+; Puts in 'working_addr'
+get_16_from_offset:
 .scope
+  acc16i16
+	clc
+	lda	#$ffff
+	adc	seg_base
+	sta	R0
+	lda	#$ffff
+	adc	seg_base+2
+	sta	R0+2
+	clc
+	lda	R0
+	adc	offset
+	sta	R1
+	lda	R0+2
+	adc	offset+2
+	sta	R1+2
+	lda	[R1]
+	sta	working_addr
+	stz	working_addr+2
+  rts
+.endscope
+
+; Store 16 bits value in A in seg_base[offset-1]
+set_16_to_offset:
+.scope
+  clc
+	lda	#$ffff
+	adc	seg_base
+	sta	R0
+	lda	#$ffff
+	adc	seg_base+2
+	sta	R0+2
+	clc
+	lda	R0
+	adc	offset
+	sta	R1
+	lda	R0+2
+	adc	offset+2
+	sta	R1+2
+	lda	working_addr
+	sta	[R1]
+  rts
+.endscope
+
+set_8_to_offset:
+.scope
+	clc
+	lda	#$ffff
+	adc	seg_base
+	sta	R0
+	lda	#$ffff
+	adc	seg_base+2
+	sta	R0+2
+	clc
+	lda	R0
+	adc	offset
+	sta	R1
+	lda	R0+2
+	adc	offset+2
+	sta	R1+2
+  acc8i16
+	lda	working_addr
+	sta	[R1]
+  acc16i16
+  rts
+.endscope
+
+get_32_from_offset:
+.scope
+	clc
+	lda	#$ffff
+	adc	seg_base
+	sta	R0
+	lda	#$ffff
+	adc	seg_base+2
+	sta	R0+2
+	clc
+	lda	R0
+	adc	offset
+	sta	R1
+	lda	R0+2
+	adc	offset+2
+	sta	R1+2
+	lda	[R1]
+	sta	working_addr
+  clc
+  inc R1
+  inc R1
+  lda [R1]
+	sta	working_addr+2
+  rts
+.endscope
+
 ; Read current value @ program, put in A.
 ; corrupts Y
 ; Then increment program to next position
+prg_next_byte:
+.scope
   acc16i16
-  lda #0000
-  lda program_offset
-  tay
+	sec
+	lda	program
+	sta	<R0
+	lda	program+2
+	sta	<R0+2
+	inc	program
+	bne	no_carry
+	inc	program+2
+no_carry:
   acc8i16
-  lda [program],Y
+	lda	[R0]
   acc16i16
-  tay
-  lda program_offset
-  clc
-  adc #1
-  sta program_offset
-  bcc done
-  lda program+2
-  inc
-  sta program+2
+	and	#$00ff
 done:
-  tya
-  rtl
-
+  clc
+	rts
 .endscope
 
 prg_next_word:
 .scope
-  lda program_offset
-  tay
-  lda #0000
-  lda [program], Y
-  tay
-  lda program_offset
-  clc
-  adc #2
-  sta program_offset
-  bcc done
-  lda program+2
-  inc
-  sta program+2
+  sec
+  acc16i16
+	lda	program
+	sta	R0
+	lda	program+2
+	sta	R0+2
+	clc
+	lda	#$2
+	adc	program
+	sta	program
+	bcc	no_carry
+	inc	program+2
+no_carry:
+	lda	[R0]
 done:
-  tya
-  rtl
+  clc
+  rts
 
 .endscope
 
+; return upper word in X, lower in A
+prg_next_long:
+.scope
+  sec
+  acc16i16
+	lda	program
+	sta	R0
+	lda	program+2
+	sta	R0+2
+	clc
+	lda	#$4
+	adc	program
+	sta	program
+	bcc	no_carry
+	inc	program+2
+no_carry:
+	ldy	#$2
+	lda	[R0],Y
+	tax
+	lda	[R0]
+done:
+  clc
+  rts
+
+.endscope
 
 load_header:
 .scope
 
   ; First two bytes must be $01 $00 for non-c64
-  jsl prg_next_word
+  jsr prg_next_word
   cmp #$0001
   bne fail_bad_magic
 
   ; Next 4 bytes should be 'o65\0' ($65 $36 $35 $00)
-  jsl prg_next_word
+  jsr prg_next_word
   cmp #$366f
   bne fail_bad_magic
-  jsl prg_next_word
+  jsr prg_next_word
   cmp #$0035
   beq good_magic
 
@@ -241,10 +258,10 @@ fail_bad_magic:
   lda #O65_BAD_HEADER_MAGIC
   sta status
   acc16i16
-  rtl
+  rts
 
 good_magic:
-  jsl prg_next_word
+  jsr prg_next_word
   sta mode
 
   and #$2000
@@ -274,13 +291,13 @@ read_16_sizes:
   PrgNext16To stack
 
 done:
-  rtl
+  rts
 
 .endscope
 
 load_header_options:
 .scope
-  
+
 ;  while ((olen = *(program++))) {
 start_loop:
   clc
@@ -303,11 +320,11 @@ read_header_option:
   bne eat_header_bytes
   brl start_loop
 eat_header_bytes:
-  jsl prg_next_byte
+  jsr prg_next_byte
   bra read_header_option
 done:
   acc16i16
-	rtl
+	rts
 
 .endscope
 
@@ -334,9 +351,179 @@ eat_references_loop:
   cmp #0
   beq eat_references_loop
 done:
-  rtl
+  rts
 
 .endscope
+
+do_reloc:
+.scope
+  acc16i8
+  ldx type
+  acc16i16
+
+  ;  ProgramPtr reloc_start = &seg_base[reloc_offset - 1];
+	clc
+	lda	#$ffff
+	adc	offset
+	sta	R0
+	lda	#$ffff
+	adc	offset+2
+	sta	R0+2
+	clc
+	lda	seg_base
+	adc	R0
+	sta	reloc_start
+	lda	seg_base+2
+	adc R0+2
+	sta	reloc_start+2
+
+  ; clear the address that's there
+  stz working_addr
+  stz working_addr+2
+reloc_word:
+  cpx #RELOC_WORD
+  bne reloc_seg
+	lda	[reloc_start]
+	sta	working_addr
+	stz	working_addr+2
+;    working_addr = working_addr + (cur_segment_base & 0x00ff0000);
+	stz	R0
+	lda	cur_segment_base+2
+	and	#^$ff0000
+	sta	R0+2
+	clc
+	lda	working_addr
+	adc	R0
+	sta	working_addr
+	lda	working_addr+2
+	adc	R0+2
+	sta	working_addr+2
+;    working_addr = working_addr - cur_segment_base;
+	sec
+	lda	working_addr
+	sbc	cur_segment_base
+	sta	working_addr
+	lda	working_addr+2
+	sbc	cur_segment_base+2
+	sta	working_addr+2
+;    working_addr = working_addr + new_segment_base;
+	clc
+	lda	working_addr
+	adc	new_segment_base
+	sta	working_addr
+	lda	working_addr+2
+	adc	new_segment_base+2
+	sta	working_addr+2
+;    working_addr &= 0x0000ffff;
+	stz	working_addr+2
+	lda	working_addr
+	sta	[reloc_start]
+
+  brl done
+reloc_seg:
+  cpx #RELOC_SEG
+  bne reloc_segaddr
+  jsr prg_next_byte       ; eat these two bytes,
+  jsr prg_next_byte       ; not sure what to do with them
+  jsr get_16_from_offset  ; get a whole word, easier that way
+  and #$ff00              ; clear lower byte
+  sta working_addr+1      ; shift upper byte into the bank byte
+  stz working_addr        ; clear lower word
+  AdjustAddr
+  lda working_addr+1      ; get just the bank
+  jsr set_8_to_offset     ; and set it back
+  brl done
+reloc_segaddr:
+  cpx #RELOC_SEGADDR
+  bne reloc_low
+  jsr get_32_from_offset  ; get 32 bits of the segment address
+  acc8i16
+  stz working_addr+3      ; throw away the highest byte
+  acc16i16
+  AdjustAddr              ; adjust it
+  jsr set_16_to_offset    ; store the lower 16
+  clc
+  inc offset              ; advance offset by 2
+  inc offset
+  jsr set_8_to_offset     ; store the upper 8 there
+  brl done
+reloc_low:
+;    working_addr = (*reloc_start) + new_segment_base;
+  cpx #RELOC_LOW
+  bne reloc_high
+	lda	[reloc_start]
+	and	#$00ff
+	sta	R0
+	stz	R0+2
+	clc
+	lda	R0
+	adc	new_segment_base
+	sta	working_addr
+	lda	R0+2
+	adc	new_segment_base+2
+	sta	working_addr+2
+;    working_addr = working_addr & 0x000000ff;
+	lda	working_addr
+	and	#$ff
+	sta	working_addr
+	stz	working_addr+2
+;    *reloc_start = working_addr;
+  acc8i16
+	lda	working_addr
+	sta	[reloc_start]
+  acc16i16
+
+  bra done
+reloc_high:
+  cpx #RELOC_HIGH
+  bne unknown_reloc_type
+  ;    working_addr = ((*reloc_start) << 8) + new_segment_base;
+	lda	[reloc_start]
+	and	#$00ff
+	xba
+	and	#$ff00
+	sta	R0
+	ldy	#$0
+	lda	R0
+	bpl	L32
+	dey
+L32:
+	sta	R0
+	sty	R0+2
+	clc
+	lda	R0
+	adc	new_segment_base
+	sta	working_addr
+	lda	R0+2
+	adc	new_segment_base+2
+	sta	working_addr+2
+;    working_addr = (working_addr & 0x0000ff00) >> 8;
+	lda	working_addr
+
+;    reloc_table_ptr++;  // not sure what to do with this arg?
+	inc	program
+	bne	no_carry
+	inc	program+2
+no_carry:
+;#if KTRACE
+;    kprintf("RELOC_HIGH %02x => %04x\n", (*reloc_start), working_addr);
+;#endif
+;    (*reloc_start) += working_addr;
+
+  acc8i16
+	lda	working_addr
+	sta	[reloc_start]
+  acc16i16
+  brl done
+unknown_reloc_type:
+  acc8i16
+  lda #O65_UNKNOWN_RELOC_TYPE
+  sta status
+  acc16i16
+done:
+  rts
+.endscope
+
 
 perform_relocations:
 .scope
@@ -344,10 +531,10 @@ perform_relocations:
   stz offset+2
 continue_relocations:
   clc
-  jsl prg_next_byte
+  jsr prg_next_byte
   cmp #0
   bne check_continue_offset
-  jmp done
+  jml done
 check_continue_offset:
   cmp #$ff            ; if 0xff add to the ongoing offset and go again
   bne accumulate_offset
@@ -356,12 +543,12 @@ check_continue_offset:
   Store32 ADDER32_R, offset
   jmp perform_relocations
 
-accumulate_offset:    
+accumulate_offset:
   sta ADDER32_A
   lda #$0000
   sta ADDER32_A+2
   Store32 offset, ADDER32_B
-  Store32 ADDER32_R, offset  
+  Store32 ADDER32_R, offset
 get_type_and_segment:
   jsr prg_next_byte
   acc8i16
@@ -377,7 +564,7 @@ start_text_seg_reloc:
   ; do text seg reloc
   Store32 tbase, cur_segment_base
   Store32 seg_base, new_segment_base
-  jsl do_reloc
+  jsr do_reloc
   jmp continue_relocations
 start_data_seg_reloc:
   cmp #DATA_SEGMENT
@@ -387,7 +574,7 @@ start_data_seg_reloc:
   Store32 seg_base, ADDER32_A
   Store32 tlen, ADDER32_B
   Store32 ADDER32_R, new_segment_base
-  jsl do_reloc
+  jsr do_reloc
   jmp continue_relocations
 start_zp_seg_reloc:
   cmp #ZP_SEGMENT
@@ -395,7 +582,7 @@ start_zp_seg_reloc:
   ; do zp segment
   Store32 #$00000000, cur_segment_base
   Store32 zbase, new_segment_base
-  jsl do_reloc
+  jsr do_reloc
   jmp continue_relocations
 start_bss_seg_reloc:
   cmp #BSS_SEGMENT
@@ -407,7 +594,7 @@ start_bss_seg_reloc:
   Store32 ADDER32_R, ADDER32_A
   Store32 dlen, ADDER32_B
   Store32 ADDER32_R, new_segment_base
-  jsl do_reloc
+  jsr do_reloc
   jmp continue_relocations
 unknown_segment_type:
   acc8i16
@@ -415,107 +602,103 @@ unknown_segment_type:
   sta status
   acc16i16
 done:
-  rtl
+  rts
 .endscope
 
-do_reloc:
-.scope
-  acc16i8
-  ldx type
+
+load_program:
+  ProcStart
+
+	; set zero page to where the linker tells us it should be
+	acc16i16
+	lda #__ZEROPAGE_LOAD__
+	tcd
+
+  ; clear zero page vars
+  acc8i16
+  stz status
+  stz olen
+  stz otype
+
   acc16i16
+  stz cur_segment_base
+  stz cur_segment_base+2
+  stz new_segment_base
+  stz new_segment_base+2
   stz working_addr
   stz working_addr+2
-reloc_word:  
-  cpx #RELOC_WORD
-  bne reloc_seg
-  ldy offset
-  dey
-  lda [seg_base],y          ; word = seg_base[offset-1]
-  sta working_addr
-  lda cur_segment_base+2
-  sta working_addr+2     
-  AdjustAddr
-  lda working_addr
-  sta [seg_base],y
-  jmp done
-reloc_seg: 
-  cpx #RELOC_SEG
-  bne reloc_segaddr
-  jsr prg_next_byte       ; eat these two bytes,
-  jsr prg_next_byte       ;  not sure what to do with them
-  ldy offset
-  dey
+
+  Store32 #$20000, program
+
+step_load_header:
+  jsr load_header         ; load the header
   acc8i16
-  lda [seg_base],y
-  sta working_addr+2
+  clc
+  lda status
+  cmp #0
   acc16i16
-  AdjustAddr
-  lda working_addr
-  sta [seg_base],y
-  jmp done
-reloc_segaddr:
-  cpx #RELOC_SEGADDR
-  bne reloc_low
-  ldy offset
-  iny
+  beq step_load_header_options
+  bra done
+step_load_header_options:
+  jsr load_header_options ; eat the header options
   acc8i16
-  lda [seg_base],y
-  sta working_addr+2
+  clc
+  lda status
+  cmp #0
   acc16i16
-  dey
-  dey
-  lda [seg_base],y
-  sta working_addr
-  AdjustAddr
-  lda working_addr
-  sta [seg_base],Y
-  iny
-  iny
+  beq store_seg_base
+  bra done
+store_seg_base:
+  Store32 program, seg_base
+
+step_jump_past_segments:
+  ; jump offset by tlen+dlen
+	clc
+	lda	tlen
+	adc	dlen
+	sta	R0
+	lda	tlen+2
+	adc	dlen+2
+	sta	R0+2
+	clc
+	lda	program
+	adc	R0
+	sta	program
+	lda	program+2
+	adc	R0+2
+	sta	program+2
+
+step_load_external_references:
+  ; We've jumped to the start of the external references list
+  ; eat that
+  jsr load_external_references
   acc8i16
-  lda working_addr+2
-  sta [seg_base],Y
+  clc
+  lda status
+  cmp #0
   acc16i16
-  jmp done
-reloc_low:
-  cpx #RELOC_LOW
-  bne reloc_high
-  ldy offset
-  dey
-  lda [seg_base],y         
-  sta working_addr
-  Store32 working_addr, ADDER32_A
-  Store32 cur_segment_base, ADDER32_B
-  Store32 ADDER32_R, working_addr
-  AdjustAddr
+  beq step_perform_text_relocations
+  bra done
+step_perform_text_relocations:
+  jsr perform_relocations     ; perform text seg relocations
   acc8i16
-  lda working_addr
-  sta [seg_base],y
+  clc
+  lda status
+  cmp #0
   acc16i16
-  jmp done
-reloc_high:
-  cpx #RELOC_HIGH
-  bne unknown_reloc_type
-  ldy offset
-  dey
-  lda [seg_base],y
-  sta working_addr+2
-  Store32 working_addr, ADDER32_A
-  Store32 cur_segment_base, ADDER32_B
-  Store32 ADDER32_R, working_addr
-  AdjustAddr
+  beq step_perform_data_relocations
+  bra done
+step_perform_data_relocations:
+  jsr perform_relocations
   acc8i16
-  lda working_addr+1
-  sta [seg_base],y
+  clc
+  lda status
+  cmp #0
   acc16i16
-  jsr prg_next_byte
-  jmp done
-unknown_reloc_type:
-  acc8i16
-  lda #O65_UNKNOWN_RELOC_TYPE
-  sta status
-  acc16i16
+  beq step_perform_bss_clear
+  bra done
+step_perform_bss_clear:
+step_execute_program:
+  jsr seg_base
 done:
-  rtl
-
-.endscope
-
+  ProcExit

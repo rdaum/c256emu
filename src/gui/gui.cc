@@ -263,7 +263,7 @@ void GUI::DrawDisassembler() {
   static bool live_trace = false;
   ImGui::Checkbox("Live trace", &live_trace);
   if (!live_trace && !system_->GetDebugInterface()->paused()) {
-    return;
+    return ImGui::End();
   }
   Disassembler *disassembler = system_->cpu()->GetDisassembler();
   ImGui::Columns(3);
