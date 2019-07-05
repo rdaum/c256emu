@@ -147,11 +147,13 @@ void I8042::kbd_update_irq() {
       if (mode_ & KBD_MODE_MOUSE_INT)
         irq_mouse_level = 1;
     } else {
+      // TODO: not sure why int mode keeps getting turned off.
       //      if ((mode_ & KBD_MODE_KBD_INT) && !(mode_ & KBD_MODE_DISABLE_KBD))
       irq_kbd_level = 1;
     }
   }
   irq_controller_->SetKeyboard(irq_kbd_level);
+  irq_controller_->SetMouse(irq_mouse_level);
 }
 
 void I8042::kbd_update_kbd_irq(int level) {
