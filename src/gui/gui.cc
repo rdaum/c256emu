@@ -1,10 +1,9 @@
 #include "gui/gui.h"
 
 #include <array>
+#include <vector>
 
 #include <imgui.h>
-
-#include <circular_buffer.hpp>
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
@@ -41,6 +40,13 @@ constexpr std::array<Vicky::ScalingQuality, 3> kScalingQualities{
 void window_close_callback(GLFWwindow *window) {
   System *system = (System *)glfwGetWindowUserPointer(window);
   system->SetStop();
+}
+
+template<typename T>
+void pop_front(std::vector<T>& vec)
+{
+  assert(!vec.empty());
+  vec.erase(vec.begin());
 }
 
 } // namespace
@@ -558,18 +564,23 @@ void GUI::DrawCPUStatus() const {
 
 void GUI::DrawProfiler() const {
   ImGui::SetNextTreeNodeOpen(true, ImGuiCond_Appearing);
-  static jm::circular_buffer<float, 128> mhz_buffer;
-  static jm::circular_buffer<float, 128> fps_buffer;
+  static std::vector<float> mhz_buffer;
+  static std::vector<float> fps_buffer;
   if (ImGui::CollapsingHeader("Profile")) {
     auto profile_info = system_->profile_info();
     mhz_buffer.push_back(profile_info.mhz_equiv);
     fps_buffer.push_back(profile_info.fps);
+    if (mhz_buffer.size() > 128) {
+      pop_front(mhz_buffer);
+    }
+    if (fps_buffer.size() > 128) {
+      pop_front(fps_buffer);
+    }
     ImGui::BeginGroup();
 
     ImGui::LabelText("FPS", "%f", profile_info.fps);
-    std::vector<float> linear_fps(fps_buffer.size());
-    std::copy(fps_buffer.begin(), fps_buffer.end(), linear_fps.begin());
-    ImGui::PlotLines("", linear_fps.data(), linear_fps.size());
+
+    ImGui::PlotLines("", fps_buffer.data(), fps_buffer.size());
     ImGui::LabelText("Mhz", "%f", profile_info.mhz_equiv);
 
     std::vector<float> linear_mhz(fps_buffer.size());

@@ -33,9 +33,6 @@ find_package(glfw3 CONFIG REQUIRED)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
         ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-# Configure circular_buffer a downloadable library.
-include(cmake/External_circular_buffer.cmake)
-
 # Add RetroCpu as a subdirectory module.
 include(cmake/Submodule.cmake)
 add_subdirectory(retro_cpu)
@@ -73,11 +70,10 @@ set(BUS_HEADERS
     src/bus/register_utils.h
     )
 add_library(bus ${BUS_SOURCES} ${BUS_HEADERS})
-add_dependencies(bus circular_buffer retro_cpu_core retro_cpu_65816)
+add_dependencies(bus retro_cpu_core retro_cpu_65816)
 target_include_directories(bus PUBLIC
         retro_cpu
         ${GLOG_ROOT}/include
-        ${CIRCULAR_BUFFER_INCLUDE_DIRS}
         ./src)
 target_compile_options(bus PUBLIC ${glog_CFLAGS_OTHER})
 
@@ -89,10 +85,9 @@ add_executable(c256emu
         src/gui/automation_console.cc src/gui/automation_console.h
         src/gui/imgui_impl_glfw.cpp src/gui/imgui_impl_glfw.h
         src/gui/imgui_impl_opengl2.cpp src/gui/imgui_impl_opengl2.h)
-add_dependencies(c256emu bus gflags retro_cpu_core retro_cpu_65816 retro_host circular_buffer)
+add_dependencies(c256emu bus gflags retro_cpu_core retro_cpu_65816 retro_host)
 target_include_directories(c256emu PUBLIC
         retro_cpu
-        ${CIRCULAR_BUFFER_INCLUDE_DIRS}
         ./src)
 
 if (WIN32)
