@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <GLFW/glfw3.h>
 #include <glog/logging.h>
 
 #include <atomic>
@@ -35,7 +35,7 @@ class Vicky {
   ~Vicky();
 
   // Initialize.
-  SDL_Rect Start();
+  GLFWwindow *Start();
 
   // Render a single scan line and advance to the next.
   void RenderLine();
@@ -51,14 +51,12 @@ class Vicky {
 
   uint8_t* vram() { return video_ram_; }
 
-  unsigned int window_id() const;
+  //  unsigned int window_id() const;
 
   void set_scale(float scale);
   float scale() const { return scale_; }
 
   enum class ScalingQuality { NEAREST, LINEAR, BEST };
-  void set_scaling_quality(ScalingQuality scaling_quality);
-  ScalingQuality scaling_quality() const { return scaling_quality_; }
 
   void set_gamma_override(bool override) { gamma_override_ = override; }
   bool gamma_override() const { return gamma_override_; }
@@ -73,7 +71,7 @@ class Vicky {
                      uint32_t sprite_mask,
                      uint32_t* pixel);
 
-  uint32_t ApplyGamma(uint32_t colour_val);
+  uint32_t ColourCorrect(uint32_t colour_val);
 
   System* sys_;
   InterruptController* int_controller_;
@@ -84,9 +82,7 @@ class Vicky {
   // Enable gamma correction even if the video mode doesn't say so.
   bool gamma_override_ = true;
 
-  SDL_Window* window_;
-  SDL_Renderer* renderer_;
-  SDL_GLContext gl_context_;
+  GLFWwindow *window_;
 
   union BGRAColour {
     uint32_t v;
@@ -125,7 +121,7 @@ class Vicky {
   uint8_t mouse_cursor_0_[256]{};
   uint8_t mouse_cursor_1_[256]{};
 
-  // Set by SDL
+  // TODO.
   uint16_t mouse_pos_x_ = 0;
   uint16_t mouse_pos_y_ = 0;
 
@@ -178,6 +174,4 @@ class Vicky {
   // Our physical frame buffer
   uint32_t frame_buffer_[kRasterSize];
 
-  // Which is uploaded to this texture each frame.
-  SDL_Texture* vicky_texture_ = nullptr;
 };

@@ -4,7 +4,7 @@
 
 class MathCoprocessor;
 class Vicky;
-class Keyboard;
+class I8042;
 class Rtc;
 class CH376SD;
 class InterruptController;
@@ -19,7 +19,7 @@ class C256SystemBus : public SystemBus {
   InterruptController* int_controller() const { return int_controller_.get(); }
   Vicky* vicky() const { return vicky_.get(); }
   VDMA* vdma() const { return vdma_.get(); }
-  Keyboard* keyboard() const { return keyboard_.get(); }
+  I8042* keyboard() const { return keyboard_.get(); }
 
  private:
   void InitBus();
@@ -37,7 +37,7 @@ class C256SystemBus : public SystemBus {
   std::unique_ptr<InterruptController> int_controller_;
   std::unique_ptr<Vicky> vicky_;
   std::unique_ptr<VDMA> vdma_;
-  std::unique_ptr<Keyboard> keyboard_;
+  std::unique_ptr<I8042> keyboard_;
   std::unique_ptr<Rtc> rtc_;
   std::unique_ptr<CH376SD> sd_;
   Page pages[4096];

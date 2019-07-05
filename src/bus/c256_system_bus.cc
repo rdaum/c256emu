@@ -1,8 +1,8 @@
 #include "bus/c256_system_bus.h"
 
 #include "bus/ch376_sd.h"
+#include "bus/i8042_kbd_mouse.h"
 #include "bus/int_controller.h"
-#include "bus/keyboard.h"
 #include "bus/math_copro.h"
 #include "bus/rtc.h"
 #include "bus/vdma.h"
@@ -13,7 +13,7 @@ C256SystemBus::C256SystemBus(System* sys) {
   int_controller_ = std::make_unique<InterruptController>(sys);
   // TODO: Timers 0x160 - 0x17f
   // TODO: SDMA: 0x180-0x19f
-  keyboard_ = std::make_unique<Keyboard>(sys, int_controller_.get());
+  keyboard_ = std::make_unique<I8042>(int_controller_.get());
   vicky_ = std::make_unique<Vicky>(sys, int_controller_.get());
   vdma_ = std::make_unique<VDMA>(vicky_->vram(), int_controller_.get());
   rtc_ = std::make_unique<Rtc>();

@@ -5,11 +5,11 @@
 #include <thread>
 
 #include "bus/int_controller.h"
-#include "bus/keyboard.h"
-#include "bus/sdl_to_atset_keymap.h"
 #include "bus/vicky_def.h"
 #include "system.h"
 #include "vicky.h"
+
+#include <GL/glext.h>
 
 namespace {
 
@@ -18,10 +18,7 @@ constexpr uint8_t kTileSize = 16;
 constexpr uint8_t kSpriteSize = 32;
 constexpr uint16_t kTileSetStride = 256;
 
-using UniqueTexturePtr =
-    std::unique_ptr<SDL_Texture, std::function<void(SDL_Texture*)>>;
-
-bool Set16(uint32_t addr, uint32_t start_addr, uint16_t* dest, uint8_t v) {
+bool Set16(uint32_t addr, uint32_t start_addr, uint16_t *dest, uint8_t v) {
   uint16_t o = addr - start_addr;
   if (o > 1)
     return false;
@@ -32,7 +29,7 @@ bool Set16(uint32_t addr, uint32_t start_addr, uint16_t* dest, uint8_t v) {
   return true;
 }
 
-bool Set24(uint32_t addr, uint32_t start_addr, uint32_t* dest, uint8_t v) {
+bool Set24(uint32_t addr, uint32_t start_addr, uint32_t *dest, uint8_t v) {
   uint16_t o = addr - start_addr;
   if (o > 2)
     return false;
@@ -45,35 +42,35 @@ bool Set24(uint32_t addr, uint32_t start_addr, uint32_t* dest, uint8_t v) {
   return true;
 }
 
-void Set32(uint32_t* value, uint8_t bit_number) {
+void Set32(uint32_t *value, uint8_t bit_number) {
   auto mask = static_cast<uint32_t>(1 << bit_number);
   *value = *value | mask;
 }
 
-void SetLower8(uint16_t* destination, uint8_t value) {
+void SetLower8(uint16_t *destination, uint8_t value) {
   *destination &= 0xFF00;
   *destination |= value;
 }
 
-void SetHigher8(uint16_t* destination, uint8_t value) {
+void SetHigher8(uint16_t *destination, uint8_t value) {
   *destination &= 0x00ff;
   *destination |= (value << 8);
 }
 
 std::string ScalingQualityStr(Vicky::ScalingQuality scaling_quality) {
   switch (scaling_quality) {
-    case Vicky::ScalingQuality::NEAREST:
-      return "0";
-    case Vicky::ScalingQuality::LINEAR:
-      return "1";
-    default:
-    case Vicky::ScalingQuality::BEST:
-      return "2";
+  case Vicky::ScalingQuality::NEAREST:
+    return "0";
+  case Vicky::ScalingQuality::LINEAR:
+    return "1";
+  default:
+  case Vicky::ScalingQuality::BEST:
+    return "2";
   }
 }
-}  // namespace
+} // namespace
 
-Vicky::Vicky(System* system, InterruptController* int_controller)
+Vicky::Vicky(System *system, InterruptController *int_controller)
     : sys_(system), int_controller_(int_controller) {
   memset(fg_colour_mem_, 0, sizeof(fg_colour_mem_));
   memset(bg_colour_mem_, 0, sizeof(bg_colour_mem_));
@@ -96,9 +93,9 @@ Vicky::Vicky(System* system, InterruptController* int_controller)
   };
 }
 
-void Vicky::InitPages(Page* vicky_page_start) {
-  auto map = [vicky_page_start](uint32_t addr, uint8_t* ptr, uint32_t size) {
-    auto* start = vicky_page_start + (addr >> 12);
+void Vicky::InitPages(Page *vicky_page_start) {
+  auto map = [vicky_page_start](uint32_t addr, uint8_t *ptr, uint32_t size) {
+    auto *start = vicky_page_start + (addr >> 12);
     CHECK((size & 0xFFF) == 0);
     for (uint32_t i = 0; i<size>> 12; i++) {
       start[i].ptr = ptr + (i * (1 << 12));
@@ -109,42 +106,24 @@ void Vicky::InitPages(Page* vicky_page_start) {
   map(kTextMemoryBegin, text_mem_, kTextMemorySize);
   map(kTextColorMemoryBegin, text_colour_mem_, kTextColorMemorySize);
   map(kFontBankMemoryBegin, font_bank_, kFontTotalMemorySize);
-  map(kGrphLutBegin, (uint8_t*)lut_, kGrphLutTotalSize);
-  map(kTileMapsBegin, (uint8_t*)tile_mem_, sizeof(tile_mem_));
+  map(kGrphLutBegin, (uint8_t *)lut_, kGrphLutTotalSize);
+  map(kTileMapsBegin, (uint8_t *)tile_mem_, sizeof(tile_mem_));
 }
 
-SDL_Rect Vicky::Start() {
+GLFWwindow *Vicky::Start() {
   window_ =
-      SDL_CreateWindow("Vicky", SDL_WINDOWPOS_UNDEFINED,
-                       SDL_WINDOWPOS_UNDEFINED, kVickyBitmapWidth * scale_,
-                       kVickyBitmapHeight * scale_, SDL_WINDOW_OPENGL);
+      glfwCreateWindow(kVickyBitmapWidth * scale_, kVickyBitmapHeight * scale_,
+                       "Vicky", nullptr, nullptr);
 
   CHECK(window_);
-  gl_context_ = SDL_GL_CreateContext(window_);
-  renderer_ = SDL_CreateRenderer(window_, -1, 0);
-  vicky_texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_ARGB8888,
-                                     SDL_TEXTUREACCESS_STREAMING,
+  glfwMakeContextCurrent(window_);
 
-                                     kVickyBitmapWidth, kVickyBitmapHeight);
-
-  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,
-              ScalingQualityStr(scaling_quality_).c_str());
-
-  CHECK(renderer_);
-
-  int x, y, w, h;
-  SDL_GetWindowPosition(window_, &x, &y);
-  SDL_GetWindowSize(window_, &w, &h);
-
-  return SDL_Rect{x, y, w, h};
+  return window_;
 }
 
 Vicky::~Vicky() {
   if (window_) {
-    SDL_DestroyTexture(vicky_texture_);
-    SDL_DestroyRenderer(renderer_);
-    SDL_DestroyWindow(window_);
-    SDL_Quit();
+    glfwDestroyWindow(window_);
   }
 }
 
@@ -155,25 +134,29 @@ uint8_t Vicky::ReadByte(uint32_t addr) {
   }
 
   if (addr == kMousePtrCtrlReg) {
-    if (mouse_cursor_enable_) v|= 0x01;
-    if (mouse_cursor_select_) v|= 0x02;
+    if (mouse_cursor_enable_)
+      v |= 0x01;
+    if (mouse_cursor_select_)
+      v |= 0x02;
     return v;
   }
   if (addr == kBorderCtrlReg) {
-    if (border_enabled_) v |= Border_Ctrl_Enable;
+    if (border_enabled_)
+      v |= Border_Ctrl_Enable;
     return v;
   }
   if (addr == kBitmapCtrlReg) {
-    if (bitmap_enabled_) v |= 0x01;
+    if (bitmap_enabled_)
+      v |= 0x01;
     v |= (bitmap_lut_ << 4);
     return v;
   }
 
   if (addr >= kTextFgColourLUT && addr < kTextBgColourLUT) {
-    memcpy(&v, (uint8_t*)fg_colour_mem_ + addr - kTextFgColourLUT, 1);
+    memcpy(&v, (uint8_t *)fg_colour_mem_ + addr - kTextFgColourLUT, 1);
     return v;
   } else if (addr >= kTextBgColourLUT && addr < 0x1fc0) {
-    memcpy(&v, (uint8_t*)bg_colour_mem_ + addr - kTextBgColourLUT, 1);
+    memcpy(&v, (uint8_t *)bg_colour_mem_ + addr - kTextBgColourLUT, 1);
     return v;
   } else if (addr >= GAMMA_B_LUT_PTR && addr < GAMMA_G_LUT_PTR) {
     return gamma_.b[addr & 0xff];
@@ -186,7 +169,6 @@ uint8_t Vicky::ReadByte(uint32_t addr) {
   } else if (addr >= kMousePtrGrap1Begin && addr <= kMousePtrGrap1End) {
     return mouse_cursor_1_[addr - kMousePtrGrap1Begin];
   }
-
 
   if (addr >= kTileRegistersBegin && addr <= kTileRegistersEnd) {
     uint8_t v = 0;
@@ -237,21 +219,17 @@ uint8_t Vicky::ReadByte(uint32_t addr) {
     } else if (register_num == 1) {
       v = sprite.start_addr & 0x000000ff;
     } else if (register_num == 2) {
-      v = sprite.start_addr & 0x0000ff00;
-      v >>= 8;
+      v = sprite.start_addr & 0x0000ff000 >> 8;
     } else if (register_num == 3) {
-      v = sprite.start_addr & 0x00ff0000;
-      v >>= 16;
+      v = sprite.start_addr & 0x00ff0000 >> 16;
     } else if (register_num == 4) {
       v = sprite.x & 0x00ff;
     } else if (register_num == 5) {
-      v = sprite.x & 0xff00;
-      v >>= 8;
+      v = sprite.x & 0xff00 >> 8;
     } else if (register_num == 6) {
       v = sprite.x & 0x00ff;
     } else if (register_num == 7) {
-      v = sprite.y & 0xff00;
-      v >>= 8;
+      v = sprite.y & 0xff00 >> 8;
     } else {
       LOG(ERROR) << "Unsupported sprite reg read: " << register_num;
     }
@@ -267,10 +245,10 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
     return;
 
   if (addr >= kTextFgColourLUT && addr < kTextBgColourLUT) {
-    memcpy((uint8_t*)fg_colour_mem_ + addr - kTextFgColourLUT, &v, 1);
+    memcpy((uint8_t *)fg_colour_mem_ + addr - kTextFgColourLUT, &v, 1);
     return;
   } else if (addr >= kTextBgColourLUT && addr < 0x1fc0) {
-    memcpy((uint8_t*)bg_colour_mem_ + addr - kTextBgColourLUT, &v, 1);
+    memcpy((uint8_t *)bg_colour_mem_ + addr - kTextBgColourLUT, &v, 1);
     return;
   } else if (addr >= GAMMA_B_LUT_PTR && addr < GAMMA_G_LUT_PTR) {
     gamma_.b[addr & 0xFF] = v;
@@ -297,7 +275,7 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
     uint16_t tile_offset = addr - kTileRegistersBegin;
     uint8_t tile_num = tile_offset / kNumTileRegisters;
     uint8_t register_num = tile_offset % kNumTileRegisters;
-    TileSet& tile_set = tile_sets_[tile_num];
+    TileSet &tile_set = tile_sets_[tile_num];
     if (register_num == 0) {
       tile_set.enabled = v & TILE_Enable;
       tile_set.lut = (v & 0b00001110) >> 1;
@@ -325,7 +303,7 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
     uint16_t sprite_offset = addr - kSpriteRegistersBegin;
     uint16_t sprite_num = sprite_offset / kNumSpriteRegisters;
     uint16_t register_num = sprite_offset % kNumSpriteRegisters;
-    Sprite& sprite = sprites_[sprite_num];
+    Sprite &sprite = sprites_[sprite_num];
     if (register_num == 0) /* control register */ {
       uint8_t layer = (v & 0b01110000) >> 4;
       sprite.layer = layer;
@@ -365,6 +343,8 @@ void Vicky::StoreByte(uint32_t addr, uint8_t v) {
 }
 
 void Vicky::RenderLine() {
+  glfwPollEvents();
+
   if (vblank_cnt_ < kVickyVBlankLines) {
     vblank_cnt_++;
     return;
@@ -380,18 +360,18 @@ void Vicky::RenderLine() {
   if (run_char_gen && (cursor_reg_ & Vky_Cursor_Enable)) {
     uint16_t flash_interval_ms = 0;
     switch (cursor_reg_ >> 1) {
-      case 0b00:
-        flash_interval_ms = 1000;
-        break;
-      case 0b01:
-        flash_interval_ms = 500;
-        break;
-      case 0b10:
-        flash_interval_ms = 250;
-        break;
-      case 0b11:
-        flash_interval_ms = 200;
-        break;
+    case 0b00:
+      flash_interval_ms = 1000;
+      break;
+    case 0b01:
+      flash_interval_ms = 500;
+      break;
+    case 0b10:
+      flash_interval_ms = 250;
+      break;
+    case 0b11:
+      flash_interval_ms = 200;
+      break;
     }
     auto time_since_flash =
         std::chrono::steady_clock::now() - last_cursor_flash_;
@@ -401,13 +381,13 @@ void Vicky::RenderLine() {
     }
   }
 
-  uint32_t* row_pixels = &frame_buffer_[kVickyBitmapWidth * raster_y_];
+  uint32_t *row_pixels = &frame_buffer_[kVickyBitmapWidth * raster_y_];
 
   // Calculate sprites valid for this row before scanning.
   uint32_t sprite_masks[4]{0, 0, 0, 0};
   if (mode_ & Mstr_Ctrl_Sprite_En) {
     for (uint8_t sprite_num = 0; sprite_num < 32; sprite_num++) {
-      Sprite& sprite = sprites_[sprite_num];
+      Sprite &sprite = sprites_[sprite_num];
       if (!sprite.enabled || sprite.y < raster_y_ ||
           sprite.y > raster_y_ + kSpriteSize || sprite.x > 479)
         continue;
@@ -417,10 +397,10 @@ void Vicky::RenderLine() {
 
   for (uint16_t raster_x = 0; raster_x < kVickyBitmapWidth; raster_x++) {
     CHECK(raster_x < 640);
-    uint32_t* row_pixel = &row_pixels[raster_x];
+    uint32_t *row_pixel = &row_pixels[raster_x];
 
     // Background colour
-    row_pixels[raster_x] = ApplyGamma(background_bgr_.v);
+    row_pixels[raster_x] = ColourCorrect(background_bgr_.v);
 
     // Bitmap
     if (mode_ & Mstr_Ctrl_Bitmap_En && bitmap_enabled_)
@@ -448,7 +428,7 @@ void Vicky::RenderLine() {
       RenderMouseCursor(raster_x, row_pixel);
 
     if (border_enabled_) {
-      uint32_t border_colour = ApplyGamma(border_colour_.v);
+      uint32_t border_colour = ColourCorrect(border_colour_.v);
       if (raster_x < kBorderWidth) {
         *row_pixel = border_colour;
         continue;
@@ -474,64 +454,88 @@ void Vicky::RenderLine() {
   // TODO line interrupt
   raster_y_++;
   if (raster_y_ == kVickyBitmapHeight) {
-    SDL_UpdateTexture(vicky_texture_, nullptr, frame_buffer_,
-                      kVickyBitmapWidth * sizeof(uint32_t));
-    SDL_GL_MakeCurrent(window_, gl_context_);
+    int display_w, display_h;
+    glfwMakeContextCurrent(window_);
+    glfwGetFramebufferSize(window_, &display_w, &display_h);
+    glViewport(0, 0, display_w, display_h);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    int w, h;
-    SDL_GetWindowSize(window_, &w, &h);
-    SDL_Rect scaled_rect{0, 0, w, h};
-    SDL_RenderCopy(renderer_, vicky_texture_, nullptr, &scaled_rect);
-    SDL_RenderPresent(renderer_);
+    GLuint texture_id;
+    glGenTextures(1, &texture_id);
+    glBindTexture(GL_TEXTURE_2D, texture_id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, kVickyBitmapWidth,
+                 kVickyBitmapHeight, 0, GL_BGRA, GL_UNSIGNED_BYTE,
+                 frame_buffer_);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+    glEnable(GL_TEXTURE_2D);
+    glBegin(GL_QUADS);
+    glTexCoord2f(0, 1);
+    glVertex3f(-1, -1, 0);
+    glTexCoord2f(1, 1);
+    glVertex3f(1, -1, 0);
+    glTexCoord2f(1, 0);
+    glVertex3f(1, 1, 0);
+    glTexCoord2f(0, 0);
+    glVertex3f(-1, 1, 0);
+    glEnd();
+    glDisable(GL_TEXTURE_2D);
+
+    glfwSwapBuffers(window_);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glDeleteTextures(1, &texture_id);
+
     vblank_cnt_ = 0;
     raster_y_ = 0;
   }
 }
 
-bool Vicky::RenderBitmap(uint16_t raster_x, uint32_t* row_pixel) {
-  uint8_t* indexed_row =
+bool Vicky::RenderBitmap(uint16_t raster_x, uint32_t *row_pixel) {
+  uint8_t *indexed_row =
       video_ram_ + bitmap_addr_offset_ + (raster_y_ * kVickyBitmapWidth);
   uint8_t colour_index = indexed_row[raster_x];
   if (colour_index == 0)
     return false;
-  *row_pixel = ApplyGamma(lut_[bitmap_lut_][colour_index].v);
+  *row_pixel = ColourCorrect(lut_[bitmap_lut_][colour_index].v);
   return true;
 }
 
-bool Vicky::RenderSprites(uint16_t raster_x,
-                          uint8_t layer,
-                          uint32_t sprite_mask,
-                          uint32_t* row_pixel) {
+bool Vicky::RenderSprites(uint16_t raster_x, uint8_t layer,
+                          uint32_t sprite_mask, uint32_t *row_pixel) {
   // TODO this sprite routine can't keep up to 14mhz emulation on my
   // PC if lots of sprites were enabled in many layers.
 
   // Keep drawing until we run out of sprites in this layer.
   for (int sprite_num = 0; sprite_mask; sprite_num++, sprite_mask >>= 1) {
-    Sprite& sprite = sprites_[sprite_num];
+    Sprite &sprite = sprites_[sprite_num];
 
     if (!sprite.enabled || raster_x < sprite.x ||
         raster_x > sprite.x + kSpriteSize || raster_y_ < sprite.y ||
         raster_y_ > sprite.y + kSpriteSize)
       continue;
 
-    const uint8_t* sprite_mem = video_ram_ + sprite.start_addr;
+    const uint8_t *sprite_mem = video_ram_ + sprite.start_addr;
     uint8_t colour_index =
         sprite_mem[raster_x - sprite.x + (raster_y_ - sprite.y) * kSpriteSize];
     if (colour_index == 0)
       return false;
-    *row_pixel = ApplyGamma(lut_[sprite.lut][colour_index].v);
+    *row_pixel = ColourCorrect(lut_[sprite.lut][colour_index].v);
     return true;
   }
   return false;
 }
 
-bool Vicky::RenderTileMap(uint16_t raster_x,
-                          uint8_t layer,
-                          uint32_t* row_pixel) {
+bool Vicky::RenderTileMap(uint16_t raster_x, uint8_t layer,
+                          uint32_t *row_pixel) {
   if (tile_sets_[layer].enabled) {
     // TODO support for linear tile sheets.  this assumes a 256x256 sheet
     // of 16x16 tiles for now.
-    const auto& tile_set = tile_sets_[layer];
+    const auto &tile_set = tile_sets_[layer];
 
     uint16_t adjusted_x = raster_x;
     uint16_t adjusted_y = raster_y_;
@@ -554,56 +558,54 @@ bool Vicky::RenderTileMap(uint16_t raster_x,
     uint8_t screen_tile_col = adjusted_x / kTileSize;
     uint8_t screen_tile_sub_col = adjusted_x % kTileSize;
 
-    TileMem* tile_mem = &tile_mem_[layer];
+    TileMem *tile_mem = &tile_mem_[layer];
     uint8_t tile_num = tile_mem->map[screen_tile_row][screen_tile_col];
-    uint8_t* tile_sheet_bitmap = &video_ram_[tile_set.start_addr];
+    uint8_t *tile_sheet_bitmap = &video_ram_[tile_set.start_addr];
 
     uint8_t tile_sheet_column =
-        tile_num % kTileSize;  // the column in the tile sheet
-    uint8_t tile_sheet_row = tile_num / kTileSize;  // the row in the tile sheet
+        tile_num % kTileSize; // the column in the tile sheet
+    uint8_t tile_sheet_row = tile_num / kTileSize; // the row in the tile sheet
 
     // the physical memory location of the row in the sheet our tile is
     // in
-    uint8_t* tile_bitmap_row =
+    uint8_t *tile_bitmap_row =
         &tile_sheet_bitmap[(tile_sheet_row * kTileSize + screen_tile_sub_row) *
                            kTileSetStride];
 
     // the physical memory location of the column in the sheet our tile
     // is in
-    uint8_t* tile_bitmap_column =
+    uint8_t *tile_bitmap_column =
         &tile_bitmap_row[tile_sheet_column * kTileSize];
 
     uint8_t colour_index = tile_bitmap_column[screen_tile_sub_col];
     if (colour_index == 0)
       return false;
 
-    *row_pixel = ApplyGamma(lut_[tile_set.lut][colour_index].v);
+    *row_pixel = ColourCorrect(lut_[tile_set.lut][colour_index].v);
     return true;
   }
   return false;
 }
 
-bool Vicky::RenderMouseCursor(uint16_t raster_x, uint32_t* row_pixel) {
-  int x, y;
-  SDL_GetMouseState(&x, &y);
-  mouse_pos_x_ = x;
-  mouse_pos_y_ = y;
+bool Vicky::RenderMouseCursor(uint16_t raster_x, uint32_t *row_pixel) {
+  // TODO: hook up.
   if ((raster_x >= mouse_pos_x_ && raster_x <= mouse_pos_x_ + 16) &&
       (raster_y_ >= mouse_pos_y_ && raster_y_ <= mouse_pos_y_ + 16)) {
-    uint8_t* mouse_mem =
+    uint8_t *mouse_mem =
         mouse_cursor_select_ ? mouse_cursor_0_ : mouse_cursor_1_;
     uint8_t mouse_sub_col = raster_x % 16;
     uint8_t mouse_sub_row = raster_y_ % 16;
     uint8_t pixel_val = mouse_mem[mouse_sub_col + (mouse_sub_row * 16)];
     if (pixel_val == 0)
       return false;
-    *row_pixel = ApplyGamma(pixel_val | (pixel_val << 8) | (pixel_val << 16));
+    *row_pixel =
+        ColourCorrect(pixel_val | (pixel_val << 8) | (pixel_val << 16));
     return true;
   }
   return false;
 }
 
-bool Vicky::RenderCharacterGenerator(uint16_t raster_x, uint32_t* row_pixel) {
+bool Vicky::RenderCharacterGenerator(uint16_t raster_x, uint32_t *row_pixel) {
   int16_t bitmap_x = raster_x;
   int16_t bitmap_y = raster_y_;
 
@@ -625,8 +627,8 @@ bool Vicky::RenderCharacterGenerator(uint16_t raster_x, uint32_t* row_pixel) {
   uint8_t colour = text_colour_mem_[column + (row * kColsPerLine)];
   uint8_t fg_colour_num = (uint8_t)((colour & 0xf0) >> 4);
   uint8_t bg_colour_num = (uint8_t)(colour & 0x0f);
-  uint8_t* character_font = &font_bank_[character * 8];
-  uint8_t* cursor_font = &font_bank_[cursor_char_ * 8];
+  uint8_t *character_font = &font_bank_[character * 8];
+  uint8_t *cursor_font = &font_bank_[cursor_char_ * 8];
 
   uint32_t fg_colour = fg_colour_mem_[fg_colour_num];
   uint32_t bg_colour = bg_colour_mem_[bg_colour_num];
@@ -637,20 +639,20 @@ bool Vicky::RenderCharacterGenerator(uint16_t raster_x, uint32_t* row_pixel) {
 
   int pixel_pos = 1 << (7 - sub_column);
   if (is_cursor_cell && cursor_font[sub_row] & pixel_pos) {
-    *row_pixel = ApplyGamma(fg_colour);
+    *row_pixel = ColourCorrect(fg_colour);
     return true;
   } else if (character_font[sub_row] & pixel_pos) {
-    *row_pixel = ApplyGamma(is_cursor_cell ? bg_colour : fg_colour);
+    *row_pixel = ColourCorrect(is_cursor_cell ? bg_colour : fg_colour);
     return true;
   } else if (mode_ & Mstr_Ctrl_Text_Mode_En && !is_cursor_cell) {
     // note no bg color in overlay or when cursor on
-    *row_pixel = ApplyGamma(bg_colour);
+    *row_pixel = ColourCorrect(bg_colour);
     return true;
   }
   return false;
 }
 
-uint32_t Vicky::ApplyGamma(uint32_t colour_val) {
+uint32_t Vicky::ColourCorrect(uint32_t colour_val) {
   // Seems like GAMMA_en is always off? But too dim if we won't use it, so
   // we allow an override for it, and default it to on.
   if (!gamma_override_ && !(mode_ & Mstr_Ctrl_GAMMA_En))
@@ -662,23 +664,13 @@ uint32_t Vicky::ApplyGamma(uint32_t colour_val) {
   corrected.bgra[0] = gamma_.b[colour.bgra[0]];
   corrected.bgra[1] = gamma_.g[colour.bgra[1]];
   corrected.bgra[2] = gamma_.r[colour.bgra[2]];
-  corrected.bgra[3] = colour.bgra[0];
+  corrected.bgra[3] = colour.bgra[3];
 
   return corrected.v;
 }
 
-unsigned int Vicky::window_id() const {
-  return SDL_GetWindowID(window_);
-}
-
 void Vicky::set_scale(float scale) {
   scale_ = scale;
-  SDL_SetWindowSize(window_, kVickyBitmapWidth * scale,
+  glfwSetWindowSize(window_, kVickyBitmapWidth * scale,
                     kVickyBitmapHeight * scale);
-}
-
-void Vicky::set_scaling_quality(Vicky::ScalingQuality scaling_quality) {
-  scaling_quality_ = scaling_quality;
-  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY,
-              ScalingQualityStr(scaling_quality).c_str());
 }

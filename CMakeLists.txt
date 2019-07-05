@@ -11,9 +11,6 @@ project(c256emu)
 
 set(CMAKE_CXX_STANDARD 17)
 
-hunter_add_package(SDL2)
-find_package(SDL2 CONFIG REQUIRED)
-
 hunter_add_package(gflags)
 find_package(gflags CONFIG REQUIRED)
 
@@ -45,44 +42,44 @@ add_subdirectory(retro_cpu)
 
 # The c256 bus devices
 set(BUS_SOURCES
-        src/automation/automation.cc
-        src/automation/lua_describe.cc
-        src/bus/ch376_sd.cc
-        src/bus/int_controller.cc
-        src/bus/keyboard.cc
-        src/bus/loader.cc
-        src/bus/math_copro.cc
-        src/bus/rtc.cc
-        src/bus/vicky.cc
-        src/bus/vdma.cc
-        src/bus/c256_system_bus.cc
-        src/bus/register_utils.cc
-        )
+    src/automation/automation.cc
+    src/automation/lua_describe.cc
+    src/bus/ch376_sd.cc
+    src/bus/int_controller.cc
+    src/bus/i8042_kbd_mouse.cc
+    src/bus/ps2_kbdmouse.cc
+    src/bus/loader.cc
+    src/bus/math_copro.cc
+    src/bus/rtc.cc
+    src/bus/vicky.cc
+    src/bus/vdma.cc
+    src/bus/c256_system_bus.cc
+    src/bus/register_utils.cc
+    )
 set(BUS_HEADERS
-        src/automation/automation.h
-        src/automation/lua_describe.h
-        src/bus/ch376_sd.h
-        src/bus/int_controller.h
-        src/bus/keyboard.h
-        src/bus/loader.h
-        src/bus/math_copro.h
-        src/bus/rtc.h
-        src/bus/sdl_to_atset_keymap.h
-        src/bus/vicky_def.h
-        src/bus/vicky.h
-        src/bus/vdma.h
-        src/bus/c256_system_bus.h
-        src/bus/register_utils.h
-        )
+    src/automation/automation.h
+    src/automation/lua_describe.h
+    src/bus/ch376_sd.h
+    src/bus/int_controller.h
+    src/bus/ps2_kbdmouse.h
+    src/bus/i8042_kbd_mouse.h
+    src/bus/loader.h
+    src/bus/math_copro.h
+    src/bus/rtc.h
+    src/bus/vicky_def.h
+    src/bus/vicky.h
+    src/bus/vdma.h
+    src/bus/c256_system_bus.h
+    src/bus/register_utils.h
+    )
 add_library(bus ${BUS_SOURCES} ${BUS_HEADERS})
 add_dependencies(bus circular_buffer retro_cpu_core retro_cpu_65816)
 target_include_directories(bus PUBLIC
         retro_cpu
-        ${SDL2_INCLUDE_DIRS}
         ${GLOG_ROOT}/include
         ${CIRCULAR_BUFFER_INCLUDE_DIRS}
         ./src)
-target_compile_options(bus PUBLIC ${SDL2_CFLAGS_OTHER} ${glog_CFLAGS_OTHER})
+target_compile_options(bus PUBLIC ${glog_CFLAGS_OTHER})
 
 # Main executable
 add_executable(c256emu
@@ -109,8 +106,6 @@ target_link_libraries(c256emu
         ${PLATFORM_LIBRARIES}
         glog::glog
         gflags
-        SDL2::SDL2main
-        SDL2::SDL2
         glfw
         imgui::imgui
         retro_cpu_core retro_cpu_65816 retro_host

@@ -11,9 +11,9 @@ class InterruptController {
 
   // Raise various specific interrupts.
   void RaiseFrameStart();
-  void RaiseKeyboard();
+  void SetKeyboard(bool level);
+  void SetMouse(bool level);
   void RaiseVDMATransferComplete();
-  void LowerKeyboard();
   void RaiseCH376();
   void LowerCH376();
 

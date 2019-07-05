@@ -3,9 +3,10 @@
 #include <gflags/gflags.h>
 
 #include "bus/c256_system_bus.h"
+#include "bus/i8042_kbd_mouse.h"
 #include "bus/int_controller.h"
-#include "bus/keyboard.h"
 #include "bus/loader.h"
+#include "bus/ps2_kbdmouse.h"
 #include "bus/vdma.h"
 #include "bus/vicky.h"
 #include "gui/gui.h"
@@ -26,6 +27,35 @@ constexpr int kRasterLinesPerSecond =
 
 DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
 
+void key_cb_func(GLFWwindow *window, int key, int scancode, int action,
+                 int mods) {
+  System *system = (System *)glfwGetWindowUserPointer(window);
+  system->system_bus()->keyboard()->kbd()->ps2_keyboard_event(key, scancode,
+                                                              action, mods);
+}
+
+void mouse_move_cb_func(GLFWwindow *window, double xpos, double ypos) {
+  System *system = (System *)glfwGetWindowUserPointer(window);
+  system->system_bus()->keyboard()->mouse()->ps2_mouse_move(xpos, xpos);
+}
+
+void mouse_scroll_cb_func(GLFWwindow *window, double xoffset, double yoffset) {
+  System *system = (System *)glfwGetWindowUserPointer(window);
+  system->system_bus()->keyboard()->mouse()->ps2_mouse_scroll(xoffset, yoffset);
+}
+
+void mouse_button_cb_func(GLFWwindow *window, int button, int action,
+                          int mods) {
+  System *system = (System *)glfwGetWindowUserPointer(window);
+  system->system_bus()->keyboard()->mouse()->ps2_mouse_button(button, action,
+                                                              mods);
+}
+
+void window_close_callback(GLFWwindow *window) {
+  System *system = (System *)glfwGetWindowUserPointer(window);
+  system->SetStop();
+}
+
 } // namespace
 
 System::System()
@@ -37,19 +67,27 @@ System::System()
 System::~System() = default;
 
 void System::Initialize() {
-  SDL_Init(SDL_INIT_VIDEO);
-
+  glfwInit();
   LOG(INFO) << "Starting Vicky...";
 
   // Fire up Vicky
-  auto window_geometry = system_bus_->vicky()->Start();
+  GLFWwindow *window = system_bus_->vicky()->Start();
 
   cpu_.tracing.addrs.resize(16);
 
   BootCPU();
 
   // Fire up the GUI debugger;
-  gui_->Start(window_geometry.x + window_geometry.w, window_geometry.y);
+  int x, y;
+  glfwGetWindowPos(window, &x, &y);
+  gui_->Start(x, y);
+
+  glfwSetWindowUserPointer(window, this);
+  glfwSetKeyCallback(window, key_cb_func);
+  glfwSetCursorPosCallback(window, mouse_move_cb_func);
+  glfwSetScrollCallback(window, mouse_scroll_cb_func);
+  glfwSetMouseButtonCallback(window, mouse_button_cb_func);
+  glfwSetWindowCloseCallback(window, window_close_callback);
 }
 
 void System::BootCPU(bool hard_boot) {
@@ -81,21 +119,6 @@ void System::DrawNextLine() {
 
   bool frame_end = system_bus_->vicky()->is_vertical_end();
   if (frame_end) {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-      if (event.type == SDL_QUIT) {
-        SetStop();
-        gui_->Stop();
-        return;
-      } else if (event.window.windowID == system_bus_->vicky()->window_id()) {
-        if (event.window.event == SDL_WINDOWEVENT_CLOSE) {
-          SetStop();
-          gui_->Stop();
-        }
-        system_bus_->keyboard()->ProcessEvent(event);
-      }
-    }
-
     current_frame_++;
     system_bus_->int_controller()->RaiseFrameStart();
     system_bus_->vdma()->OnFrameStart();

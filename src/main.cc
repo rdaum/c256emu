@@ -1,4 +1,3 @@
-#include <SDL2/SDL.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
@@ -19,8 +18,6 @@ int main(int argc, char* argv[]) {
   FLAGS_logtostderr = true;
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, false);
-
-  SDL_Init(SDL_INIT_VIDEO);
 
   LOG(INFO) << "Good morning.";
 

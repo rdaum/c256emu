@@ -52,16 +52,30 @@ void InterruptController::RaiseFrameStart() {
   sys_->RaiseIRQ();
 }
 
-void InterruptController::RaiseKeyboard() {
-  pending_reg1_.ints.kbd = true;
-  sys_->RaiseIRQ();
+void InterruptController::SetKeyboard(bool level) {
+  if (pending_reg1_.ints.kbd && !level) {
+    pending_reg1_.ints.kbd = false;
+    if (!pending_reg1_.ints.Pending()) {
+      sys_->ClearIRQ();
+    }
+  } else if (!pending_reg1_.ints.kbd && level) {
+    pending_reg1_.ints.kbd = true;
+    sys_->RaiseIRQ();
+  }
+
 }
 
-void InterruptController::LowerKeyboard() {
-  pending_reg1_.ints.kbd = false;
-  if (!pending_reg1_.ints.Pending()) {
-    sys_->ClearIRQ();
+void InterruptController::SetMouse(bool level) {
+  if (pending_reg0_.ints.mouse && !level) {
+    pending_reg0_.ints.mouse= false;
+    if (!pending_reg0_.ints.Pending()) {
+      sys_->ClearIRQ();
+    }
+  } else if (!pending_reg0_.ints.mouse  && level) {
+    pending_reg0_.ints.mouse = true;
+    sys_->RaiseIRQ();
   }
+
 }
 
 void InterruptController::RaiseCH376() {

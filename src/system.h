@@ -49,6 +49,7 @@ class System {
   ProfileInfo profile_info() const { return profile_info_; }
   Automation* automation();
   Vicky* vicky() const;
+  C256SystemBus *system_bus() const { return system_bus_.get(); }
 
   Loader* loader() { return &loader_; }
 

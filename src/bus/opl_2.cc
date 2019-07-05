@@ -24,5 +24,5 @@ void OPL2::Start() {
   opl_left_->init();
   opl_right_->init();
 
-  // TODO hook into audio buffer mixer // SDL
+  // TODO hook into an audio buffer mixer
 }

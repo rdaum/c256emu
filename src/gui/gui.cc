@@ -38,6 +38,11 @@ constexpr std::array<Vicky::ScalingQuality, 3> kScalingQualities{
     Vicky::ScalingQuality ::BEST,
 };
 
+void window_close_callback(GLFWwindow *window) {
+  System *system = (System *)glfwGetWindowUserPointer(window);
+  system->SetStop();
+}
+
 } // namespace
 
 GUI::~GUI() { Close(); }
@@ -55,6 +60,8 @@ void GUI::Start(int x, int y) {
       glfwSetWindowPos(window_, x, y);
       glfwMakeContextCurrent(window_);
       glfwSwapInterval(1); // Enable vsync
+      glfwSetWindowUserPointer(window_, system_);
+      glfwSetWindowCloseCallback(window_, window_close_callback);
 
       // Setup Dear ImGui context
       IMGUI_CHECKVERSION();
@@ -241,16 +248,6 @@ void GUI::DrawVickySettings() const {
     bool gamma_overide = system_->vicky()->gamma_override();
     if (ImGui::Checkbox("Gamma override", &gamma_overide)) {
       system_->vicky()->set_gamma_override(gamma_overide);
-    }
-    Vicky::ScalingQuality scaling_quality = system_->vicky()->scaling_quality();
-    if (ImGui::BeginCombo("Scaling quality",
-                          kScalingQualitiesLabels[(int)scaling_quality])) {
-      for (Vicky::ScalingQuality quality : kScalingQualities) {
-        if (ImGui::Selectable(kScalingQualitiesLabels[(int)quality])) {
-          system_->vicky()->set_scaling_quality(quality);
-        }
-      }
-      ImGui::EndCombo();
     }
   }
 }
