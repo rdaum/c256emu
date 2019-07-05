@@ -68,7 +68,14 @@ std::string ScalingQualityStr(Vicky::ScalingQuality scaling_quality) {
     return "2";
   }
 }
+
 } // namespace
+
+#define CHECK_GL                                                               \
+  {                                                                            \
+    GLenum gl_error = glGetError();                                            \
+    CHECK_EQ(gl_error, 0) << "glError: " << gl_error;                          \
+  }
 
 Vicky::Vicky(System *system, InterruptController *int_controller)
     : sys_(system), int_controller_(int_controller) {
@@ -114,15 +121,34 @@ GLFWwindow *Vicky::Start() {
   window_ =
       glfwCreateWindow(kVickyBitmapWidth * scale_, kVickyBitmapHeight * scale_,
                        "Vicky", nullptr, nullptr);
-
   CHECK(window_);
   glfwMakeContextCurrent(window_);
+  CHECK_GL;
+
+  glGenTextures(1, &texture_id_);
+  CHECK_GL;
+
+  glBindTexture(GL_TEXTURE_2D, texture_id_);
+  CHECK_GL;
+
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, kVickyBitmapWidth, kVickyBitmapHeight,
+               0, GL_BGRA, GL_UNSIGNED_BYTE, frame_buffer_);
+  CHECK_GL;
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+  CHECK_GL;
+  glBindTexture(GL_TEXTURE_2D, 0);
+  CHECK_GL;
 
   return window_;
 }
 
 Vicky::~Vicky() {
   if (window_) {
+    glDeleteTextures(1, &texture_id_);
     glfwDestroyWindow(window_);
   }
 }
@@ -460,20 +486,15 @@ void Vicky::RenderLine() {
     glViewport(0, 0, display_w, display_h);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    GLuint texture_id;
-    glGenTextures(1, &texture_id);
-    glBindTexture(GL_TEXTURE_2D, texture_id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, kVickyBitmapWidth,
-                 kVickyBitmapHeight, 0, GL_BGRA, GL_UNSIGNED_BYTE,
-                 frame_buffer_);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+    glBindTexture(GL_TEXTURE_2D, texture_id_);
+    CHECK_GL;
 
     glEnable(GL_TEXTURE_2D);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kVickyBitmapWidth,
+                    kVickyBitmapHeight, GL_BGRA, GL_UNSIGNED_BYTE,
+                    frame_buffer_);
+    CHECK_GL;
+
     glBegin(GL_QUADS);
     glTexCoord2f(0, 1);
     glVertex3f(-1, -1, 0);
@@ -484,11 +505,14 @@ void Vicky::RenderLine() {
     glTexCoord2f(0, 0);
     glVertex3f(-1, 1, 0);
     glEnd();
+    CHECK_GL;
     glDisable(GL_TEXTURE_2D);
+    CHECK_GL;
 
     glfwSwapBuffers(window_);
+    CHECK_GL;
     glBindTexture(GL_TEXTURE_2D, 0);
-    glDeleteTextures(1, &texture_id);
+    CHECK_GL;
 
     vblank_cnt_ = 0;
     raster_y_ = 0;

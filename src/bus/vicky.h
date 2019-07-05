@@ -173,5 +173,5 @@ class Vicky {
 
   // Our physical frame buffer
   uint32_t frame_buffer_[kRasterSize];
-
+  GLuint texture_id_;
 };
