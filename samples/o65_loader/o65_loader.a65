@@ -85,29 +85,7 @@ start:
 
 ; util functions
 
-set_8_to_offset:
-.scope
-	clc
-	lda	#$ffff
-	adc	seg_base
-	sta	R0
-	lda	#$ffff
-	adc	seg_base+2
-	sta	R0+2
-	clc
-	lda	R0
-	adc	offset
-	sta	R1
-	lda	R0+2
-	adc	offset+2
-	sta	R1+2
-  acc8i16
-	lda	working_addr
-	sta	[R1]
-  acc16i16
-  rts
-.endscope
-
+; TODO this could probably be rewritten
 get_32_from_offset:
 .scope
 	clc
@@ -170,31 +148,6 @@ prg_next_word:
 no_carry:
 	txa
 done:
-  clc
-  rts
-.endscope
-
-; return upper word in X, lower in A
-prg_next_long:
-.scope
-  sec
-  acc16i16
-	lda	program
-	sta	R0
-	lda	program+2
-	sta	R0+2
-	clc
-	lda	#$4
-	adc	program
-	sta	program
-	bcc	next_long_no_carry
-	inc	program+2
-next_long_no_carry:
-	ldy	#$2
-	lda	[R0],Y
-	tax
-	lda	[R0]
-done_prg_next_long:
   clc
   rts
 .endscope
@@ -265,15 +218,12 @@ start_loop:
 	bne start_header_option
   bra done_load_header_options
 start_header_option:
-;    uint8_t otype = *(program++);
-;    olen -= 2;  // take out len and type bytes from count
-  PrgNext8To otype
+  PrgNext8To otype      ; get type from program stream
   acc8i16
-  dec olen
-
+  dec olen              
 read_header_option:
   acc8i16
-  dec olen
+  dec olen              ; count down olen bytes and eat the option string
   lda olen
   cmp #0
   bne eat_header_bytes
@@ -318,7 +268,6 @@ do_reloc:
   ldx type
   acc16i16
 
-  ;  ProgramPtr reloc_start = &seg_base[reloc_offset - 1];
   stz reloc_start
   stz reloc_start+2
   
@@ -352,7 +301,6 @@ reloc_word:
 	sta	working_addr+2
 
   AdjustAddr  
-;    working_addr &= 0x0000ffff;
 	stz	working_addr+2
 	lda	working_addr
 	sta	[reloc_start]
@@ -382,14 +330,13 @@ reloc_segaddr:
   AdjustAddr              ; adjust it
   lda working_addr
   sta	[reloc_start]       ; store the lower 16
-  ldy 2
+  ldy #2
   lda working_addr+2
   acc8i16
   sta [reloc_start],y
   acc16i16
   brl done_do_reloc
 reloc_low:
-;    working_addr = (*reloc_start) + new_segment_base;
   cpx #RELOC_LOW
   bne reloc_high
 	lda	[reloc_start]
@@ -403,12 +350,10 @@ reloc_low:
 	lda	R0+2
 	adc	new_segment_base+2
 	sta	working_addr+2
-;    working_addr = working_addr & 0x000000ff;
 	lda	working_addr
 	and	#$ff
 	sta	working_addr
 	stz	working_addr+2
-;    *reloc_start = working_addr;
   acc8i16
 	lda	working_addr
 	sta	[reloc_start]
@@ -417,7 +362,6 @@ reloc_low:
 reloc_high:
   cpx #RELOC_HIGH
   bne unknown_reloc_type
-  ;    working_addr = ((*reloc_start) << 8) + new_segment_base;
   acc8i16
 	lda	[reloc_start]
   sta working_addr+1
@@ -560,7 +504,7 @@ step_load_header:
   cmp #0
   acc16i16
   beq step_load_header_options
-  bra done_load_program
+  brl done_load_program
 step_load_header_options:
   jsr load_header_options ; eat the header options
   acc8i16
@@ -569,7 +513,7 @@ step_load_header_options:
   cmp #0
   acc16i16
   beq store_seg_base
-  bra done_load_program
+  brl done_load_program
 store_seg_base:
   Store32 program, seg_base
 
@@ -620,7 +564,28 @@ step_perform_data_relocations:
   beq step_perform_bss_clear
   bra done_load_program
 step_perform_bss_clear:
-  ; todo
+  Add32 seg_base, tlen, new_segment_base
+  Add32 new_segment_base, dlen, R0
+  Add32 R0, blen, R1
+zero_loop:  
+  clc
+  lda R0
+  cmp R1
+  bne keep_going
+  lda R0+2
+  cmp R1+2
+  bne keep_going
+  bra done_load_program
+keep_going:
+  acc8i16
+  lda #00
+  sta [R0]
+  acc16i16
+  clc
+  inc R0
+  bne zero_loop
+  inc R0+2
+  bne zero_loop
 done_load_program:
   rts
 .endscope

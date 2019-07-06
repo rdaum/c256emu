@@ -23,29 +23,6 @@
 	.i8
 .endmacro
 
-.macro ProcStart
-  pha  ; save working registers
-  phx
-  phy
-  phd  ; save frame pointer and reset accordingly.
-  tsc
-  tcd
-.endmacro
-
-.macro ProcExit
-  tdc
-  tcs
-
-  ; pop statically-allocated variables here,
-  ; since they sit above the caller's D register.
-
-  pld  ; remember to restore the previous caller's D register!
-  ply
-  plx
-  pla
-  rtl
-.endmacro
-
 .macro Store32 v, d
 .if (.match (.left (1, {v}), #))
   ; immediate mode
@@ -112,15 +89,6 @@ no_carry:
 ;  working_addr += new_segment_base;
 	Sub32 working_addr, cur_segment_base, working_addr
   Add32 working_addr, new_segment_base, working_addr
-.endmacro
-
-.macro CopyBytesUnrolled source, dest, count
-  .repeat count, N
-    lda [source+N*2]
-    sta [dest+N*2]
-    lda [source+(N*2)+2]
-    sta [dest+(N*2)+2]
-  .endrep
 .endmacro
 
 .macro PrgNext32To D
