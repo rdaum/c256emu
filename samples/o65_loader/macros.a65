@@ -62,23 +62,39 @@
   sta d+2
 .endmacro
 
+.macro Add32 OP1, OP2, DEST
+  .local no_carry
+  clc
+  lda OP1
+  adc OP2
+  sta DEST
+  bcc no_carry
+  inc DEST
+no_carry:
+  lda OP1+2
+  adc OP2+2
+  sta DEST+2
+.endmacro
+
+.macro Sub32 OP1, OP2, DEST
+  .local no_carry
+  sec
+  lda OP1
+  sbc OP2
+  sta DEST
+  bcs no_carry
+  dec DEST
+ no_carry:
+  lda OP1+2
+  sbc OP2+2
+  sta DEST+2
+.endmacro
+
 .macro AdjustAddr
 ;  working_addr -= cur_segment_base;
-	sec
-	lda	working_addr
-	sbc	cur_segment_base
-	sta	working_addr
-	lda	working_addr+2
-	sbc	cur_segment_base+2
-	sta	working_addr+2
 ;  working_addr += new_segment_base;
-	clc
-	lda	working_addr
-	adc	new_segment_base
-	sta	working_addr
-	lda	working_addr+2
-	adc	new_segment_base+2
-	sta	working_addr+2
+	Sub32 working_addr, cur_segment_base, working_addr
+  Add32 working_addr, new_segment_base, working_addr
 .endmacro
 
 .macro CopyBytesUnrolled source, dest, count
@@ -91,19 +107,19 @@
 .endmacro
 
 .macro PrgNext32To D
-  jsl prg_next_word
+  jsr prg_next_word
   sta D
-  jsl prg_next_word
+  jsr prg_next_word
   sta D+2
 .endmacro
 
 .macro PrgNext16To D
-  jsl prg_next_word
+  jsr prg_next_word
   sta D
 .endmacro
 
 .macro PrgNext8To D
-  jsl prg_next_byte
+  jsr prg_next_byte
   acc8i16
   sta D
   acc16i16
