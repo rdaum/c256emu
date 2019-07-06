@@ -275,9 +275,7 @@ void DoReloc(uint32_t cur_segment_base, uint32_t new_segment_base,
     uint8_t *seg_byte = &(*seg)[reloc_offset - 1];
     uint8_t b1 = in_file.get();
     uint8_t b2 = in_file.get();
-    //    uint16_t location = (b1<<8) | b2;  // not sure what we can do with
-    //    this, most SEG references are just the bank?
-    uint32_t full_addr = (*seg_byte) << 16;
+    uint32_t full_addr = (*seg_byte) << 16 | (b1 << 8) | b2;
     uint32_t adjust_full_addr =
         AdjustAddr(cur_segment_base, new_segment_base, full_addr);
     uint8_t new_seg = adjust_full_addr >> 16;
@@ -315,11 +313,11 @@ void DoReloc(uint32_t cur_segment_base, uint32_t new_segment_base,
 
   if (type == RELOC_HIGH) {
     uint8_t *hi_addr = &(*seg)[reloc_offset - 1];
-    uint32_t full_addr = cur_segment_base + (*hi_addr << 8);
+    uint8_t b1 = in_file.get();
+    uint32_t full_addr = cur_segment_base + (*hi_addr << 8) | b1;
     uint32_t adjust_full_addr =
         AdjustAddr(cur_segment_base, new_segment_base, full_addr);
     uint16_t new_hi = (adjust_full_addr & 0x0000ff00) >> 8;
-    uint8_t b1 = in_file.get(); // not sure what to do with this?
     if (verbose)
       LOG(INFO) << "HI relocated: " << std::hex << (int)*hi_addr << " to "
                 << (int)new_hi;
