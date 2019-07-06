@@ -65,14 +65,30 @@
 .macro Add32 OP1, OP2, DEST
   .local no_carry
   clc
+.if (.match (.left (1, {OP1}), #))
+  lda #.loword(.right (.tcount ({OP1})-1, {OP1}))
+.else
   lda OP1
+.endif  
+.if (.match (.left (1, {OP2}), #))
+  adc #.loword(.right (.tcount ({OP2})-1, {OP2}))
+.else
   adc OP2
+.endif  
   sta DEST
   bcc no_carry
   inc DEST
 no_carry:
+.if (.match (.left (1, {OP1}), #))
+  lda #.hiword(.right (.tcount ({OP1})-1, {OP1}))
+.else
   lda OP1+2
+.endif  
+.if (.match (.left (1, {OP2}), #))
+  adc #.hiword(.right (.tcount ({OP2})-1, {OP2}))
+.else
   adc OP2+2
+.endif  
   sta DEST+2
 .endmacro
 
@@ -85,6 +101,7 @@ no_carry:
   bcs no_carry
   dec DEST
  no_carry:
+  sec
   lda OP1+2
   sbc OP2+2
   sta DEST+2
