@@ -15,19 +15,14 @@ constexpr const char kAutomationLuaObj[] = "Automation";
 #define EOF_MARKER "<eof>"
 #endif
 
-System* GetSystem(lua_State* L) {
-  lua_getglobal(L, kAutomationLuaObj);
-  Automation* automation = (Automation*)lua_touserdata(L, -1);
-  lua_pop(L, 1);
-  return automation->system();
-}
-
 Automation* GetAutomation(lua_State* L) {
   lua_getglobal(L, kAutomationLuaObj);
   Automation* automation = (Automation*)lua_touserdata(L, -1);
   lua_pop(L, 1);
   return automation;
 }
+
+System *GetSystem(lua_State *L) { return GetAutomation(L)->system(); }
 
 void PushTable(lua_State* L, const std::string& label, bool val) {
   lua_pushstring(L, label.c_str());
@@ -267,6 +262,13 @@ void Automation::AddBreakpoint(cpuaddr_t address,
                                const std::string& function_name) {
   std::lock_guard<std::recursive_mutex> lua_lock(lua_mutex_);
 
+  auto bp = std::find_if(
+      breakpoints_.begin(), breakpoints_.end(),
+      [address](const Breakpoint &b) { return b.address == address; });
+  if (bp != breakpoints_.end()) {
+    return;
+  }
+
   breakpoints_.push_back({address, function_name});
   debug_interface_->SetBreakpoint(address, [this, address](EmulatedCpu*) {
     std::lock_guard<std::recursive_mutex> lua_lock(lua_mutex_);
@@ -303,12 +305,17 @@ bool Automation::HasBreakpoint(cpuaddr_t addr) const {
 
 // static
 int Automation::LuaAddBreakpoint(lua_State* L) {
-  Automation* automation = GetAutomation(L);
-  uint32_t addr = lua_tointeger(L, -2);
-  size_t len;
-  const char *function_cstr = lua_tolstring(L, -1, &len);
-  std::string function(function_cstr, len);
-  automation->AddBreakpoint(addr, function);
+  Automation *automation = GetAutomation(L);
+  int8_t num_args = lua_gettop(L);
+  uint32_t addr = lua_tointeger(L, -1 * num_args);
+  if (num_args == 1) {
+    automation->AddBreakpoint(addr);
+  } else {
+    size_t len;
+    const char *function_cstr = lua_tolstring(L, -1, &len);
+    std::string function(function_cstr, len);
+    automation->AddBreakpoint(addr, function);
+  }
 
   return 0;
 }

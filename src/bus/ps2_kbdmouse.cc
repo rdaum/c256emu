@@ -76,6 +76,12 @@
 #define MOD_SHIFT_R (1 << 4)
 #define MOD_ALT_R (1 << 5)
 
+#define PS2_MOUSE_BUTTON_LEFT 0x01
+#define PS2_MOUSE_BUTTON_RIGHT 0x02
+#define PS2_MOUSE_BUTTON_MIDDLE 0x04
+#define PS2_MOUSE_BUTTON_SIDE 0x08
+#define PS2_MOUSE_BUTTON_EXTRA 0x10
+
 static uint8_t translate_table[256] = {
     0xff, 0x43, 0x41, 0x3f, 0x3d, 0x3b, 0x3c, 0x58, 0x64, 0x44, 0x42, 0x40,
     0x3e, 0x0f, 0x29, 0x59, 0x65, 0x38, 0x2a, 0x70, 0x1d, 0x10, 0x02, 0x5a,
@@ -706,12 +712,6 @@ void PS2MouseState::ps2_mouse_move(double x, double y) {
   mouse_dx = x;
   mouse_dy = y;
 }
-
-#define PS2_MOUSE_BUTTON_LEFT 0x01
-#define PS2_MOUSE_BUTTON_RIGHT 0x02
-#define PS2_MOUSE_BUTTON_MIDDLE 0x04
-#define PS2_MOUSE_BUTTON_SIDE 0x08
-#define PS2_MOUSE_BUTTON_EXTRA 0x10
 
 void PS2MouseState::ps2_mouse_button(int button, int action, int mods) {
   /* check if deltas are recorded when disabled */
