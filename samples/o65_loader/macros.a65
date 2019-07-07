@@ -1,4 +1,7 @@
+;;; Some macro utilities.
 
+;;; accumulator/index modes.
+;;; This is a bit of a blunt force instrument. Could be improved.
 .macro acc8i16
 	sep #$20
 	.a8
@@ -23,89 +26,83 @@
 	.i8
 .endmacro
 
+;;; Store a 32-bit value somewhere.
 .macro Store32 v, d
 .if (.match (.left (1, {v}), #))
-  ; immediate mode
-  lda #.loword(.right (.tcount ({v})-1, {v}))
+	;; immediate mode
+	lda #.loword(.right (.tcount ({v})-1, {v}))
 .else
-  lda v
+	lda v
 .endif
-  sta d
+	sta d
 .if (.match (.left (1, {v}), #))
-  lda #.hiword(.right (.tcount ({v})-1, {v}))
+	lda #.hiword(.right (.tcount ({v})-1, {v}))
 .else
-  lda v+2
+	lda v+2
 .endif
-  sta d+2
+	sta d+2
 .endmacro
 
+;;; Add two 32 bit values into somewhere.
 .macro Add32 OP1, OP2, DEST
-  .local no_carry
-  clc
+.local no_carry
+	clc
 .if (.match (.left (1, {OP1}), #))
-  lda #.loword(.right (.tcount ({OP1})-1, {OP1}))
+	lda #.loword(.right (.tcount ({OP1})-1, {OP1}))
 .else
-  lda OP1
+	lda OP1
 .endif  
 .if (.match (.left (1, {OP2}), #))
-  adc #.loword(.right (.tcount ({OP2})-1, {OP2}))
+	adc #.loword(.right (.tcount ({OP2})-1, {OP2}))
 .else
-  adc OP2
+	adc OP2
 .endif  
-  sta DEST
-  bcc no_carry
-  inc DEST
+	sta DEST
+	bcc no_carry
+	inc DEST
 no_carry:
 .if (.match (.left (1, {OP1}), #))
-  lda #.hiword(.right (.tcount ({OP1})-1, {OP1}))
+	lda #.hiword(.right (.tcount ({OP1})-1, {OP1}))
 .else
-  lda OP1+2
+	lda OP1+2
 .endif  
 .if (.match (.left (1, {OP2}), #))
-  adc #.hiword(.right (.tcount ({OP2})-1, {OP2}))
+	adc #.hiword(.right (.tcount ({OP2})-1, {OP2}))
 .else
-  adc OP2+2
+	adc OP2+2
 .endif  
-  sta DEST+2
+	sta DEST+2
 .endmacro
 
+;;; Subtract two 32 bit values into somewhere.
 .macro Sub32 OP1, OP2, DEST
-  .local no_carry
-  sec
-  lda OP1
-  sbc OP2
-  sta DEST
-  bcs no_carry
-  dec DEST
+ .local no_carry
+	sec
+.if (.match (.left (1, {OP1}), #))
+	lda #.loword(.right (.tcount ({OP1})-1, {OP1}))
+.else
+	lda OP1
+.endif  
+.if (.match (.left (1, {OP2}), #))
+	sbc #.loword(.right (.tcount ({OP2})-1, {OP2}))
+.else
+	sbc OP2
+.endif  
+	sta DEST
+	bcs no_carry
+	dec DEST
  no_carry:
-  sec
-  lda OP1+2
-  sbc OP2+2
-  sta DEST+2
+	sec
+.if (.match (.left (1, {OP1}), #))
+	lda #.hiword(.right (.tcount ({OP1})-1, {OP1}))
+.else
+	lda OP1+2
+.endif  
+.if (.match (.left (1, {OP2}), #))
+	sbc #.hiword(.right (.tcount ({OP2})-1, {OP2}))
+.else
+	sbc OP2+2
+.endif  
+	sta DEST+2
 .endmacro
 
-.macro AdjustAddr
-;  working_addr -= cur_segment_base;
-;  working_addr += new_segment_base;
-	Sub32 working_addr, cur_segment_base, working_addr
-  Add32 working_addr, new_segment_base, working_addr
-.endmacro
-
-.macro PrgNext32To D
-  jsr prg_next_word
-  sta D
-  jsr prg_next_word
-  sta D+2
-.endmacro
-
-.macro PrgNext16To D
-  jsr prg_next_word
-  sta D
-.endmacro
-
-.macro PrgNext8To D
-  jsr prg_next_byte
-  acc8i16
-  sta D
-  acc16i16
-.endmacro

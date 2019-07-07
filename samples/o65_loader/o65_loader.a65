@@ -2,6 +2,7 @@
 
 .include "macros.a65"
 
+;;; Constants
 TEXT_SEGMENT = 2
 DATA_SEGMENT = 3
 BSS_SEGMENT = 4
@@ -19,6 +20,7 @@ O65_UNKNOWN_RELOC_TYPE = $03
 
 .import __ZEROPAGE_LOAD__    ; symbol defining the start of the ZP
 
+;;; The structure of our zero page.
 .zeropage
 .org $00
   status:            .res 1  ; 0 if ok, otherwise some error code
@@ -58,534 +60,582 @@ O65_UNKNOWN_RELOC_TYPE = $03
 
   num_references:    .res 4
 
-
-.reloc
+;;; Code section
+.reloc				; Let the linker decide where to put this.
 .code
 start:
-  ; set zero page to where the linker tells us it should be
 	acc16i16
+	pha			; X, Y, D for return
+	phx
+	phy
+	phd
+		
+	;; set zero page to where the linker tells us it should be
 	lda #__ZEROPAGE_LOAD__
 	tcd
 
-  ; stash the address of the program
-  Store32 #$30000, program
+	;; stash the address of the program
+	Store32 #$30000, program
 
-  ; begin relocation
-  jsr load_program
+	;; perform relocation
+	jsr load_program
 
-  ; then jump to it by pushing address to stack and rtl
-  acc8i16
-  lda seg_base+2
-  pha
-  acc16i16
-  lda seg_base
-  dec
-  pha
+  ;; check status
+  acc16i8
+	ldx status
+	cpx #0
+  bne done      ; TODO: push error code back somehow
+
+  ;; We'll return to 'done' after the executable exits.
+  phb
+  pea done
+
+	;; then jump to it by pushing address to stack and rtl
+	acc8i16
+	lda seg_base+2
+	pha
+	acc16i16
+	lda seg_base
+	dec
+	pha
   rtl
 
-; util functions
+done:
+  acc16i16
+  lda status    ;  return the status back to the caller in A
+	pld
+	ply
+	plx
 
-; TODO this could probably be rewritten
+
+	rtl
+
+;;; TODO this could probably be rewritten
 get_32_from_offset:
 .scope
 	clc
-	lda	#$ffff
-	adc	seg_base
-	sta	R0
-	lda	#$ffff
-	adc	seg_base+2
-	sta	R0+2
+	lda #$ffff
+	adc seg_base
+	sta R0
+	lda #$ffff
+	adc seg_base+2
+	sta R0+2
 	clc
-	lda	R0
-	adc	offset
-	sta	R1
-	lda	R0+2
-	adc	offset+2
-	sta	R1+2
-	lda	[R1]
-	sta	working_addr
-  clc
-  inc R1
-  inc R1
-  lda [R1]
-	sta	working_addr+2
-  rts
-.endscope
-
-; Read current value @ program, put in A.
-; corrupts Y
-; Then increment program to next position
-prg_next_byte:
-.scope
-  acc8i8
-	lda	[program]
-  tax
-  acc16i16
-	sec
-	inc	program
-	bne	no_carry
-	inc	program+2
-no_carry:
-  txa
-	and	#$00ff
-done:
-  clc
+	lda R0
+	adc offset
+	sta R1
+	lda R0+2
+	adc offset+2
+	sta R1+2
+	lda [R1]
+	sta working_addr
+	clc
+	inc R1
+	inc R1
+	lda [R1]
+	sta working_addr+2
 	rts
 .endscope
 
+;;; Read current byte @ program, put in A.
+;;; Then increment program to next position
+prg_next_byte:
+.scope
+	acc8i8
+	lda [program]
+	tax
+ 	acc16i16
+	sec
+	inc program
+	bne no_carry
+	inc program+2
+no_carry:
+	txa
+	and #$00ff
+done:
+	clc
+	rts
+.endscope
+
+;;; Read current 16 bit word @ program, put in A.
+;;; Then increment program to next position
 prg_next_word:
 .scope
-  sec
-  acc16i16
-	lda	[program]
-  tax
+	sec
+	acc16i16
+	lda [program]
+	tax
 	clc
-	lda	#$2
-	adc	program
-	sta	program
-	bcc	no_carry
-	inc	program+2
+	lda #$2
+	adc program
+	sta program
+	bcc no_carry
+	inc program+2
 no_carry:
 	txa
 done:
-  clc
-  rts
-.endscope
-
-load_header:
-.scope
-  ; First two bytes must be $01 $00 for non-c64
-  jsr prg_next_word
-  cmp #$0001
-  bne fail_bad_magic
-
-  ; Next 4 bytes should be 'o65\0' ($65 $36 $35 $00)
-  jsr prg_next_word
-  cmp #$366f
-  bne fail_bad_magic
-  jsr prg_next_word
-  cmp #$0035
-  beq good_magic
-
-fail_bad_magic:
-  acc8i16
-  lda #O65_BAD_HEADER_MAGIC
-  sta status
-  acc16i16
-  jmp done_load_header
-
-good_magic:
-  jsr prg_next_word
-  sta mode
-
-  and #$2000
-  cmp #$2000
-  bne read_16_sizes
-
-  PrgNext32To tbase
-  PrgNext32To tlen
-  PrgNext32To dbase
-  PrgNext32To dlen
-  PrgNext32To bbase
-  PrgNext32To blen
-  PrgNext32To zbase
-  PrgNext32To zlen
-  PrgNext32To stack
-  bra done_load_header
-
-read_16_sizes:
-  PrgNext16To tbase
-  PrgNext16To tlen
-  PrgNext16To dbase
-  PrgNext16To dlen
-  PrgNext16To bbase
-  PrgNext16To blen
-  PrgNext16To zbase
-  PrgNext16To zlen
-  PrgNext16To stack
-
-done_load_header:
-  rts
-.endscope
-
-load_header_options:
-.scope
-;  while ((olen = *(program++))) {
-start_loop:
-  clc
-  PrgNext8To olen
-  cmp #0
-	bne start_header_option
-  bra done_load_header_options
-start_header_option:
-  PrgNext8To otype      ; get type from program stream
-  acc8i16
-  dec olen              
-read_header_option:
-  acc8i16
-  dec olen              ; count down olen bytes and eat the option string
-  lda olen
-  cmp #0
-  bne eat_header_bytes
-  bra start_loop
-eat_header_bytes:
-  jsr prg_next_byte
-  bra read_header_option
-done_load_header_options:
-  acc16i16
+	clc
 	rts
 .endscope
 
+.macro PrgNext32To D
+	jsr prg_next_word
+	sta D
+	jsr prg_next_word
+	sta D+2
+.endmacro
+
+.macro PrgNext16To D
+	jsr prg_next_word
+	sta D
+.endmacro
+
+.macro PrgNext8To D
+  jsr prg_next_byte
+  acc8i16
+  sta D
+  acc16i16
+.endmacro
+
+;;; Load the header bytes from the program, populating the zp
+;;; with its attributes
+load_header:
+.scope
+	;; First two bytes must be $01 $00 for non-c64
+	jsr prg_next_word
+	cmp #$0001
+	bne fail_bad_magic
+
+	; Next 4 bytes should be 'o65\0' ($65 $36 $35 $00)
+	jsr prg_next_word
+	cmp #$366f
+	bne fail_bad_magic
+	jsr prg_next_word
+	cmp #$0035
+	beq good_magic
+fail_bad_magic:
+	acc8i16
+	lda #O65_BAD_HEADER_MAGIC
+	sta status
+	acc16i16
+	jmp done_load_header
+good_magic:
+	jsr prg_next_word
+	sta mode
+
+	and #$2000
+	cmp #$2000
+	bne read_16_sizes
+
+	PrgNext32To tbase
+	PrgNext32To tlen
+	PrgNext32To dbase
+	PrgNext32To dlen
+	PrgNext32To bbase
+	PrgNext32To blen
+	PrgNext32To zbase
+	PrgNext32To zlen
+	PrgNext32To stack
+	bra done_load_header
+read_16_sizes:
+	PrgNext16To tbase
+	PrgNext16To tlen
+	PrgNext16To dbase
+	PrgNext16To dlen
+	PrgNext16To bbase
+	PrgNext16To blen
+	PrgNext16To zbase
+	PrgNext16To zlen
+	PrgNext16To stack
+done_load_header:
+	rts
+.endscope
+
+;;; Scan the header options from the program.
+;;; Currently discards them.
+load_header_options:
+.scope
+start_loop:
+	clc
+	PrgNext8To olen
+	cmp #0
+	bne start_header_option
+	bra done_load_header_options
+start_header_option:
+	PrgNext8To otype      ; get type from program stream
+	acc8i16
+	dec olen              
+read_header_option:
+	acc8i16
+	dec olen              ; count down olen bytes and eat the option string
+	lda olen
+	cmp #0
+	bne eat_header_bytes
+	bra start_loop
+eat_header_bytes:
+	jsr prg_next_byte
+	bra read_header_option
+done_load_header_options:
+	acc16i16
+	rts
+.endscope
+
+;;; Scan the external references from the program.
+;;; Currently discards them.
 load_external_references:
 .scope
-  clc
-  lda mode
-  and #$2000
-  cmp #$2000
-  bne read_num_refs_16
-  stz num_references
-  stz num_references+2
+	clc
+	lda mode
+	and #$2000
+	cmp #$2000
+	bne read_num_refs_16
+	stz num_references
+	stz num_references+2
 read_num_refs_32:
-  PrgNext32To num_references
-  bra eat_references_loop
+	PrgNext32To num_references
+	bra eat_references_loop
 read_num_refs_16:
-  PrgNext16To num_references
+	PrgNext16To num_references
 eat_references_loop:
-  lda num_references
-  cmp #0
-  beq done_load_external_references
-  inc num_references
-  jsr prg_next_byte
-  cmp #0
-  beq eat_references_loop
+	lda num_references
+	cmp #0
+	beq done_load_external_references
+	inc num_references
+	jsr prg_next_byte
+	cmp #0
+	beq eat_references_loop
 done_load_external_references:
-  rts
+	rts
 .endscope
 
+;; Do the actual the relocation of working_addr.
+.macro AdjustAddr
+	Sub32 working_addr, cur_segment_base, working_addr
+	Add32 working_addr, new_segment_base, working_addr
+.endmacro
+
+;;; Perform a relocation.
+;;; Expects 'type', 'segment', 'offset', 'seg_base', 'current_segment_base',
+;;; and 'new_segment_base' to be populated.
 do_reloc:
 .scope
-  acc16i8
-  ldx type
-  acc16i16
+	acc16i8
+	ldx type
+	acc16i16
 
-  stz reloc_start
-  stz reloc_start+2
+	stz reloc_start
+	stz reloc_start+2
   
 	clc
-  lda offset
-  dec
+	lda offset
+	dec
 	clc
-  adc seg_base
-  sta reloc_start
-  bcc no_carry_offset
-  inc reloc_start+2
+	adc seg_base
+	sta reloc_start
+	bcc no_carry_offset
+	inc reloc_start+2
 no_carry_offset:
-  lda offset+2
-  adc seg_base+2
-  adc reloc_start+2
-  sta reloc_start+2
+	lda offset+2
+	adc seg_base+2
+	adc reloc_start+2
+	sta reloc_start+2
 
-  ; clear the address that's there
-  stz working_addr
-  stz working_addr+2
+	;; clear the address that's there
+	stz working_addr
+	stz working_addr+2
 reloc_word:
-  cpx #RELOC_WORD
-  bne reloc_seg
-	lda	[reloc_start]
-	sta	working_addr
-	stz	working_addr+2
-;    Add the bank of the current segment base in.
+	cpx #RELOC_WORD
+	bne reloc_seg
+	lda [reloc_start]
+	sta working_addr
+	stz working_addr+2
+	;;    Add the bank of the current segment base in.
 	clc
-	lda	working_addr+2
-	adc	cur_segment_base+2
-	sta	working_addr+2
+	lda working_addr+2
+	adc cur_segment_base+2
+	sta working_addr+2
+	AdjustAddr  
+	stz working_addr+2
+	lda working_addr
+	sta [reloc_start]
 
-  AdjustAddr  
-	stz	working_addr+2
-	lda	working_addr
-	sta	[reloc_start]
-
-  brl done_do_reloc
+	brl done_do_reloc
 reloc_seg:
-  cpx #RELOC_SEG
-  bne reloc_segaddr
-  lda	[reloc_start]       ; get a whole word, easier that way
-  and #$00ff              ; clear upper byte
-  sta working_addr+2      ; shift lower byte into the bank byte
-  jsr prg_next_word       ; stick parameter argments...
-  sta working_addr        ; into lower word 
-  AdjustAddr
-  acc8i16
-  lda working_addr+2      ; get just the bank
-  sta [reloc_start]       ; and stick the modified bank back
-  acc16i16
-  brl done_do_reloc
+	cpx #RELOC_SEG
+	bne reloc_segaddr
+	lda [reloc_start]       ; get a whole word, easier that way
+	and #$00ff              ; clear upper byte
+	sta working_addr+2      ; shift lower byte into the bank byte
+	jsr prg_next_word       ; stick parameter argments...
+	sta working_addr        ; into lower word 
+	AdjustAddr
+	acc8i16
+	lda working_addr+2      ; get just the bank
+	sta [reloc_start]       ; and stick the modified bank back
+	acc16i16
+	brl done_do_reloc
 reloc_segaddr:
-  cpx #RELOC_SEGADDR
-  bne reloc_low
-  jsr get_32_from_offset  ; get 32 bits of the segment address
-  acc8i16
-  stz working_addr+3      ; throw away the highest byte
-  acc16i16
-  AdjustAddr              ; adjust it
-  lda working_addr
-  sta	[reloc_start]       ; store the lower 16
-  ldy #2
-  lda working_addr+2
-  acc8i16
-  sta [reloc_start],y
-  acc16i16
-  brl done_do_reloc
+	cpx #RELOC_SEGADDR
+	bne reloc_low
+	jsr get_32_from_offset  ; get 32 bits of the segment address
+	acc8i16
+	stz working_addr+3      ; throw away the highest byte
+	acc16i16
+	AdjustAddr              ; adjust it
+	lda working_addr
+	sta [reloc_start]       ; store the lower 16
+	ldy #2
+	lda working_addr+2
+	acc8i16
+	sta [reloc_start],y
+	acc16i16
+	brl done_do_reloc
 reloc_low:
-  cpx #RELOC_LOW
-  bne reloc_high
-	lda	[reloc_start]
-	and	#$00ff
-	sta	R0
-	stz	R0+2
+	cpx #RELOC_LOW
+	bne reloc_high
+	lda [reloc_start]
+	and #$00ff
+	sta R0
+	stz R0+2
 	clc
-	lda	R0
-	adc	new_segment_base
-	sta	working_addr
-	lda	R0+2
-	adc	new_segment_base+2
-	sta	working_addr+2
-	lda	working_addr
-	and	#$ff
-	sta	working_addr
-	stz	working_addr+2
-  acc8i16
-	lda	working_addr
-	sta	[reloc_start]
-  acc16i16
-  bra done_do_reloc
+	lda R0
+	adc new_segment_base
+	sta working_addr
+	lda R0+2
+	adc new_segment_base+2
+	sta working_addr+2
+	lda working_addr
+	and #$ff
+	sta working_addr
+	stz working_addr+2
+	acc8i16
+	lda working_addr
+	sta [reloc_start]
+	acc16i16
+	bra done_do_reloc
 reloc_high:
-  cpx #RELOC_HIGH
-  bne unknown_reloc_type
-  acc8i16
-	lda	[reloc_start]
-  sta working_addr+1
-  acc16i16
-  jsr prg_next_byte
-  acc8i16
-  sta working_addr
-  acc16i16
-  Add32 working_addr, cur_segment_base, working_addr
-  AdjustAddr
-  lda working_addr
-  and #$ff00
-  xba
-  acc8i16	
-	sta	[reloc_start]
-  acc16i16
-  bra done_do_reloc
+	cpx #RELOC_HIGH
+	bne unknown_reloc_type
+	acc8i16
+	lda [reloc_start]
+	sta working_addr+1
+	acc16i16
+	jsr prg_next_byte
+	acc8i16
+	sta working_addr
+	acc16i16
+	Add32 working_addr, cur_segment_base, working_addr
+	AdjustAddr
+	lda working_addr
+	and #$ff00
+	xba
+	acc8i16	
+	sta [reloc_start]
+	acc16i16
+	bra done_do_reloc
 unknown_reloc_type:
-  acc8i16
-  lda #O65_UNKNOWN_RELOC_TYPE
-  sta status
-  acc16i16
+	acc8i16
+	lda #O65_UNKNOWN_RELOC_TYPE
+	sta status
+	acc16i16
 done_do_reloc:
-  rts
+	rts
 .endscope
 
+;;; Scan for and perform relocations.
 perform_relocations:
 .scope
-  stz offset
-  stz offset+2
+	stz offset
+	stz offset+2
 continue_relocations:
-  clc
-  jsr prg_next_byte
-  cmp #0
-  acc8i16
-  sta offset_byte
-  acc16i16
-  bne check_continue_offset
-  jmp done_perform_relocations
+	clc
+	jsr prg_next_byte
+	cmp #0
+	acc8i16
+	sta offset_byte
+	acc16i16
+	bne check_continue_offset
+	jmp done_perform_relocations
 check_continue_offset:
-  cmp #$ff            ; if 0xff add to the ongoing offset and go again
-  bne accumulate_offset
-  lda #$fe
-  clc
-  adc offset
-  sta offset
-  bcs do_carry_fe_offset
-  bra do_continue_fe_offset
+	cmp #$ff            ; if 0xff add to the ongoing offset and go again
+	bne accumulate_offset
+	lda #$fe
+	clc
+	adc offset
+	sta offset
+	bcs do_carry_fe_offset
+	bra do_continue_fe_offset
 do_carry_fe_offset:
-  inc offset+2
+	inc offset+2
 do_continue_fe_offset:
-  bra continue_relocations
-
+	bra continue_relocations
 accumulate_offset:
-  acc8i16
-  lda offset_byte
-  acc16i16
-  clc
-  adc offset
-  sta offset
-  bcs do_carry_accum_offset
-  bra get_type_and_segment
+	acc8i16
+	lda offset_byte
+	acc16i16
+	clc
+	adc offset
+	sta offset
+	bcs do_carry_accum_offset
+	bra get_type_and_segment
 do_carry_accum_offset:  
-  inc offset+2
+	inc offset+2
 get_type_and_segment:
-  jsr prg_next_byte
-  acc8i16
-  tax
-  and #$f0
-  sta type
-  txa
-  and #$0f
-  sta segment
-  acc16i16
+	jsr prg_next_byte
+	acc8i16
+	tax
+	and #$f0
+	sta type
+	txa
+	and #$0f
+	sta segment
+	acc16i16
 start_text_seg_reloc:
-  cmp #TEXT_SEGMENT
-  bne start_data_seg_reloc
-  ; do text seg reloc
-  Store32 tbase, cur_segment_base
-  Store32 seg_base, new_segment_base
-  jsr do_reloc
-  jmp continue_relocations
+	cmp #TEXT_SEGMENT
+	bne start_data_seg_reloc
+	;; do text seg reloc
+	Store32 tbase, cur_segment_base
+	Store32 seg_base, new_segment_base
+	jsr do_reloc
+	jmp continue_relocations
 start_data_seg_reloc:
-  cmp #DATA_SEGMENT
-  bne start_zp_seg_reloc
-  ; do data segment
-  Store32 tbase, cur_segment_base
-  clc
-  Add32 seg_base, tlen, new_segment_base
-  jsr do_reloc
-  jmp continue_relocations
+	cmp #DATA_SEGMENT
+	bne start_zp_seg_reloc
+	;; do data segment
+	Store32 tbase, cur_segment_base
+	clc
+	Add32 seg_base, tlen, new_segment_base
+	jsr do_reloc
+	jmp continue_relocations
 start_zp_seg_reloc:
-  cmp #ZP_SEGMENT
-  bne start_bss_seg_reloc
-  ; do zp segment
-  Store32 #$00000000, cur_segment_base
-  Store32 zbase, new_segment_base
-  jsr do_reloc
-  jmp continue_relocations
+	cmp #ZP_SEGMENT
+	bne start_bss_seg_reloc
+	; do zp segment
+	Store32 #$00000000, cur_segment_base
+	Store32 zbase, new_segment_base
+	jsr do_reloc
+	jmp continue_relocations
 start_bss_seg_reloc:
-  cmp #BSS_SEGMENT
-  bne unknown_segment_type
-  ; do bss_reloc
-  Store32 bbase, cur_segment_base
-  Add32 seg_base, tlen, new_segment_base
-  Add32 new_segment_base, dlen, new_segment_base
-  jsr do_reloc
-  jmp continue_relocations
+	cmp #BSS_SEGMENT
+	bne unknown_segment_type
+	; do bss_reloc
+	Store32 bbase, cur_segment_base
+	Add32 seg_base, tlen, new_segment_base
+	Add32 new_segment_base, dlen, new_segment_base
+	jsr do_reloc
+	jmp continue_relocations
 unknown_segment_type:
-  acc8i16
-  lda #O65_UNKNOWN_RELOC_SEGMENT
-  sta status
-  acc16i16
+	acc8i16
+	lda #O65_UNKNOWN_RELOC_SEGMENT
+	sta status
+	acc16i16
 done_perform_relocations:
-  rts
+	rts
 .endscope
 
+;;; The main load routine.
 load_program:
 .scope
-  ; clear zero page vars
-  acc8i16
-  stz status
-  stz olen
-  stz otype
-
-  acc16i16
-  stz cur_segment_base
-  stz cur_segment_base+2
-  stz new_segment_base
-  stz new_segment_base+2
-  stz working_addr
-  stz working_addr+2
-
-
+	;; clear zero page vars
+	acc8i16
+	stz status
+	stz olen
+	stz otype
+	acc16i16
+	stz cur_segment_base
+	stz cur_segment_base+2
+	stz new_segment_base
+	stz new_segment_base+2
+	stz working_addr
+	stz working_addr+2
 step_load_header:
-  jsr load_header         ; load the header
-  acc8i16
-  clc
-  lda status
-  cmp #0
-  acc16i16
-  beq step_load_header_options
-  brl done_load_program
+	jsr load_header         ; load the header
+	acc8i16
+	clc
+	lda status
+	cmp #0
+	acc16i16
+	beq step_load_header_options
+	brl done_load_program
 step_load_header_options:
-  jsr load_header_options ; eat the header options
-  acc8i16
-  clc
-  lda status
-  cmp #0
-  acc16i16
-  beq store_seg_base
-  brl done_load_program
+	jsr load_header_options ; eat the header options
+	acc8i16
+	clc
+	lda status
+	cmp #0
+	acc16i16
+	beq store_seg_base
+	brl done_load_program
 store_seg_base:
-  Store32 program, seg_base
-
+	Store32 program, seg_base
 step_jump_past_segments:
   ; jump offset by tlen+dlen
 	clc
-	lda	tlen
-	adc	dlen
-	sta	R0
-	lda	tlen+2
-	adc	dlen+2
-	sta	R0+2
+	lda tlen
+	adc dlen
+	sta R0
+	lda tlen+2
+	adc dlen+2
+	sta R0+2
 	clc
-	lda	program
-	adc	R0
-	sta	program
-	lda	program+2
-	adc	R0+2
-	sta	program+2
-
+	lda program
+	adc R0
+	sta program
+	lda program+2
+	adc R0+2
+	sta program+2
 step_load_external_references:
-  ; We've jumped to the start of the external references list
-  ; eat that
-  jsr load_external_references
-  acc8i16
-  clc
-  lda status
-  cmp #0
-  acc16i16
-  beq step_perform_text_relocations
-  bra done_load_program
+	;; We've jumped to the start of the external references list
+	;; eat that
+	jsr load_external_references
+	acc8i16
+	clc
+	lda status
+	cmp #0
+	acc16i16
+	beq step_perform_text_relocations
+	bra done_load_program
 step_perform_text_relocations:
-  jsr perform_relocations     ; perform text seg relocations
-  acc8i16
-  clc
-  lda status
-  cmp #0
-  acc16i16
-  beq step_perform_data_relocations
-  bra done_load_program
+	jsr perform_relocations     ; perform text seg relocations
+	acc8i16
+	clc
+	lda status
+	cmp #0
+	acc16i16
+	beq step_perform_data_relocations
+	bra done_load_program
 step_perform_data_relocations:
-  jsr perform_relocations
-  acc8i16
-  clc
-  lda status
-  cmp #0
-  acc16i16
-  beq step_perform_bss_clear
-  bra done_load_program
+	jsr perform_relocations
+	acc8i16
+	clc
+	lda status
+	cmp #0
+	acc16i16
+	beq step_perform_bss_clear
+	bra done_load_program
 step_perform_bss_clear:
-  Add32 seg_base, tlen, new_segment_base
-  Add32 new_segment_base, dlen, R0
-  Add32 R0, blen, R1
+	Add32 seg_base, tlen, new_segment_base
+	Add32 new_segment_base, dlen, R0
+	Add32 R0, blen, R1
 zero_loop:  
-  clc
-  lda R0
-  cmp R1
-  bne keep_going
-  lda R0+2
-  cmp R1+2
-  bne keep_going
-  bra done_load_program
+	clc
+	lda R0
+	cmp R1
+	bne keep_going
+	lda R0+2
+	cmp R1+2
+	bne keep_going
+	bra done_load_program
 keep_going:
-  acc8i16
-  lda #00
-  sta [R0]
-  acc16i16
-  clc
-  inc R0
-  bne zero_loop
-  inc R0+2
-  bne zero_loop
+	acc8i16
+	lda #00
+	sta [R0]
+	acc16i16
+	clc
+	inc R0
+	bne zero_loop
+	inc R0+2
+	bne zero_loop
 done_load_program:
-  rts
+	rts
 .endscope

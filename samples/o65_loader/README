@@ -1,3 +1,17 @@
 o65 executable relocator and runner written in 65816 (ca65) assembler.
 
 See: http://www.6502.org/users/andre/o65/
+
+TODO:
+	* Support exported labels (like "main"?)
+	* Support the 'chain' bit.
+	* Reject 'obj' files. You can't run them.
+	* Respect the 'bsszero' flag.
+	* Pay attention to 'simple' bit. We just assume it.
+	* Do something with 'align'?
+	* Look at the CPU2 flag, flip into emulation mode if
+	  necessary
+	* More error handling & sanity checking throughout.
+	* Do something with the header options.
+	* Test 16-bit binaries
+	* Test HIGH relocations. Should work, but does it?
