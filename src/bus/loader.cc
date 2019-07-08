@@ -59,14 +59,14 @@ std::istream &safeGetline(std::istream &is, std::string &t) {
 
 } // namespace
 
-void LoadFromS28(const std::string &filename, SystemBus *system_bus) {
+bool LoadFromS28(const std::string &filename, SystemBus *system_bus) {
   std::ifstream srec_stream;
   srec_stream.open(filename);
   while (!srec_stream.eof()) {
     std::string line;
     std::getline(srec_stream, line);
     if (line.empty())
-      return;
+      return true;
     CHECK_EQ(line[0], 'S');
     char rec_type = line[1];
 
@@ -76,29 +76,52 @@ void LoadFromS28(const std::string &filename, SystemBus *system_bus) {
     if (rec_type == '2') {
       uint8_t byte_count;
 
-      CHECK(ReadHex(line_stream, &byte_count));
-      CHECK_EQ(byte_count * 2, (uint16_t)line.size() - 5);
+      if (!ReadHex(line_stream, &byte_count)) {
+        LOG(ERROR) << "Bad format in " << filename
+                   << " (could not read byte count)";
+        return false;
+      }
+      if (byte_count * 2 != (uint16_t)line.size() - 5) {
+        LOG(ERROR) << "Bad format in " << filename << " (invalid byte count)";
+        return false;
+      }
       uint8_t address[3];
-      CHECK(ReadHex(line_stream, &address[0]));
-      CHECK(ReadHex(line_stream, &address[1]));
-      CHECK(ReadHex(line_stream, &address[2]));
+      if (!ReadHex(line_stream, &address[0]) ||
+          !ReadHex(line_stream, &address[1]) ||
+          !ReadHex(line_stream, &address[2])) {
+        LOG(ERROR) << "Bad format in " << filename
+                   << " (could not read address)";
+        return false;
+      };
       byte_count -= 4;
       uint32_t addr = address[0] << 16 | address[1] << 8 | address[2];
       while (byte_count--) {
         uint8_t byte;
-        CHECK(ReadHex(line_stream, &byte));
+        if (!ReadHex(line_stream, &byte)) {
+          LOG(ERROR) << "Bad format in " << filename
+                     << " (could not read data byte)";
+          return false;
+        }
 
         system_bus->WriteByte(addr++, byte);
       }
       uint8_t checksum;
-      CHECK(ReadHex(line_stream, &checksum));
+      if (!ReadHex(line_stream, &checksum)) {
+        LOG(ERROR) << "Bad format in " << filename
+                   << " (could not read checksum)";
+        return false;
+      }
     }
   }
+  return true;
 }
 
-void LoadFromIHex(const std::string &filename, SystemBus *system_bus) {
+bool LoadFromIHex(const std::string &filename, SystemBus *system_bus) {
   std::ifstream hex(filename);
-  CHECK(hex);
+  if (!hex) {
+    LOG(ERROR) << "Unable to open file: " << filename;
+    return false;
+  }
   int line_no = 0;
   uint32_t page_addr = 0;
   LOG(INFO) << "Loading: " << filename;
@@ -109,14 +132,25 @@ void LoadFromIHex(const std::string &filename, SystemBus *system_bus) {
     if (line.empty())
       break;
     line_no++;
-    CHECK(line[0] == ':') << "Invalid start code in line #" << line_no << ": '"
-                          << line << "'";
+    if (line[0] != ':') {
+      LOG(ERROR) << "Bad format in " << filename
+                 << "(Invalid start code in line #" << line_no << ": '" << line
+                 << "')";
+      return false;
+    }
     std::stringstream line_stream(line.substr(1));
     uint8_t sum = 0;
 
     uint8_t byte_count;
-    CHECK(ReadHex(line_stream, &byte_count));
-    CHECK_EQ(byte_count * 2, (uint16_t)line.size() - 11);
+    if (!ReadHex(line_stream, &byte_count)) {
+      LOG(ERROR) << " Bad format in " << filename
+                 << " (could not read hex value)";
+      return false;
+    }
+    if ((byte_count * 2 != (uint16_t)line.size() - 11)) {
+      LOG(ERROR) << "Bad format in " << filename << " (bad byte count)";
+      return false;
+    }
     sum += byte_count;
     uint8_t addr_hi, addr_low;
     CHECK(ReadHex(line_stream, &addr_hi));
@@ -128,7 +162,7 @@ void LoadFromIHex(const std::string &filename, SystemBus *system_bus) {
     CHECK(ReadHex(line_stream, &record_type));
     sum += record_type;
     if (record_type == 1) { // EOF
-      return;
+      return true;
     } else if (record_type == 0) { // DATA
       while (byte_count--) {
         uint8_t data;
@@ -145,28 +179,36 @@ void LoadFromIHex(const std::string &filename, SystemBus *system_bus) {
     } else if (record_type == 4) { // Extended Linear Address
       uint8_t page_addr_hi;
       uint8_t page_addr_lo;
-      CHECK(ReadHex(line_stream, &page_addr_lo));
-      CHECK(ReadHex(line_stream, &page_addr_hi));
+      if (!ReadHex(line_stream, &page_addr_lo) ||
+          !ReadHex(line_stream, &page_addr_hi)) {
+        LOG(ERROR) << "Bad format in " << filename
+                   << " (could not read extended linear address)";
+        return false;
+      }
       page_addr = (page_addr_hi << 16) | (page_addr_lo << 8);
-      LOG(INFO) << " Page: " << page_addr;
     }
   }
+  return true;
 }
 
-void Loader::LoadFromHex(const std::string &filename) {
+bool Loader::LoadFromHex(const std::string &filename) {
   fs::path path(filename);
   if (path.extension().string() == ".hex") {
-    LoadFromIHex(filename, system_bus_);
+    return LoadFromIHex(filename, system_bus_);
   } else if (path.extension().string() == ".s28") {
     LoadFromS28(filename, system_bus_);
   } else {
-    CHECK(false) << "Unknown file format: " << path.extension();
+    LOG(ERROR) << "Unknown file format: " << path.extension();
+    return false;
   }
 }
 
-void Loader::LoadFromBin(const std::string &filename, uint32_t base_address) {
+bool Loader::LoadFromBin(const std::string &filename, uint32_t base_address) {
   std::ifstream in_file(filename);
-  CHECK(in_file.is_open());
+  if (!in_file.is_open()) {
+    LOG(ERROR) << "Unable to open file: " << filename;
+    return false;
+  }
   uint32_t address = base_address;
   char byte;
   while (in_file.get(byte)) {
@@ -174,6 +216,7 @@ void Loader::LoadFromBin(const std::string &filename, uint32_t base_address) {
     address++;
   }
   LOG(INFO) << "Done @ " << address;
+  return true;
 }
 
 struct O65Header {
@@ -327,17 +370,23 @@ void DoReloc(uint32_t cur_segment_base, uint32_t new_segment_base,
   CHECK(false) << "Unhandled reloc type: " << std::hex << (int)type;
 }
 
-void Loader::LoadFromO65(const std::string &filename, uint32_t reloc_address,
+bool Loader::LoadFromO65(const std::string &filename, uint32_t reloc_address,
                          bool verbose) {
   LOG(INFO) << "Relocating '" << filename << "' relative to " << std::hex
             << reloc_address;
   std::ifstream in_file(filename);
-  CHECK(in_file.is_open());
+  if (!in_file.is_open()) {
+    LOG(ERROR) << "Bad file: " << filename << "; could not open";
+    return false;
+  }
 
   // Load and validate the header.
   O65Header header;
   in_file.read(reinterpret_cast<char *>(&header), 8);
-  CHECK(!in_file.eof());
+  if (in_file.eof()) {
+    LOG(ERROR) << "Unexpected EOF in o65";
+    return false;
+  }
   CHECK(header.magic_marker[0] == 'o' && header.magic_marker[1] == '6' &&
         header.magic_marker[2] == '5');
 
@@ -376,7 +425,6 @@ void Loader::LoadFromO65(const std::string &filename, uint32_t reloc_address,
                                      : o65_offsets.word_mode.dlen;
   if (verbose)
     LOG(INFO) << "DBASE: " << std::hex << dbase << " DLEN: " << dlen;
-
 
   uint32_t bssbase = header.mode.m.size ? o65_offsets.long_mode.bbase
                                         : o65_offsets.word_mode.bbase;
@@ -444,9 +492,9 @@ void Loader::LoadFromO65(const std::string &filename, uint32_t reloc_address,
       DoReloc(bssbase, reloc_address + tlen + dlen, in_file, &program,
               reloc_offset, type, verbose);
     } else {
-      CHECK(false) << "Unhandled segment: " << std::hex << (int)segment;
+      LOG(ERROR) << "Unhandled o65 segment: " << std::hex << (int)segment;
+      return false;
     }
-    // TODO more rewrites for other segment types, etc.
   };
 
   // Now load the segments into memory.
@@ -460,4 +508,6 @@ void Loader::LoadFromO65(const std::string &filename, uint32_t reloc_address,
   }
 
   // Look for exported global symbols.
+
+  return true;
 }

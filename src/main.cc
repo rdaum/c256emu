@@ -30,15 +30,20 @@ int main(int argc, char* argv[]) {
   else
     LOG(FATAL) << "No kernel";
 
-  if (!FLAGS_program_hex.empty())
-    system.loader()->LoadFromHex(FLAGS_program_hex);
-
+  if (!FLAGS_program_hex.empty()) {
+    if (!system.loader()->LoadFromHex(FLAGS_program_hex)) {
+      LOG(FATAL) << "Invalid kernel hex file: "<< FLAGS_program_hex;
+    }
+  }
+  
   Automation* automation = system.automation();
   std::thread run_thread([&system, automation]() {
     system.Initialize();
 
     if (!FLAGS_script.empty()) {
-      automation->LoadScript(FLAGS_script);
+      if (!automation->LoadScript(FLAGS_script)) {
+        LOG(ERROR) << "Could not load automation file: " << FLAGS_script;
+      }
     }
     system.Run();
   });
