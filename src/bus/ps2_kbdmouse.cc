@@ -242,20 +242,20 @@ const Keybinding *translate_key(int key) {
 }
 
 void PS2State::ps2_reset_queue() {
-  queue.rptr = 0;
-  queue.wptr = 0;
-  queue.count = 0;
+  queue_.rptr = 0;
+  queue_.wptr = 0;
+  queue_.count = 0;
 }
 
 void PS2State::ps2_queue_noirq(int b) {
-  if (queue.count == PS2_QUEUE_SIZE) {
+  if (queue_.count == PS2_QUEUE_SIZE) {
     return;
   }
 
-  queue.data[queue.wptr] = b;
-  if (++queue.wptr == PS2_QUEUE_SIZE)
-    queue.wptr = 0;
-  queue.count++;
+  queue_.data[queue_.wptr] = b;
+  if (++queue_.wptr == PS2_QUEUE_SIZE)
+    queue_.wptr = 0;
+  queue_.count++;
 }
 
 void PS2State::ps2_raise_irq() { update_irq_(1); }
@@ -266,7 +266,7 @@ void PS2State::ps2_queue(int b) {
 }
 
 void PS2State::ps2_queue_2(int b1, int b2) {
-  if (PS2_QUEUE_SIZE - queue.count < 2) {
+  if (PS2_QUEUE_SIZE - queue_.count < 2) {
     return;
   }
 
@@ -276,7 +276,7 @@ void PS2State::ps2_queue_2(int b1, int b2) {
 }
 
 void PS2State::ps2_queue_3(int b1, int b2, int b3) {
-  if (PS2_QUEUE_SIZE - queue.count < 3) {
+  if (PS2_QUEUE_SIZE - queue_.count < 3) {
     return;
   }
 
@@ -287,7 +287,7 @@ void PS2State::ps2_queue_3(int b1, int b2, int b3) {
 }
 
 void PS2State::ps2_queue_4(int b1, int b2, int b3, int b4) {
-  if (PS2_QUEUE_SIZE - queue.count < 4) {
+  if (PS2_QUEUE_SIZE - queue_.count < 4) {
     return;
   }
 
@@ -301,18 +301,19 @@ void PS2State::ps2_queue_4(int b1, int b2, int b3, int b4) {
 PS2KbdState::PS2KbdState(std::function<void(int)> update_irq)
     : PS2State(update_irq) {
   ps2_kbd_reset();
+  scancode_set_ = 2;
 }
 
 PS2KbdState::~PS2KbdState() {}
 
 /* keycode is the untranslated scancode in the current scancode set. */
 void PS2KbdState::ps2_put_keycode(int keycode) {
-  if (translate) {
+  if (translate_) {
     if (keycode == 0xf0) {
-      need_high_bit = true;
-    } else if (need_high_bit) {
+      need_high_bit_ = true;
+    } else if (need_high_bit_) {
       ps2_queue(translate_table[keycode] | 0x80);
-      need_high_bit = false;
+      need_high_bit_ = false;
     } else {
       ps2_queue(translate_table[keycode]);
     }
@@ -326,20 +327,22 @@ void PS2KbdState::ps2_keyboard_event(int key, int scancode, int action,
   int mod;
 
   /* do not process events while disabled to prevent stream corruption */
-  if (!scan_enabled) {
+  if (!scan_enabled_) {
     return;
   }
 
   mod = ps2_modifier_bit(key);
   if (action == GLFW_PRESS) {
-    modifiers |= mod;
+    modifiers_ |= mod;
+  } else if (action == GLFW_RELEASE) {
+    modifiers_ &= ~mod;
   } else {
-    modifiers &= ~mod;
+    return;
   }
 
-  if (scancode_set == 1) {
+  if (scancode_set_ == 1) {
     if (key == GLFW_KEY_PAUSE) {
-      if (modifiers & (MOD_CTRL_L | MOD_CTRL_R)) {
+      if (modifiers_ & (MOD_CTRL_L | MOD_CTRL_R)) {
         if (action == GLFW_PRESS) {
           ps2_put_keycode(0xe0);
           ps2_put_keycode(0x46);
@@ -357,7 +360,7 @@ void PS2KbdState::ps2_keyboard_event(int key, int scancode, int action,
         }
       }
     } else if (key == GLFW_KEY_PRINT_SCREEN) {
-      if (modifiers & MOD_ALT_L) {
+      if (modifiers_ & MOD_ALT_L) {
         if (action == GLFW_PRESS) {
           ps2_put_keycode(0xb8);
           ps2_put_keycode(0x38);
@@ -367,7 +370,7 @@ void PS2KbdState::ps2_keyboard_event(int key, int scancode, int action,
           ps2_put_keycode(0xb8);
           ps2_put_keycode(0x38);
         }
-      } else if (modifiers & MOD_ALT_R) {
+      } else if (modifiers_ & MOD_ALT_R) {
         if (action == GLFW_PRESS) {
           ps2_put_keycode(0xe0);
           ps2_put_keycode(0xb8);
@@ -381,7 +384,7 @@ void PS2KbdState::ps2_keyboard_event(int key, int scancode, int action,
           ps2_put_keycode(0xe0);
           ps2_put_keycode(0x38);
         }
-      } else if (modifiers &
+      } else if (modifiers_ &
                  (MOD_SHIFT_L | MOD_CTRL_L | MOD_SHIFT_R | MOD_CTRL_R)) {
         if (action == GLFW_PRESS) {
           ps2_put_keycode(0xe0);
@@ -419,9 +422,9 @@ void PS2KbdState::ps2_keyboard_event(int key, int scancode, int action,
                    << glfwGetKeyName(key, scancode);
       }
     }
-  } else if (scancode_set == 2) {
+  } else if (scancode_set_ == 2) {
     if (key == GLFW_KEY_PAUSE) {
-      if (modifiers & (MOD_CTRL_L | MOD_CTRL_R)) {
+      if (modifiers_ & (MOD_CTRL_L | MOD_CTRL_R)) {
         if (action == GLFW_PRESS) {
           ps2_put_keycode(0xe0);
           ps2_put_keycode(0x7e);
@@ -442,7 +445,7 @@ void PS2KbdState::ps2_keyboard_event(int key, int scancode, int action,
         }
       }
     } else if (key == GLFW_KEY_PRINT_SCREEN) {
-      if (modifiers & MOD_ALT_L) {
+      if (modifiers_ & MOD_ALT_L) {
         if (action == GLFW_PRESS) {
           ps2_put_keycode(0xf0);
           ps2_put_keycode(0x11);
@@ -455,7 +458,7 @@ void PS2KbdState::ps2_keyboard_event(int key, int scancode, int action,
           ps2_put_keycode(0x11);
           ps2_put_keycode(0x11);
         }
-      } else if (modifiers & MOD_ALT_R) {
+      } else if (modifiers_ & MOD_ALT_R) {
         if (action == GLFW_PRESS) {
           ps2_put_keycode(0xe0);
           ps2_put_keycode(0xf0);
@@ -472,7 +475,7 @@ void PS2KbdState::ps2_keyboard_event(int key, int scancode, int action,
           ps2_put_keycode(0xe0);
           ps2_put_keycode(0x11);
         }
-      } else if (modifiers &
+      } else if (modifiers_ &
                  (MOD_SHIFT_L | MOD_CTRL_L | MOD_SHIFT_R | MOD_CTRL_R)) {
         if (action == GLFW_PRESS) {
           ps2_put_keycode(0xe0);
@@ -513,7 +516,7 @@ void PS2KbdState::ps2_keyboard_event(int key, int scancode, int action,
                    << glfwGetKeyName(key, scancode);
       }
     }
-  } else if (scancode_set == 3) {
+  } else if (scancode_set_ == 3) {
     auto binding = translate_key(key);
     if (binding) {
       uint16_t keycode = binding->at_set3_code;
@@ -535,14 +538,15 @@ uint32_t PS2State::ps2_read_data() {
   PS2Queue *q;
   int val, index;
 
-  q = &queue;
+  q = &queue_;
   if (q->count == 0) {
     /* NOTE: if no data left, we return the last keyboard one
        (needed for EMM386) */
     /* XXX: need a timer to do things correctly */
     index = q->rptr - 1;
-    if (index < 0)
+    if (index < 0) {
       index = PS2_QUEUE_SIZE - 1;
+    }
     val = q->data[index];
   } else {
     val = q->data[q->rptr];
@@ -557,11 +561,11 @@ uint32_t PS2State::ps2_read_data() {
   return val;
 }
 
-void PS2KbdState::ps2_set_ledstate(int ledstate) { this->ledstate = ledstate; }
+void PS2KbdState::ps2_set_ledstate(int ledstate) { this->ledstate_ = ledstate; }
 
 void PS2KbdState::ps2_reset_keyboard() {
-  scan_enabled = 1;
-  scancode_set = 1;
+  scan_enabled_ = 1;
+  scancode_set_ = 1;
   ps2_reset_queue();
   ps2_set_ledstate(0);
 }
@@ -579,7 +583,7 @@ void PS2KbdState::ps2_write_keyboard(int val) {
       break;
     case KBD_CMD_GET_ID:
       /* We emulate a MF2 AT keyboard here */
-      if (translate)
+      if (translate_)
         ps2_queue_3(KBD_REPLY_ACK, KBD_REPLY_ID, 0x41);
       else
         ps2_queue_3(KBD_REPLY_ACK, KBD_REPLY_ID, 0x83);
@@ -588,7 +592,7 @@ void PS2KbdState::ps2_write_keyboard(int val) {
       ps2_queue(KBD_CMD_ECHO);
       break;
     case KBD_CMD_ENABLE:
-      scan_enabled = 1;
+      scan_enabled_ = 1;
       ps2_queue(KBD_REPLY_ACK);
       break;
     case KBD_CMD_SCANCODE:
@@ -599,12 +603,12 @@ void PS2KbdState::ps2_write_keyboard(int val) {
       break;
     case KBD_CMD_RESET_DISABLE:
       ps2_reset_keyboard();
-      scan_enabled = 0;
+      scan_enabled_ = 0;
       ps2_queue(KBD_REPLY_ACK);
       break;
     case KBD_CMD_RESET_ENABLE:
       ps2_reset_keyboard();
-      scan_enabled = 1;
+      scan_enabled_ = 1;
       ps2_queue(KBD_REPLY_ACK);
       break;
     case KBD_CMD_RESET:
@@ -618,12 +622,12 @@ void PS2KbdState::ps2_write_keyboard(int val) {
     break;
   case KBD_CMD_SCANCODE:
     if (val == 0) {
-      if (queue.count <= PS2_QUEUE_SIZE - 2) {
+      if (queue_.count <= PS2_QUEUE_SIZE - 2) {
         ps2_queue(KBD_REPLY_ACK);
-        ps2_put_keycode(scancode_set);
+        ps2_put_keycode(scancode_set_);
       }
     } else if (val >= 1 && val <= 3) {
-      scancode_set = val;
+      scancode_set_ = val;
       ps2_queue(KBD_REPLY_ACK);
     } else {
       ps2_queue(KBD_REPLY_RESEND);
@@ -646,20 +650,20 @@ void PS2KbdState::ps2_write_keyboard(int val) {
    0 = raw scancodes.
    1 = translated scancodes (used by qemu internally).  */
 
-void PS2KbdState::ps2_keyboard_set_translation(int mode) { translate = mode; }
+void PS2KbdState::ps2_keyboard_set_translation(int mode) { translate_ = mode; }
 
 int PS2MouseState::ps2_mouse_send_packet() {
-  const int needed = 3 + (mouse_type - 2);
+  const int needed = 3 + (mouse_type_ - 2);
   unsigned int b;
   int dx1, dy1, dz1;
 
-  if (PS2_QUEUE_SIZE - queue.count < needed) {
+  if (PS2_QUEUE_SIZE - queue_.count < needed) {
     return 0;
   }
 
-  dx1 = mouse_dx;
-  dy1 = mouse_dy;
-  dz1 = mouse_dz;
+  dx1 = mouse_dx_;
+  dy1 = mouse_dy_;
+  dz1 = mouse_dz_;
   /* XXX: increase range to 8 bits ? */
   if (dx1 > 127)
     dx1 = 127;
@@ -669,12 +673,12 @@ int PS2MouseState::ps2_mouse_send_packet() {
     dy1 = 127;
   else if (dy1 < -127)
     dy1 = -127;
-  b = 0x08 | ((dx1 < 0) << 4) | ((dy1 < 0) << 5) | (mouse_buttons & 0x07);
+  b = 0x08 | ((dx1 < 0) << 4) | ((dy1 < 0) << 5) | (mouse_buttons_ & 0x07);
   ps2_queue_noirq(b);
   ps2_queue_noirq(dx1 & 0xff);
   ps2_queue_noirq(dy1 & 0xff);
   /* extra byte for IMPS/2 or IMEX */
-  switch (mouse_type) {
+  switch (mouse_type_) {
   default:
     break;
   case 3:
@@ -689,7 +693,7 @@ int PS2MouseState::ps2_mouse_send_packet() {
       dz1 = 7;
     else if (dz1 < -7)
       dz1 = -7;
-    b = (dz1 & 0x0f) | ((mouse_buttons & 0x18) << 1);
+    b = (dz1 & 0x0f) | ((mouse_buttons_ & 0x18) << 1);
     ps2_queue_noirq(b);
     break;
   }
@@ -697,25 +701,25 @@ int PS2MouseState::ps2_mouse_send_packet() {
   ps2_raise_irq();
 
   /* update deltas */
-  mouse_dx -= dx1;
-  mouse_dy -= dy1;
-  mouse_dz -= dz1;
+  mouse_dx_ -= dx1;
+  mouse_dy_ -= dy1;
+  mouse_dz_ -= dz1;
 
   return 1;
 }
 
 void PS2MouseState::ps2_mouse_move(double x, double y) {
   /* check if deltas are recorded when disabled */
-  if (!(mouse_status & MOUSE_STATUS_ENABLED))
+  if (!(mouse_status_ & MOUSE_STATUS_ENABLED))
     return;
 
-  mouse_dx = x;
-  mouse_dy = y;
+  mouse_dx_ = x;
+  mouse_dy_ = y;
 }
 
 void PS2MouseState::ps2_mouse_button(int button, int action, int mods) {
   /* check if deltas are recorded when disabled */
-  if (!(mouse_status & MOUSE_STATUS_ENABLED))
+  if (!(mouse_status_ & MOUSE_STATUS_ENABLED))
     return;
 
   uint8_t translated_buttons = 0;
@@ -727,34 +731,34 @@ void PS2MouseState::ps2_mouse_button(int button, int action, int mods) {
     translated_buttons |= PS2_MOUSE_BUTTON_RIGHT;
   }
   if (action == GLFW_PRESS) {
-    mouse_buttons |= translated_buttons;
+    mouse_buttons_ |= translated_buttons;
   } else {
-    mouse_buttons &= ~translated_buttons;
+    mouse_buttons_ &= ~translated_buttons;
   }
 }
 
 void PS2MouseState::ps2_mouse_scroll(double xoffset, double yoffset) {
-  mouse_dz = yoffset;
+  mouse_dz_ = yoffset;
 }
 
 void PS2MouseState::ps2_mouse_sync() {
   /* do not sync while disabled to prevent stream corruption */
-  if (!(mouse_status & MOUSE_STATUS_ENABLED)) {
+  if (!(mouse_status_ & MOUSE_STATUS_ENABLED)) {
     return;
   }
 
-  if (!(mouse_status & MOUSE_STATUS_REMOTE)) {
+  if (!(mouse_status_ & MOUSE_STATUS_REMOTE)) {
     /* if not remote, send event. Multiple events are sent if
        too big deltas */
     while (ps2_mouse_send_packet()) {
-      if (mouse_dx == 0 && mouse_dy == 0 && mouse_dz == 0)
+      if (mouse_dx_ == 0 && mouse_dy_ == 0 && mouse_dz_ == 0)
         break;
     }
   }
 }
 
 void PS2MouseState::ps2_mouse_fake_event() {
-  mouse_dx++;
+  mouse_dx_++;
   ps2_mouse_sync();
 }
 
@@ -767,9 +771,9 @@ void PS2MouseState::ps2_write_mouse(int val) {
   default:
   case -1:
     /* mouse command */
-    if (mouse_wrap) {
+    if (mouse_wrap_) {
       if (val == AUX_RESET_WRAP) {
-        mouse_wrap = 0;
+        mouse_wrap_ = 0;
         ps2_queue(AUX_ACK);
         return;
       } else if (val != AUX_RESET) {
@@ -779,27 +783,27 @@ void PS2MouseState::ps2_write_mouse(int val) {
     }
     switch (val) {
     case AUX_SET_SCALE11:
-      mouse_status &= ~MOUSE_STATUS_SCALE21;
+      mouse_status_ &= ~MOUSE_STATUS_SCALE21;
       ps2_queue(AUX_ACK);
       break;
     case AUX_SET_SCALE21:
-      mouse_status |= MOUSE_STATUS_SCALE21;
+      mouse_status_ |= MOUSE_STATUS_SCALE21;
       ps2_queue(AUX_ACK);
       break;
     case AUX_SET_STREAM:
-      mouse_status &= ~MOUSE_STATUS_REMOTE;
+      mouse_status_ &= ~MOUSE_STATUS_REMOTE;
       ps2_queue(AUX_ACK);
       break;
     case AUX_SET_WRAP:
-      mouse_wrap = 1;
+      mouse_wrap_ = 1;
       ps2_queue(AUX_ACK);
       break;
     case AUX_SET_REMOTE:
-      mouse_status |= MOUSE_STATUS_REMOTE;
+      mouse_status_ |= MOUSE_STATUS_REMOTE;
       ps2_queue(AUX_ACK);
       break;
     case AUX_GET_TYPE:
-      ps2_queue_2(AUX_ACK, mouse_type);
+      ps2_queue_2(AUX_ACK, mouse_type_);
       break;
     case AUX_SET_RES:
     case AUX_SET_SAMPLE:
@@ -807,71 +811,71 @@ void PS2MouseState::ps2_write_mouse(int val) {
       ps2_queue(AUX_ACK);
       break;
     case AUX_GET_SCALE:
-      ps2_queue_4(AUX_ACK, mouse_status, mouse_resolution, mouse_sample_rate);
+      ps2_queue_4(AUX_ACK, mouse_status_, mouse_resolution_, mouse_sample_rate_);
       break;
     case AUX_POLL:
       ps2_queue(AUX_ACK);
       ps2_mouse_send_packet();
       break;
     case AUX_ENABLE_DEV:
-      mouse_status |= MOUSE_STATUS_ENABLED;
+      mouse_status_ |= MOUSE_STATUS_ENABLED;
       ps2_queue(AUX_ACK);
       break;
     case AUX_DISABLE_DEV:
-      mouse_status &= ~MOUSE_STATUS_ENABLED;
+      mouse_status_ &= ~MOUSE_STATUS_ENABLED;
       ps2_queue(AUX_ACK);
       break;
     case AUX_SET_DEFAULT:
-      mouse_sample_rate = 100;
-      mouse_resolution = 2;
-      mouse_status = 0;
+      mouse_sample_rate_ = 100;
+      mouse_resolution_ = 2;
+      mouse_status_ = 0;
       ps2_queue(AUX_ACK);
       break;
     case AUX_RESET:
-      mouse_sample_rate = 100;
-      mouse_resolution = 2;
-      mouse_status = 0;
-      mouse_type = 0;
+      mouse_sample_rate_ = 100;
+      mouse_resolution_ = 2;
+      mouse_status_ = 0;
+      mouse_type_ = 0;
       ps2_reset_queue();
-      ps2_queue_3(AUX_ACK, 0xaa, mouse_type);
+      ps2_queue_3(AUX_ACK, 0xaa, mouse_type_);
       break;
     default:
       break;
     }
     break;
   case AUX_SET_SAMPLE:
-    mouse_sample_rate = val;
+    mouse_sample_rate_ = val;
     /* detect IMPS/2 or IMEX */
-    switch (mouse_detect_state) {
+    switch (mouse_detect_state_) {
     default:
     case 0:
       if (val == 200)
-        mouse_detect_state = 1;
+        mouse_detect_state_ = 1;
       break;
     case 1:
       if (val == 100)
-        mouse_detect_state = 2;
+        mouse_detect_state_ = 2;
       else if (val == 200)
-        mouse_detect_state = 3;
+        mouse_detect_state_ = 3;
       else
-        mouse_detect_state = 0;
+        mouse_detect_state_ = 0;
       break;
     case 2:
       if (val == 80)
-        mouse_type = 3; /* IMPS/2 */
-      mouse_detect_state = 0;
+        mouse_type_ = 3; /* IMPS/2 */
+      mouse_detect_state_ = 0;
       break;
     case 3:
       if (val == 80)
-        mouse_type = 4; /* IMEX */
-      mouse_detect_state = 0;
+        mouse_type_ = 4; /* IMEX */
+      mouse_detect_state_ = 0;
       break;
     }
     ps2_queue(AUX_ACK);
     write_cmd = -1;
     break;
   case AUX_SET_RES:
-    mouse_resolution = val;
+    mouse_resolution_ = val;
     ps2_queue(AUX_ACK);
     write_cmd = -1;
     break;
@@ -885,7 +889,7 @@ void PS2State::ps2_common_reset() {
 }
 
 void PS2State::ps2_common_post_load() {
-  PS2Queue *q = &queue;
+  PS2Queue *q = &queue_;
   uint8_t i, size;
   uint8_t tmp_data[PS2_QUEUE_SIZE];
 
@@ -916,51 +920,44 @@ PS2State::~PS2State() {}
 
 PS2State::PS2State(std::function<void(int)> update_irq)
     : update_irq_(update_irq) {
-  ps2_reset_queue();
+  ps2_common_reset();
+  ps2_common_post_load();
 }
 
 void PS2KbdState::ps2_kbd_reset() {
-  ps2_common_reset();
-  scan_enabled = 1;
-  translate = 0;
-  scancode_set = 1;
-  modifiers = 0;
+  scan_enabled_ = true;
+  translate_ = 0;
+  scancode_set_ = 1;
+  modifiers_ = 0;
 }
 
 void PS2MouseState::ps2_mouse_reset() {
   ps2_common_reset();
-  mouse_status = 0;
-  mouse_resolution = 0;
-  mouse_sample_rate = 0;
-  mouse_wrap = 0;
-  mouse_type = 0;
-  mouse_detect_state = 0;
-  mouse_dx = 0;
-  mouse_dy = 0;
-  mouse_dz = 0;
-  mouse_buttons = 0;
+  mouse_status_ = 0;
+  mouse_resolution_ = 0;
+  mouse_sample_rate_ = 0;
+  mouse_wrap_ = 0;
+  mouse_type_ = 0;
+  mouse_detect_state_ = 0;
+  mouse_dx_ = 0;
+  mouse_dy_ = 0;
+  mouse_dz_ = 0;
+  mouse_buttons_ = 0;
 }
 
 PS2MouseState::~PS2MouseState() {}
 
-bool PS2KbdState::ps2_keyboard_ledstate_needed(void *opaque) {
-  return ledstate != 0; /* 0 is default state */
+PS2MouseState::PS2MouseState(std::function<void(int)> update_irq)
+    : PS2State(update_irq) {
+  ps2_mouse_reset();
 }
 
-int PS2KbdState::ps2_kbd_ledstate_post_load(int version_id) {
-  //  kbd_put_ledstate(ledstate);
-  return 0;
+bool PS2KbdState::ps2_keyboard_ledstate_needed(void *opaque) {
+  return ledstate_ != 0; /* 0 is default state */
 }
+
 
 bool PS2KbdState::ps2_keyboard_need_high_bit_needed() {
-  return need_high_bit != 0; /* 0 is the usual state */
+  return need_high_bit_ != 0; /* 0 is the usual state */
 }
 
-int PS2KbdState::ps2_kbd_post_load(int version_id) {
-  if (version_id == 2)
-    scancode_set = 2;
-
-  ps2_common_post_load();
-
-  return 0;
-}

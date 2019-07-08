@@ -136,11 +136,6 @@ I8042::I8042(InterruptController *irq_controller)
       mouse_(std::make_unique<PS2MouseState>(
           [this](int l) { this->kbd_update_aux_irq(l); })),
       mask_(0x04) {
-  if (!outport_present_) {
-    outport_ = kbd_outport_default();
-  }
-  outport_present_ = false;
-
   kbd_reset();
 }
 
@@ -314,7 +309,6 @@ void I8042::kbd_reset() {
   mode_ = KBD_MODE_KBD_INT | KBD_MODE_MOUSE_INT;
   status_ = KBD_STAT_CMD | KBD_STAT_UNLOCKED;
   outport_ = KBD_OUT_RESET | KBD_OUT_A20 | KBD_OUT_ONES;
-  outport_present_ = false;
 }
 
 uint8_t I8042::kbd_outport_default() {

@@ -39,12 +39,11 @@ private:
   std::unique_ptr<PS2MouseState> mouse_;
   cpuaddr_t mask_;
 
-  uint8_t write_cmd_; /* if non zero, write data to port 60 is expected */
-  uint8_t status_;
-  uint8_t mode_;
-  uint8_t outport_;
-  bool outport_present_;
+  uint8_t write_cmd_ = 0; /* if non zero, write data to port 60 is expected */
+  uint8_t status_ = 0;
+  uint8_t mode_ = 0;
+  uint8_t outport_ = 0;
   /* Bitmask of devices with data available.  */
-  uint8_t pending_;
+  uint8_t pending_ = 0;
 
 };

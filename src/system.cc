@@ -26,29 +26,29 @@ constexpr int kRasterLinesPerSecond =
     (kVickyBitmapHeight + kVickyVBlankLines) * kVickyTargetFps;
 
 DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
+DEFINE_bool(gui, true, "Enable the GUI debugger / profiler");
 
 void key_cb_func(GLFWwindow *window, int key, int scancode, int action,
                  int mods) {
   System *system = (System *)glfwGetWindowUserPointer(window);
-  system->system_bus()->keyboard()->kbd()->ps2_keyboard_event(key, scancode,
-                                                              action, mods);
+  system->KeyEvent(key, scancode, action, mods);
+
 }
 
 void mouse_move_cb_func(GLFWwindow *window, double xpos, double ypos) {
   System *system = (System *)glfwGetWindowUserPointer(window);
-  system->system_bus()->keyboard()->mouse()->ps2_mouse_move(xpos, xpos);
+  system->MouseMoveEvent(xpos, ypos);
 }
 
 void mouse_scroll_cb_func(GLFWwindow *window, double xoffset, double yoffset) {
   System *system = (System *)glfwGetWindowUserPointer(window);
-  system->system_bus()->keyboard()->mouse()->ps2_mouse_scroll(xoffset, yoffset);
+  system->MouseScrollEvent(xoffset, yoffset);
 }
 
 void mouse_button_cb_func(GLFWwindow *window, int button, int action,
                           int mods) {
   System *system = (System *)glfwGetWindowUserPointer(window);
-  system->system_bus()->keyboard()->mouse()->ps2_mouse_button(button, action,
-                                                              mods);
+  system->MouseButtonEvent(button, action, mods);
 }
 
 void window_close_callback(GLFWwindow *window) {
@@ -60,7 +60,8 @@ void window_close_callback(GLFWwindow *window) {
 
 System::System()
     : turbo_(FLAGS_turbo), system_bus_(std::make_unique<C256SystemBus>(this)),
-      loader_(system_bus_.get()), gui_(std::make_unique<GUI>(this)),
+      loader_(system_bus_.get()),
+      gui_(FLAGS_gui ? std::make_unique<GUI>(this) : nullptr),
       cpu_(system_bus_.get()), debug_(&cpu_, &events_, system_bus_.get(), true),
       automation_(&cpu_, this, &debug_) {}
 
@@ -77,17 +78,19 @@ void System::Initialize() {
 
   BootCPU();
 
-  // Fire up the GUI debugger;
-  int x, y;
-  glfwGetWindowPos(window, &x, &y);
-  gui_->Start(x, y);
+  if (FLAGS_gui) {
+    // Fire up the GUI debugger;
+    int x, y;
+    glfwGetWindowPos(window, &x, &y);
+    gui_->Start(x, y);
 
-  glfwSetWindowUserPointer(window, this);
-  glfwSetKeyCallback(window, key_cb_func);
-  glfwSetCursorPosCallback(window, mouse_move_cb_func);
-  glfwSetScrollCallback(window, mouse_scroll_cb_func);
-  glfwSetMouseButtonCallback(window, mouse_button_cb_func);
-  glfwSetWindowCloseCallback(window, window_close_callback);
+    glfwSetWindowUserPointer(window, this);
+    glfwSetKeyCallback(window, key_cb_func);
+    glfwSetCursorPosCallback(window, mouse_move_cb_func);
+    glfwSetScrollCallback(window, mouse_scroll_cb_func);
+    glfwSetMouseButtonCallback(window, mouse_button_cb_func);
+    glfwSetWindowCloseCallback(window, window_close_callback);
+  }
 }
 
 void System::BootCPU(bool hard_boot) {
@@ -120,7 +123,7 @@ void System::DrawNextLine() {
   bool frame_end = system_bus_->vicky()->is_vertical_end();
   if (frame_end) {
     current_frame_++;
-    system_bus_->int_controller()->RaiseFrameStart();
+    system_bus_->int_controller()->SetFrameStart(true);
     system_bus_->vdma()->OnFrameStart();
 
     if (live_watches_) {
@@ -150,6 +153,8 @@ void System::DrawNextLine() {
     }
     frame_clock = now;
     next_frame_clock += kVickyFrameDelayDurationNs;
+  } else {
+    system_bus_->int_controller()->SetFrameStart(false);
   }
   ScheduleNextScanline();
 }
@@ -273,4 +278,22 @@ uint32_t System::peek_rtsl() const { return peek_rtsl_; }
 std::vector<uint8_t> System::direct_page_watch() {
   std::unique_lock<std::mutex> l(memory_watch_mutex_);
   return direct_page_watch_;
+}
+
+void System::KeyEvent(int key, int scancode, int action, int mods) {
+  system_bus()->keyboard()->kbd()->ps2_keyboard_event(key, scancode, action,
+                                                      mods);
+}
+
+
+void System::MouseMoveEvent(double xpos, double ypos) {
+  system_bus()->keyboard()->mouse()->ps2_mouse_move(xpos, ypos);
+}
+
+void System::MouseScrollEvent(double xoffset, double yoffset) {
+  system_bus()->keyboard()->mouse()->ps2_mouse_scroll(xoffset, yoffset);
+}
+
+void System::MouseButtonEvent(int button, int action, int mods) {
+  system_bus()->keyboard()->mouse()->ps2_mouse_button(button, action, mods);
 }

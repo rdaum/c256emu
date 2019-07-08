@@ -99,14 +99,14 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
         current_cmd_ = v;
         return;
       case GET_STATUS:
-        int_controller_->LowerCH376();
+        int_controller_->SetCH376(false);
         out_data_.push_back(int_status_);
         int_status_ = 0;
         return;
       case DISK_MOUNT:
         mounted_ = true;
         int_status_ = USB_INT_SUCCESS;
-        int_controller_->RaiseCH376();
+        int_controller_->SetCH376(true);
         return;
       case SET_FILE_NAME:
         current_file_.Clear();
@@ -141,7 +141,7 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
           return;
         }
         current_file_.byte_seek_request.reset();
-        int_controller_->RaiseCH376();
+        int_controller_->SetCH376(true);
         return;
       }
       case FILE_CLOSE: {
@@ -165,7 +165,7 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
         }
         int_status_ =
             current_file_.directory_iterator == end ? 0x42 : USB_INT_DISK_READ;
-        int_controller_->RaiseCH376();
+        int_controller_->SetCH376(true);
       } break;
       case RD_USB_DATA0:
         if (current_file_.open) {
@@ -193,7 +193,7 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
         } else {
           int_status_ = USB_INT_SUCCESS;  // done reading
         }
-        int_controller_->RaiseCH376();
+        int_controller_->SetCH376(true);
         break;
       case BYTE_LOCATE:
         // Seek.
@@ -230,7 +230,7 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
       case FILE_CLOSE:
         // v? "Update or not" ?
         int_status_ = USB_INT_SUCCESS;
-        int_controller_->RaiseCH376();
+        int_controller_->SetCH376(true);
         break;
       case GET_FILE_SIZE:
         Push32(current_file_.statbuf.st_size, &out_data_);
@@ -244,7 +244,7 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
           } else {
             int_status_ = USB_INT_DISK_READ;
           }
-          int_controller_->RaiseCH376();
+          int_controller_->SetCH376(true);
         }
         break;
       case BYTE_LOCATE:
@@ -258,7 +258,7 @@ void CH376SD::StoreByte(uint32_t addr, uint8_t v) {
           }
           fseek(current_file_.f, seek_val, SEEK_SET);
           int_status_ = USB_INT_SUCCESS;
-          int_controller_->RaiseCH376();
+          int_controller_->SetCH376(true);
         }
     }
   }

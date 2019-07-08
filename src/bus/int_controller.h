@@ -9,19 +9,20 @@ class InterruptController {
  public:
   explicit InterruptController(System* sys);
 
-  // Raise various specific interrupts.
-  void RaiseFrameStart();
+  // Manage various specific interrupts.
+  void SetFrameStart(bool level);
   void SetKeyboard(bool level);
   void SetMouse(bool level);
-  void RaiseVDMATransferComplete();
-  void RaiseCH376();
-  void LowerCH376();
+  void SetCH376(bool level);
+  void SetVDMATransfer(bool level);
 
   // SystemBusDevice implementation.
   void StoreByte(uint32_t addr, uint8_t v);
   uint8_t ReadByte(uint32_t addr);
 
  private:
+  bool AnyPending() const;
+
   union InterruptSet1 {
     struct {
       bool vicky0 : 1;  // Start of frame
@@ -96,3 +97,4 @@ class InterruptController {
   InterruptSet2 mask_reg1_;
   InterruptSet3 mask_reg2_;
 };
+

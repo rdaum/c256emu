@@ -32,7 +32,7 @@ private:
   std::function<void(int)> update_irq_;
 
 protected:
-  PS2Queue queue;
+  PS2Queue queue_;
 };
 
 class PS2KbdState : public PS2State {
@@ -43,8 +43,6 @@ public:
   void ps2_keyboard_event(int key, int scancode, int action, int mods);
 
   bool ps2_keyboard_need_high_bit_needed();
-  int ps2_kbd_post_load(int version_id);
-  int ps2_kbd_ledstate_post_load(int version_id);
   bool ps2_keyboard_ledstate_needed(void *opaque);
   void ps2_kbd_reset();
   void ps2_put_keycode(int keycode);
@@ -55,18 +53,17 @@ public:
   void ps2_keyboard_set_translation(int mode);
 
 private:
-  int scan_enabled;
-  int translate;
-  int scancode_set; /* 1=XT, 2=AT, 3=PS/2 */
-  int ledstate;
-  bool need_high_bit;
-  unsigned int modifiers; /* bitmask of MOD_* constants above */
+  bool scan_enabled_;
+  int translate_;
+  int scancode_set_; /* 1=XT, 2=AT, 3=PS/2 */
+  int ledstate_;
+  bool need_high_bit_ = false;
+  unsigned int modifiers_; /* bitmask of MOD_* constants above */
 };
 
 struct PS2MouseState : public PS2State {
 public:
-  explicit PS2MouseState(std::function<void(int)> update_irq)
-      : PS2State(update_irq) {}
+  explicit PS2MouseState(std::function<void(int)> update_irq);
   virtual ~PS2MouseState();
 
   void ps2_mouse_move(double x, double y);
@@ -81,14 +78,14 @@ public:
 private:
   void ps2_mouse_sync();
 
-  uint8_t mouse_status;
-  uint8_t mouse_resolution;
-  uint8_t mouse_sample_rate;
-  uint8_t mouse_wrap;
-  uint8_t mouse_type; /* 0 = PS2, 3 = IMPS/2, 4 = IMEX */
-  uint8_t mouse_detect_state;
-  int mouse_dx; /* current values, needed for 'poll' mode */
-  int mouse_dy;
-  int mouse_dz;
-  uint8_t mouse_buttons;
+  uint8_t mouse_status_;
+  uint8_t mouse_resolution_;
+  uint8_t mouse_sample_rate_;
+  uint8_t mouse_wrap_;
+  uint8_t mouse_type_; /* 0 = PS2, 3 = IMPS/2, 4 = IMEX */
+  uint8_t mouse_detect_state_;
+  int mouse_dx_; /* current values, needed for 'poll' mode */
+  int mouse_dy_;
+  int mouse_dz_;
+  uint8_t mouse_buttons_;
 };

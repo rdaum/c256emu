@@ -80,6 +80,14 @@ class System {
   bool direct_page_watch_enabled() const;
   std::vector<uint8_t> direct_page_watch();
 
+  void DrawNextLine();
+  void ScheduleNextScanline();
+  void KeyEvent(int key, int scancode, int action,
+                int mods);
+  void MouseMoveEvent(double xpos, double ypos);
+  void MouseScrollEvent(double xoffset, double yoffset);
+  void MouseButtonEvent(int button, int action,
+                        int mods);
 protected:
   friend class InterruptController;
 
@@ -87,8 +95,7 @@ protected:
   void ClearIRQ();
 
  private:
-  void DrawNextLine();
-  void ScheduleNextScanline();
+
 
   std::atomic_bool turbo_;
 

@@ -86,7 +86,7 @@ void VDMA::OnFrameStart() {
     // TODO linear ("1d") transfer
   }
   if (ctrl_reg_.reg.int_enable) {
-    int_controller_->RaiseVDMATransferComplete();
+    int_controller_->SetVDMATransfer(true);
   }
 }
 
