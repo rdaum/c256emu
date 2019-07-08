@@ -69,7 +69,10 @@ start:
 	phx
 	phy
 	phd
-		
+
+  ;; test
+  Add32 $111234, $111234, $111234
+
 	;; set zero page to where the linker tells us it should be
 	lda #__ZEROPAGE_LOAD__
 	tcd
@@ -264,7 +267,7 @@ start_loop:
 start_header_option:
 	PrgNext8To otype      ; get type from program stream
 	acc8i16
-	dec olen              
+	dec olen
 read_header_option:
 	acc8i16
 	dec olen              ; count down olen bytes and eat the option string
@@ -325,7 +328,7 @@ do_reloc:
 
 	stz reloc_start
 	stz reloc_start+2
-  
+
 	clc
 	lda offset
 	dec
@@ -354,7 +357,7 @@ reloc_word:
 	lda working_addr+2
 	adc cur_segment_base+2
 	sta working_addr+2
-	AdjustAddr  
+	AdjustAddr
 	stz working_addr+2
 	lda working_addr
 	sta [reloc_start]
@@ -367,7 +370,7 @@ reloc_seg:
 	and #$00ff              ; clear upper byte
 	sta working_addr+2      ; shift lower byte into the bank byte
 	jsr prg_next_word       ; stick parameter argments...
-	sta working_addr        ; into lower word 
+	sta working_addr        ; into lower word
 	AdjustAddr
 	acc8i16
 	lda working_addr+2      ; get just the bank
@@ -429,7 +432,7 @@ reloc_high:
 	lda working_addr
 	and #$ff00
 	xba
-	acc8i16	
+	acc8i16
 	sta [reloc_start]
 	acc16i16
 	bra done_do_reloc
@@ -478,7 +481,7 @@ accumulate_offset:
 	sta offset
 	bcs do_carry_accum_offset
 	bra get_type_and_segment
-do_carry_accum_offset:  
+do_carry_accum_offset:
 	inc offset+2
 get_type_and_segment:
 	jsr prg_next_byte
@@ -617,7 +620,7 @@ step_perform_bss_clear:
 	Add32 seg_base, tlen, new_segment_base
 	Add32 new_segment_base, dlen, R0
 	Add32 R0, blen, R1
-zero_loop:  
+zero_loop:
 	clc
 	lda R0
 	cmp R1

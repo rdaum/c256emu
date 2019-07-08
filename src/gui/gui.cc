@@ -485,6 +485,7 @@ void GUI::DrawCPUStatus() const {
     uint32_t program_address = cpu->program_address();
     ImGui::LabelText("PC", "%s (%d)", Addr(program_address).c_str(),
                      program_address);
+    ImGui::LabelText("Cycle #", "%lu", cpu->cpu_state.cycle);
 
     ImGui::Columns(3);
     DebugInterface *debug_interface = system_->GetDebugInterface();
