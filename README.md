@@ -27,7 +27,10 @@ GUI Debugger/Inspector that can:
   * Disassemble
   * Profile the CPU/FPS
   * Show status of CPU
+  * View the current stack and direct page
   * Alter some parameters of video rendering
+  * Raise interrupts
+  * Trace of previously run instructions
   
 Embedded Lua interpretter that can do the following:
 
@@ -35,11 +38,10 @@ Embedded Lua interpretter that can do the following:
   * Disassemble
   * Inspect CPU state
   * Read and modify memory
-  * Has bugs, needs love. (stepping and resume after suspend currently broken)
   
 #### Interrupt controller
 
-  * Seems to service most of the known interrupts correctly, but undoubtably complete.
+  * Seems to service most of the known interrupts correctly, but undoubtably incomplete.
   
 #### Vicky VDP
 
@@ -47,8 +49,9 @@ Embedded Lua interpretter that can do the following:
   * Character generator w/ cursor blink.
   * Border
   * Sprites
-  * Tile sets are currently buggy/incorrect.
+  * Tile sets / maps
   * Mouse cursor support (untested)
+  * VDMA (blitter) support.
 
 #### CH376 SD card controller functionality:
 
@@ -58,21 +61,26 @@ Embedded Lua interpretter that can do the following:
 
 #### Keyboard support:
 
-  * Keyboard input with scancode conversion (probably incomplete)
-  * No mouse support
+  * Fork of QEMU's PS2 mouse & keyboard emulation. Should be pretty
+    complete.
 
+#### Real time clock
+
+  * Support for reading date/time from the system clock. No support
+    (yet) for alarms or setting clock.
+  
 #### Math coprocessor
 
   * Seems right.
 
 ### Missing / broken emulation / features
 
-  * DMA
+  * SDMA
   * MIDI
   * Serial
-  * Sound (basic framework for OPL2 emulation there but not hooked up to audio mixing)
+  * Sound (basic framework for OPL2 emulation there but not hooked up to any audio mixing)
   * More complete SD card support
-  * Fully working debugger
+  * IDE, Floppy disk support
 
 ## Building
 
@@ -89,8 +97,8 @@ Then kick off cmake as usual:
   make
   ```
 
-The build will clone and install its own copy of the Google test framework,
-the liblinenoise-ng library, and the 'jm' circular_buffer library.
+The build will clone and install its own copy of the Google test
+framework, Google flags, Google logging, GLFW, Lua, and Dear ImGui. 
 
 ## Using
 
@@ -112,6 +120,7 @@ Below are the set of arguments the program accepts:
   * `-script` (Lua script to run on start (automation only)) type: string
      default: ""
   * `-turbo` (turn off frame rate / CPU throttling, go as fast as possible)
+  * `-gui` (turn the GUI debug on or off. defaults to on) 
 
 To run the emulator you will need to at minimum provide either a `-kernel_bin` argument or `kernel_hex` argument. Both
 arguments are for loading a bootable kernel into the emulated C256's
@@ -182,6 +191,10 @@ c256emu.load_bin(<file>, <addr>)
 -- the hex file. 
 c256emu.load_hex(<file>)
 
+-- Load an O65 relocatable binary. The load address is used to relocate
+-- the binary to be runnable at that address.
+c256emu.load_o65(<file>, <addr>)
+
 -- Jump the program counter to <addr>
 c256emu.sys(<addr>)
 
@@ -207,7 +220,6 @@ The `-script` argument can be used to read any Lua program, to set up functions,
 
 ### What missing from the debugger right now:
 
-  * Raise / clear interrupts
   * Breakpoints on interrupts
   * Assembler
   * Conditional breakpoints

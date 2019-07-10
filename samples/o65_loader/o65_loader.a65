@@ -70,9 +70,6 @@ start:
 	phy
 	phd
 
-  ;; test
-  Add32 $111234, $111234, $111234
-
 	;; set zero page to where the linker tells us it should be
 	lda #__ZEROPAGE_LOAD__
 	tcd
