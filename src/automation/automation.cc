@@ -1,4 +1,4 @@
-#include "automation.h"
+#include "automation/automation.h"
 
 #include <algorithm>
 
@@ -445,8 +445,9 @@ int Automation::LuaDisasm(lua_State* L) {
   WDC65C816* cpu = sys->cpu();
   auto disassembler = cpu->GetDisassembler();
   cpuaddr_t addr;
-  if (lua_isnumber(L, -1)) {
-    addr = (cpuaddr_t)lua_tointeger(L, -1);
+  int8_t num_args = lua_gettop(L);
+  if (lua_isnumber(L, num_args == 2 ? -2 : -1)) {
+    addr = (cpuaddr_t)lua_tointeger(L, num_args == 2 ? -2 : -1);
   } else if (!automation->debug_interface_->paused()) {
     return luaL_error(
         L, "c256emu: cannot disassemble current address while not paused");
@@ -454,8 +455,8 @@ int Automation::LuaDisasm(lua_State* L) {
     addr = cpu->GetCpuState()->GetCanonicalAddress();
   }
   Disassembler::Config config;
-  if (lua_isnumber(L, 2))
-    config.max_instruction_count = (uint32_t)lua_tointeger(L, -2);
+  if (num_args > 1 && lua_isnumber(L, -1))
+    config.max_instruction_count = (uint32_t)lua_tointeger(L, -1);
 
   auto list = disassembler->Disassemble(config, addr);
   lua_newtable(L);
