@@ -23,17 +23,20 @@ int main(int argc, char* argv[]) {
 
   System system;
 
+  bool kernel_loaded = false;
   if (!FLAGS_kernel_hex.empty())
-    system.loader()->LoadFromHex(FLAGS_kernel_hex);
+    kernel_loaded = system.loader()->LoadFromHex(FLAGS_kernel_hex);
   else if (!FLAGS_kernel_bin.empty())
-    system.loader()->LoadFromBin(FLAGS_kernel_bin, 0x180000);
-  else
-    LOG(FATAL) << "No kernel";
+    kernel_loaded = system.loader()->LoadFromBin(FLAGS_kernel_bin, 0x180000);
+  
+  if (!kernel_loaded) {
+	LOG(ERROR) << "No kernel; pass a valid kernel file with -kernel_hex or -kernel_bin";
+	return -1;
+  }
 
-  if (!FLAGS_program_hex.empty()) {
-    if (!system.loader()->LoadFromHex(FLAGS_program_hex)) {
-      LOG(FATAL) << "Invalid kernel hex file: "<< FLAGS_program_hex;
-    }
+  if (!FLAGS_program_hex.empty() && !system.loader()->LoadFromHex(FLAGS_program_hex)) {
+	LOG(ERROR) << "Invalid kernel hex file: "<< FLAGS_program_hex;
+	return -1;
   }
   
   Automation* automation = system.automation();

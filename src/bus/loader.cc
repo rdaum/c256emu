@@ -196,7 +196,7 @@ bool Loader::LoadFromHex(const std::string &filename) {
   if (path.extension().string() == ".hex") {
     return LoadFromIHex(filename, system_bus_);
   } else if (path.extension().string() == ".s28") {
-    LoadFromS28(filename, system_bus_);
+    return LoadFromS28(filename, system_bus_);
   } else {
     LOG(ERROR) << "Unknown file format: " << path.extension();
     return false;
