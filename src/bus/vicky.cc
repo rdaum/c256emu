@@ -9,7 +9,7 @@
 #include "system.h"
 #include "vicky.h"
 
-#include <GL/glext.h>
+#include <GL/GL.h>
 
 namespace {
 
@@ -132,11 +132,10 @@ GLFWwindow *Vicky::Start() {
   CHECK_GL;
 
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, kVickyBitmapWidth, kVickyBitmapHeight,
-               0, GL_BGRA, GL_UNSIGNED_BYTE, frame_buffer_);
+               0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, frame_buffer_);
   CHECK_GL;
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, GL_CLAMP);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
   CHECK_GL;
@@ -491,7 +490,7 @@ void Vicky::RenderLine() {
 
     glEnable(GL_TEXTURE_2D);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kVickyBitmapWidth,
-                    kVickyBitmapHeight, GL_BGRA, GL_UNSIGNED_BYTE,
+                    kVickyBitmapHeight, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
                     frame_buffer_);
     CHECK_GL;
 

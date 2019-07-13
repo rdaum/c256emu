@@ -11,6 +11,8 @@ project(c256emu)
 
 set(CMAKE_CXX_STANDARD 17)
 
+find_package(OpenGL REQUIRED)
+
 hunter_add_package(gflags)
 find_package(gflags CONFIG REQUIRED)
 

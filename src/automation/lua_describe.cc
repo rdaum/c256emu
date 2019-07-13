@@ -24,8 +24,11 @@
 #include "automation/lua_describe.h"
 
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
+#include <string>
 
 /*
  * All this code borrowed / forked from https://github.com/dpapavas/luaprompt
@@ -54,9 +57,9 @@ int printed_width(const std::string &s) {
   }
   return n;
 }
-}
+} // namespace
 
-void LuaDescribe::dump_literal(const std::string& s) {
+void LuaDescribe::dump_literal(const std::string &s) {
   dump_ << s;
   column_ += printed_width(s);
 }
@@ -66,7 +69,7 @@ void LuaDescribe::dump_character(const char c) {
   column_ += 1;
 }
 
-static int is_identifier(const char* s, int n) {
+static int is_identifier(const char *s, int n) {
   int i;
 
   /* Check whether a string can be used as a key without quotes and
@@ -97,7 +100,7 @@ void LuaDescribe::break_line() {
   column_ = indent_;
 }
 
-void LuaDescribe::dump_string(const std::string& s) {
+void LuaDescribe::dump_string(const std::string &s) {
   int l;
 
   /* Break the line if the current chunk doesn't fit but it would
@@ -115,8 +118,8 @@ void LuaDescribe::dump_string(const std::string& s) {
   column_ += l;
 }
 
-void LuaDescribe::describe(lua_State* L, int index) {
-  char* s;
+void LuaDescribe::describe(lua_State *L, int index) {
+  char *s;
   size_t n;
   int type;
 
@@ -126,7 +129,7 @@ void LuaDescribe::describe(lua_State* L, int index) {
   if (luaL_getmetafield(L, index, "__tostring")) {
     lua_pushvalue(L, index);
     lua_pcall(L, 1, 1, 0);
-    s = (char*)lua_tolstring(L, -1, &n);
+    s = (char *)lua_tolstring(L, -1, &n);
     lua_pop(L, 1);
 
     dump_string(s);
@@ -134,14 +137,14 @@ void LuaDescribe::describe(lua_State* L, int index) {
     /* Copy the value to avoid mutating it. */
 
     lua_pushvalue(L, index);
-    s = (char*)lua_tolstring(L, -1, &n);
+    s = (char *)lua_tolstring(L, -1, &n);
     lua_pop(L, 1);
 
     dump_string(s);
   } else if (type == LUA_TSTRING) {
     int i, started, score, level, uselevel = 0;
 
-    s = (char*)lua_tolstring(L, index, &n);
+    s = (char *)lua_tolstring(L, index, &n);
 
     /* Scan the string to decide how to print it. */
 
@@ -224,10 +227,10 @@ void LuaDescribe::describe(lua_State* L, int index) {
         } else if (isprint(s[i])) {
           dump_character(s[i]);
         } else {
-          char* t = new char[5];
+          char *t = new char[5];
           size_t n;
 
-          asprintf(&t, "\\%03u", ((unsigned char*)s)[i]);
+          sprintf(t, "\\%03u", ((unsigned char *)s)[i]);
           dump_string(t);
         }
       }
@@ -235,36 +238,32 @@ void LuaDescribe::describe(lua_State* L, int index) {
       dump_literal("\"");
     }
   } else if (type == LUA_TNIL) {
-    asprintf(&s, "nil");
-    dump_string(s);
-    free(s);
+    dump_string("nil");
   } else if (type == LUA_TBOOLEAN) {
-    asprintf(&s, "%s", lua_toboolean(L, index) ? "true" : "false");
+    s = lua_toboolean(L, index) ? "true" : "false";
     dump_string(s);
-    free(s);
   } else if (type == LUA_TFUNCTION) {
-    asprintf(&s, "<function:%p>", lua_topointer(L, index));
-    dump_string(s);
-    free(s);
+    std::stringstream ss;
+    ss << "<function:" << std::hex << lua_topointer(L, index) << ">";
+    dump_string(ss.str());
   } else if (type == LUA_TUSERDATA) {
-    asprintf(&s, "<userdata:%p>", lua_topointer(L, index));
-
-    dump_string(s);
-    free(s);
+    std::stringstream ss;
+    ss << "<userdata:" << std::hex << lua_topointer(L, index) << ">";
+    dump_string(ss.str());
   } else if (type == LUA_TTHREAD) {
-    asprintf(&s, "<thread:%p>", lua_topointer(L, index));
-    dump_string(s);
-    free(s);
+    std::stringstream ss;
+    ss << "<thread:" << std::hex << lua_topointer(L, index) << ">";
+    dump_string(ss.str());
   } else if (type == LUA_TTABLE) {
+    std::stringstream ss;
     int i, l, n, oldindent, multiline, nobreak;
 
     /* Check if table is too deeply nested. */
 
     if (indent_ > 8 * line_width_ / 10) {
-      char* s;
-      asprintf(&s, "{ ... }");
-      dump_string(s);
-      free(s);
+      std::stringstream ss;
+      ss << "{ ... }";
+      dump_string(ss.str());
 
       return;
     }
@@ -278,12 +277,10 @@ void LuaDescribe::describe(lua_State* L, int index) {
     for (i = 0; i < n; i += 1) {
       lua_rawgeti(L, -1, n - i);
       if (lua_compare(L, -1, -3, LUA_OPEQ)) {
-        char* s;
         size_t n;
 
-        asprintf(&s, "{ [%d]... }", -(i + 1));
-        dump_string(s);
-        free(s);
+        ss << "{ [" << -(i + 1) << "]... }";
+        dump_string(ss.str());
         lua_pop(L, 2);
 
         return;
@@ -357,10 +354,10 @@ void LuaDescribe::describe(lua_State* L, int index) {
         /* Dump the key and value. */
 
         if (lua_type(L, -2) == LUA_TSTRING) {
-          char* s;
+          char *s;
           size_t n;
 
-          s = (char*)lua_tolstring(L, -2, &n);
+          s = (char *)lua_tolstring(L, -2, &n);
 
           if (is_identifier(s, n)) {
             dump_string(s);
@@ -403,7 +400,7 @@ void LuaDescribe::describe(lua_State* L, int index) {
   }
 }
 
-std::string LuaDescribe::luap_describe(lua_State* L, int index) {
+std::string LuaDescribe::luap_describe(lua_State *L, int index) {
   index = absolute(L, index);
   indent_ = 0;
   column_ = 0;
