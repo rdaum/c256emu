@@ -9,7 +9,7 @@
 #include "system.h"
 #include "vicky.h"
 
-#include <GL/GL.h>
+#include <GL/gl.h>
 
 namespace {
 

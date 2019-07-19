@@ -119,7 +119,7 @@ void LuaDescribe::dump_string(const std::string &s) {
 }
 
 void LuaDescribe::describe(lua_State *L, int index) {
-  char *s;
+  const char *s;
   size_t n;
   int type;
 
