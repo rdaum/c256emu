@@ -517,11 +517,11 @@ void GUI::DrawCPUStatus() const {
     ImGui::NextColumn();
 
     ImGui::Separator();
-    ImGui::LabelText("A", "$%04x (%d)", cpu->a(), cpu->a());
+    ImGui::LabelText("A", "0x%04x (%d)", cpu->a(), cpu->a());
     ImGui::NextColumn();
-    ImGui::LabelText("X", "$%04x (%d)", cpu->x(), cpu->x());
+    ImGui::LabelText("X", "0x%04x (%d)", cpu->x(), cpu->x());
     ImGui::NextColumn();
-    ImGui::LabelText("Y", "$%04x (%d)", cpu->y(), cpu->y());
+    ImGui::LabelText("Y", "0x%04x (%d)", cpu->y(), cpu->y());
     ImGui::NextColumn();
 
     ImGui::LabelText("C", "%d", cpu->cpu_state.carry);
@@ -539,14 +539,14 @@ void GUI::DrawCPUStatus() const {
     ImGui::NextColumn();
 
 
-    ImGui::LabelText("DBR", "$%02x (%d)",
+    ImGui::LabelText("DBR", "0x%02x (%d)",
                      cpu->cpu_state.code_segment_base >> 16,
                      cpu->cpu_state.code_segment_base >> 16);
     ImGui::NextColumn();
-    ImGui::LabelText("SP", "$%04x (%d)", cpu->cpu_state.regs.sp.u16,
+    ImGui::LabelText("SP", "0x%04x (%d)", cpu->cpu_state.regs.sp.u16,
                      cpu->cpu_state.regs.sp.u16);
     ImGui::NextColumn();
-    ImGui::LabelText("D", "$%04x (%d)", cpu->cpu_state.regs.d.u16,
+    ImGui::LabelText("D", "0x%04x (%d)", cpu->cpu_state.regs.d.u16,
                      cpu->cpu_state.regs.d.u16);
     ImGui::NextColumn();
     ImGui::Separator();
