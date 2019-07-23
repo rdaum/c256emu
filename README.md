@@ -88,8 +88,6 @@ To build, you will need a C++17 compliant compiler (a recent clang or GCC should
 
 CMake should download and compile the third party dependencies it needs.
 
-This may or may not succeed on Windows. Working on that.
-
 Then kick off cmake as usual:
 
   ```shell
@@ -99,6 +97,9 @@ Then kick off cmake as usual:
 
 The build will clone and install its own copy of the Google test
 framework, Google flags, Google logging, GLFW, Lua, and Dear ImGui. 
+
+This build does work on Windows & Visual Studio, but with some shenanigans. 
+I am providing snapshotted Windows binaries, periodically.
 
 ## Using
 
