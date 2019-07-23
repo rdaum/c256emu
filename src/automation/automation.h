@@ -13,6 +13,7 @@
 #include "cpu/65816/cpu_65c816.h"
 #include "debug_interface.h"
 
+class LuaReplContext;
 class System;
 
 // Will be used for debugging / automation.
@@ -60,8 +61,6 @@ class Automation {
   static int LuaSys(lua_State* L);
   static int LuaDisasm(lua_State* L);
 
-  std::string ExecuteLua(int* status);
-
   static const ::luaL_Reg c256emu_methods[];
 
   std::recursive_mutex lua_mutex_;
@@ -72,10 +71,7 @@ class Automation {
 
   ::lua_State* lua_state_;
 
+  std::unique_ptr<LuaReplContext> repl_context_;
+
   std::vector<Breakpoint> breakpoints_;
-
-  LuaDescribe describe_;
-  std::string buffer_;
-
-  bool incomplete_ = false;
 };

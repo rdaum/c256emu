@@ -38,8 +38,8 @@
 
 namespace {
 
-int printed_width(const std::string &s) {
-  int n;
+int PrintedWidth(const std::string &s) {
+  int n = 0;
   bool discard = 0;
 
   /* Calculate the printed width of the chunk s ignoring escape
@@ -57,34 +57,54 @@ int printed_width(const std::string &s) {
   }
   return n;
 }
-} // namespace
 
-void LuaDescribe::dump_literal(const std::string &s) {
-  dump_ << s;
-  column_ += printed_width(s);
+
+bool IsIdentifier(const std::string &s, int n) {
+  /* Check whether a string can be used as a key without quotes and
+   * braces. */
+  for (int i = 0; i < n; i += 1) {
+    if (!isalpha(s[i]) && (i == 0 || !isalnum(s[i])) && s[i] != '_') {
+      return false;
+    }
+  }
+
+  return true;
 }
 
-void LuaDescribe::dump_character(const char c) {
+} // namespace
+
+LuaDescribe::LuaDescribe(int line_width) : line_width_(line_width) {}
+
+std::string LuaDescribe::Describe(lua_State *L, int index) {
+  index = absolute(L, index);
+  indent_ = 0;
+  column_ = 0;
+  dump_ = std::stringstream();
+
+  /* Create a table to hold the ancestors for checking for cycles
+   * when printing table hierarchies. */
+
+  lua_newtable(L);
+  ancestors_ = luaL_ref(L, LUA_REGISTRYINDEX);
+
+  DoDescribe(L, index);
+
+  luaL_unref(L, LUA_REGISTRYINDEX, ancestors_);
+
+  return dump_.str();
+}
+
+void LuaDescribe::DumpLiteral(const std::string &s) {
+  dump_ << s;
+  column_ += PrintedWidth(s);
+}
+
+void LuaDescribe::DumpCharacter(const char c) {
   dump_ << c;
   column_ += 1;
 }
 
-static int is_identifier(const char *s, int n) {
-  int i;
-
-  /* Check whether a string can be used as a key without quotes and
-   * braces. */
-
-  for (i = 0; i < n; i += 1) {
-    if (!isalpha(s[i]) && (i == 0 || !isalnum(s[i])) && s[i] != '_') {
-      return 0;
-    }
-  }
-
-  return 1;
-}
-
-void LuaDescribe::break_line() {
+void LuaDescribe::BreakLine() {
   int i;
 
   /* Add a line break. */
@@ -100,16 +120,16 @@ void LuaDescribe::break_line() {
   column_ = indent_;
 }
 
-void LuaDescribe::dump_string(const std::string &s) {
+void LuaDescribe::DumpString(const std::string &s) {
   int l;
 
   /* Break the line if the current chunk doesn't fit but it would
    * fit if we started on a fresh line at the current indent. */
 
-  l = printed_width(s);
+  l = PrintedWidth(s);
 
   if (column_ + l > line_width_ && indent_ + l <= line_width_) {
-    break_line();
+    BreakLine();
   }
 
   /* Copy the string to the buffer. */
@@ -118,7 +138,7 @@ void LuaDescribe::dump_string(const std::string &s) {
   column_ += l;
 }
 
-void LuaDescribe::describe(lua_State *L, int index) {
+void LuaDescribe::DoDescribe(lua_State *L, int index) {
   const char *s;
   size_t n;
   int type;
@@ -132,7 +152,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
     s = (char *)lua_tolstring(L, -1, &n);
     lua_pop(L, 1);
 
-    dump_string(s);
+    DumpString(s);
   } else if (type == LUA_TNUMBER) {
     /* Copy the value to avoid mutating it. */
 
@@ -140,7 +160,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
     s = (char *)lua_tolstring(L, -1, &n);
     lua_pop(L, 1);
 
-    dump_string(s);
+    DumpString(s);
   } else if (type == LUA_TSTRING) {
     int i, started, score, level, uselevel = 0;
 
@@ -187,73 +207,73 @@ void LuaDescribe::describe(lua_State *L, int index) {
     if (score > line_width_) {
       /* Dump the string as a long string. */
 
-      dump_character('[');
+      DumpCharacter('[');
       for (i = 0; i < uselevel; i += 1) {
-        dump_character('=');
+        DumpCharacter('=');
       }
-      dump_literal("[\n");
+      DumpLiteral("[\n");
 
-      dump_string(s);
+      DumpString(s);
 
-      dump_character(']');
+      DumpCharacter(']');
       for (i = 0; i < uselevel; i += 1) {
-        dump_character('=');
+        DumpCharacter('=');
       }
-      dump_literal("]");
+      DumpLiteral("]");
     } else {
       /* Escape the string as needed and print it as a normal
        * string. */
 
-      dump_literal("\"");
+      DumpLiteral("\"");
 
       for (i = 0; i < (int)n; i += 1) {
         if (s[i] == '"' || s[i] == '\\') {
-          dump_literal("\\");
-          dump_character(s[i]);
+          DumpLiteral("\\");
+          DumpCharacter(s[i]);
         } else if (s[i] == '\a') {
-          dump_literal("\\a");
+          DumpLiteral("\\a");
         } else if (s[i] == '\b') {
-          dump_literal("\\b");
+          DumpLiteral("\\b");
         } else if (s[i] == '\f') {
-          dump_literal("\\f");
+          DumpLiteral("\\f");
         } else if (s[i] == '\n') {
-          dump_literal("\\n");
+          DumpLiteral("\\n");
         } else if (s[i] == '\r') {
-          dump_literal("\\r");
+          DumpLiteral("\\r");
         } else if (s[i] == '\t') {
-          dump_literal("\\t");
+          DumpLiteral("\\t");
         } else if (s[i] == '\v') {
-          dump_literal("\\v");
+          DumpLiteral("\\v");
         } else if (isprint(s[i])) {
-          dump_character(s[i]);
+          DumpCharacter(s[i]);
         } else {
           char *t = new char[5];
           size_t n;
 
           sprintf(t, "\\%03u", ((unsigned char *)s)[i]);
-          dump_string(t);
+          DumpString(t);
         }
       }
 
-      dump_literal("\"");
+      DumpLiteral("\"");
     }
   } else if (type == LUA_TNIL) {
-    dump_string("nil");
+    DumpString("nil");
   } else if (type == LUA_TBOOLEAN) {
     s = lua_toboolean(L, index) ? "true" : "false";
-    dump_string(s);
+    DumpString(s);
   } else if (type == LUA_TFUNCTION) {
     std::stringstream ss;
     ss << "<function:" << std::hex << lua_topointer(L, index) << ">";
-    dump_string(ss.str());
+    DumpString(ss.str());
   } else if (type == LUA_TUSERDATA) {
     std::stringstream ss;
     ss << "<userdata:" << std::hex << lua_topointer(L, index) << ">";
-    dump_string(ss.str());
+    DumpString(ss.str());
   } else if (type == LUA_TTHREAD) {
     std::stringstream ss;
     ss << "<thread:" << std::hex << lua_topointer(L, index) << ">";
-    dump_string(ss.str());
+    DumpString(ss.str());
   } else if (type == LUA_TTABLE) {
     std::stringstream ss;
     int i, l, n, oldindent, multiline, nobreak;
@@ -263,7 +283,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
     if (indent_ > 8 * line_width_ / 10) {
       std::stringstream ss;
       ss << "{ ... }";
-      dump_string(ss.str());
+      DumpString(ss.str());
 
       return;
     }
@@ -280,7 +300,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
         size_t n;
 
         ss << "{ [" << -(i + 1) << "]... }";
-        dump_string(ss.str());
+        DumpString(ss.str());
         lua_pop(L, 2);
 
         return;
@@ -299,7 +319,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
     /* Open the table and update the indentation level to the
      * current column. */
 
-    dump_literal("{ ");
+    DumpLiteral("{ ");
     oldindent = indent_;
     indent_ = column_;
     multiline = 0;
@@ -318,7 +338,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
 
       if (lua_istable(L, -1)) {
         if (!nobreak) {
-          break_line();
+          BreakLine();
         }
 
         multiline = 1;
@@ -328,11 +348,11 @@ void LuaDescribe::describe(lua_State *L, int index) {
 
       /* Dump the value and separating comma. */
 
-      describe(L, -1);
-      dump_literal(", ");
+      DoDescribe(L, -1);
+      DumpLiteral(", ");
 
       if (lua_istable(L, -1) && i != l - 1) {
-        break_line();
+        BreakLine();
         nobreak = 1;
       }
 
@@ -348,7 +368,7 @@ void LuaDescribe::describe(lua_State *L, int index) {
           lua_tointeger(L, -2) < 1 || lua_tointeger(L, -2) > l) {
         /* Keep each key-value pair on a separate line. */
 
-        break_line();
+        BreakLine();
         multiline = 1;
 
         /* Dump the key and value. */
@@ -359,22 +379,22 @@ void LuaDescribe::describe(lua_State *L, int index) {
 
           s = (char *)lua_tolstring(L, -2, &n);
 
-          if (is_identifier(s, n)) {
-            dump_string(s);
+          if (IsIdentifier(s, n)) {
+            DumpString(s);
           } else {
-            dump_literal("[");
-            describe(L, -2);
-            dump_literal("]");
+            DumpLiteral("[");
+            DoDescribe(L, -2);
+            DumpLiteral("]");
           }
         } else {
-          dump_literal("[");
-          describe(L, -2);
-          dump_literal("]");
+          DumpLiteral("[");
+          DoDescribe(L, -2);
+          DumpLiteral("]");
         }
 
-        dump_literal(" = ");
-        describe(L, -1);
-        dump_literal(",");
+        DumpLiteral(" = ");
+        DoDescribe(L, -1);
+        DumpLiteral(",");
       }
 
       lua_pop(L, 1);
@@ -392,29 +412,10 @@ void LuaDescribe::describe(lua_State *L, int index) {
     indent_ = oldindent;
 
     if (multiline) {
-      break_line();
-      dump_literal("}");
+      BreakLine();
+      DumpLiteral("}");
     } else {
-      dump_literal(" }");
+      DumpLiteral(" }");
     }
   }
-}
-
-std::string LuaDescribe::luap_describe(lua_State *L, int index) {
-  index = absolute(L, index);
-  indent_ = 0;
-  column_ = 0;
-  dump_ = std::stringstream();
-
-  /* Create a table to hold the ancestors for checking for cycles
-   * when printing table hierarchies. */
-
-  lua_newtable(L);
-  ancestors_ = luaL_ref(L, LUA_REGISTRYINDEX);
-
-  describe(L, index);
-
-  luaL_unref(L, LUA_REGISTRYINDEX, ancestors_);
-
-  return dump_.str();
 }

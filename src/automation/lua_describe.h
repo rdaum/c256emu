@@ -4,18 +4,21 @@
 #include <sstream>
 
 class LuaDescribe {
- public:
-  explicit LuaDescribe(int line_width) : line_width_(line_width) {}
+public:
+  explicit LuaDescribe(int line_width);
 
-  std::string luap_describe(lua_State* L, int index);
+  std::string Describe(lua_State *L, int index);
 
- private:
-  void describe(lua_State* L, int index);
-  void break_line();
-  void dump_string(const std::string& s);
-  void dump_character(const char c);
-  void dump_literal(const std::string& s);
+private:
+  void DoDescribe(lua_State *L, int index);
+  void BreakLine();
+  void DumpString(const std::string &s);
+  void DumpCharacter(const char c);
+  void DumpLiteral(const std::string &s);
 
   std::stringstream dump_;
-  int indent_, column_, line_width_, ancestors_;
+  size_t indent_ = 0;
+  int column_ = 0;
+  int line_width_;
+  int ancestors_ = 0;
 };

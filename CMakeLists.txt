@@ -43,6 +43,7 @@ add_subdirectory(retro_cpu)
 set(BUS_SOURCES
     src/automation/automation.cc
     src/automation/lua_describe.cc
+    src/automation/lua_repl_context.cc
     src/bus/ch376_sd.cc
     src/bus/int_controller.cc
     src/bus/i8042_kbd_mouse.cc
@@ -58,6 +59,7 @@ set(BUS_SOURCES
 set(BUS_HEADERS
     src/automation/automation.h
     src/automation/lua_describe.h
+    src/automation/lua_repl_context.h
     src/bus/ch376_sd.h
     src/bus/int_controller.h
     src/bus/ps2_kbdmouse.h
