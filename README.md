@@ -119,7 +119,7 @@ Below are the set of arguments the program accepts:
      default: false
   * `-script` (Lua script to run on start (automation only)) type: string
      default: ""
-  * `-turbo` (turn off frame rate / CPU throttling, go as fast as possible)
+  * `-clock_rate` (adjust target clock rate.  defaults to 14.318mhz)
   * `-gui` (turn the GUI debug on or off. defaults to on) 
 
 To run the emulator you will need to at minimum provide either a `-kernel_bin` argument or `kernel_hex` argument. Both

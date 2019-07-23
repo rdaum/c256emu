@@ -21,12 +21,11 @@ constexpr auto kVickyFrameDelayDuration =
 constexpr auto kVickyFrameDelayDurationNs =
     std::chrono::duration_cast<std::chrono::nanoseconds>(
         kVickyFrameDelayDuration);
-constexpr uint64_t kTargetClockRate = 14318000;
 constexpr int kRasterLinesPerSecond =
     (kVickyBitmapHeight + kVickyVBlankLines) * kVickyTargetFps;
 
-DEFINE_bool(turbo, false, "Enable turbo mode; do not throttle to 60fps/14mhz");
 DEFINE_bool(gui, true, "Enable the GUI debugger / profiler");
+DEFINE_double(clock_rate, 14.318, "Target clock rate in Mhz");
 
 void key_cb_func(GLFWwindow *window, int key, int scancode, int action,
                  int mods) {
@@ -59,11 +58,13 @@ void window_close_callback(GLFWwindow *window) {
 } // namespace
 
 System::System()
-    : turbo_(FLAGS_turbo), system_bus_(std::make_unique<C256SystemBus>(this)),
+    : system_bus_(std::make_unique<C256SystemBus>(this)),
       loader_(system_bus_.get()),
       gui_(FLAGS_gui ? std::make_unique<GUI>(this) : nullptr),
       cpu_(system_bus_.get()), debug_(&cpu_, &events_, system_bus_.get(), true),
-      automation_(&cpu_, this, &debug_) {}
+      automation_(&cpu_, this, &debug_) {
+
+}
 
 System::~System() = default;
 
@@ -130,10 +131,8 @@ void System::DrawNextLine() {
       PerformWatches();
     }
 
-    if (!turbo_) {
-      auto sleep_time = next_frame_clock - frame_clock;
-      std::this_thread::sleep_for(sleep_time);
-    }
+    auto sleep_time = next_frame_clock - frame_clock;
+    std::this_thread::sleep_for(sleep_time);
 
     auto now = std::chrono::high_resolution_clock::now();
     if (current_frame_ % 60 == 0) {
@@ -161,7 +160,7 @@ void System::DrawNextLine() {
 
 void System::ScheduleNextScanline() {
   total_scanlines_++;
-  events_.ScheduleNoLock((kTargetClockRate * total_scanlines_) /
+  events_.ScheduleNoLock((FLAGS_clock_rate * 1000000 * total_scanlines_) /
                              kRasterLinesPerSecond,
                          std::bind(&System::DrawNextLine, this));
 }

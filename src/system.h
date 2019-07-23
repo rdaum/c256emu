@@ -53,9 +53,6 @@ class System {
 
   Loader* loader() { return &loader_; }
 
-  bool turbo() const { return turbo_; }
-  void set_turbo(bool turbo) { turbo_ = turbo; }
-
   void set_live_watches(bool live_watch) { live_watches_ = true; }
   bool live_watches() const { return live_watches_; }
 
@@ -96,8 +93,6 @@ protected:
 
  private:
 
-
-  std::atomic_bool turbo_;
 
   uint32_t current_frame_ = 0;
   uint64_t total_scanlines_ = 0;

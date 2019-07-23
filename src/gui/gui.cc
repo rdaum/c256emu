@@ -553,10 +553,6 @@ void GUI::DrawCPUStatus() const {
     ImGui::Columns(2);
     ImGui::Checkbox("Fast MVN/MVP", &cpu->fast_block_moves);
     ImGui::NextColumn();
-    bool turbo = system_->turbo();
-    if (ImGui::Checkbox("Turbo", &turbo)) {
-      system_->set_turbo(turbo);
-    }
 
     ImGui::Columns(1);
     ImGui::EndGroup();
