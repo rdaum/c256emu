@@ -1,5 +1,7 @@
 # c256emu
 
+NOTE: this project will not be maintained going forward, as I have cancelled my order for the C256. I make no guarantees that it will match the Rev C or later hardware behaviour. You're welcome to fork it and maintain it going forward.
+
 This is a work in progress emulator for the [C256 Foenix](https://c256foenix.com/) microcomputer.
 
 It is written in C++ and renders to a window via SDL2. It's relatively fast, 
