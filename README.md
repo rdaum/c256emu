@@ -1,11 +1,10 @@
 # c256emu
 
-NOTE: this project will not be maintained going forward, as I have cancelled my order for the C256. I make no guarantees that it will match the Rev C or later hardware behaviour. You're welcome to fork it and maintain it going forward.
+**NOTE: this project will not be maintained going forward, as I have cancelled my order for the C256. I make no guarantees that it will match the Rev C or later hardware behaviour. You're welcome to fork it and maintain it going forward.**
 
-This is a work in progress emulator for the [C256 Foenix](https://c256foenix.com/) microcomputer.
+This is/was a work in progress emulator for the [C256 Foenix](https://c256foenix.com/) microcomputer.
 
-It is written in C++ and renders to a window via SDL2. It's relatively fast, 
-and on my i5 workstation easily emulates the C256 at full 14mhz and full 60fps.
+It is written in C++ and renders to a window via OpenGL. It's relatively fast, and on my i5 workstation easily emulates the C256 at full 14mhz and full 60fps.
 
 There are definitely bugs and missing pieces. There are definitely
 going to be mismatches with the hardware as I do not have a board to compare against yet. When the Rev C boards are released, I will test and fix accordingly.
